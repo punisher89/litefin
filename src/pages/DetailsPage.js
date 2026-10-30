@@ -72,6 +72,7 @@ class DetailsPage extends Page {
 
         this._itemId = null;
         this._item = null;
+        this._enhancedInfoRequestId = 0;
         this._nextUp = null;
         this._seasons = null;
         this._episodes = null;
@@ -292,6 +293,7 @@ class DetailsPage extends Page {
 
                             <!-- Overview -->
                             <div id="watch-providers-container" class="hidden"></div>
+                            <div id="enhanced-details-info" class="details-enhanced-info"></div>
                             <div class="details-overview">
                                 <div class="overview-text ${getOverviewClampClass()}" tabindex="-1"></div>
                                 <button class="see-more-btn" tabindex="0" data-i18n="${shouldAlwaysShowOverviewButton() ? 'DetailedView' : 'ShowMore'}">${getOverviewButtonText()}</button>
@@ -866,6 +868,7 @@ class DetailsPage extends Page {
             // 5. Update layout classes and text info
             this._updateLayoutClasses();
             this._renderHeroText();
+            void this._loadEnhancedDetailsInfo();
             this._setupFavoriteButton();
             this._renderRichMetadata();
             void this._loadWatchProviders();
@@ -885,6 +888,214 @@ class DetailsPage extends Page {
         } catch (err) {
             log.error('Failed to refresh item data:', err.message || err);
         }
+    }
+
+
+    /**
+     * Adds Jellyfin Enhanced release dates and Wikidata awards to the item hero.
+     * The local plugin remains the sole data source; disabled or unavailable
+     * features simply leave this optional section empty.
+     * @private
+     */
+    async _loadEnhancedDetailsInfo() {
+        const container = this.$('#enhanced-details-info');
+        const item = this._item;
+        if (!container) return;
+
+        const requestId = (this._enhancedInfoRequestId || 0) + 1;
+        this._enhancedInfoRequestId = requestId;
+        container.innerHTML = '';
+        container.classList.remove('visible');
+
+        if (!item || !['Movie', 'Series', 'Season', 'Episode'].includes(item.Type)) return;
+
+        const itemId = item.Id;
+        const isCurrent = () =>
+            !this._isDestroyed &&
+            this._enhancedInfoRequestId === requestId &&
+            this._item?.Id === itemId &&
+            this.$('#enhanced-details-info') === container;
+
+        try {
+            const config = await api.get('/JellyfinEnhanced/public-config');
+            if (!isCurrent() || !config) return;
+
+            const showReleaseDates = config.ShowReleaseDates === true && config.TmdbEnabled === true;
+            const showAwards = config.ShowAwards === true;
+            if (!showReleaseDates && !showAwards) return;
+
+            let tmdbId = item.ProviderIds?.Tmdb || item.SeriesTmdbId || '';
+            if (!tmdbId && item.SeriesId) {
+                const cachedSeries = state.get(`details:series:${item.SeriesId}`);
+                tmdbId = cachedSeries?.ProviderIds?.Tmdb || '';
+                if (!tmdbId) {
+                    try {
+                        const series = await api.getItem(item.SeriesId, { Fields: 'ProviderIds' });
+                        tmdbId = series?.ProviderIds?.Tmdb || '';
+                    } catch (_) {
+                        // Missing parent metadata is not fatal to the details page.
+                    }
+                }
+            }
+            if (!isCurrent() || !tmdbId) return;
+
+            const mediaType = item.Type === 'Movie' ? 'movie' : 'tv';
+            const [releaseEntries, awardData] = await Promise.all([
+                showReleaseDates
+                    ? this._getEnhancedReleaseDates(item, tmdbId, config.DEFAULT_REGION || config.DefaultRegion || 'US').catch(() => [])
+                    : Promise.resolve([]),
+                showAwards
+                    ? api.get(`/JellyfinEnhanced/awards/${mediaType}/${encodeURIComponent(tmdbId)}`).catch(() => null)
+                    : Promise.resolve(null)
+            ]);
+            if (!isCurrent()) return;
+
+            const releaseHtml = (releaseEntries || []).map((entry) => `
+                <div class="details-enhanced-release details-enhanced-release-${entry.type}">
+                    <span class="details-enhanced-release-label">${escapeHtml(entry.label)}</span>
+                    <strong>${escapeHtml(entry.date)}</strong>
+                </div>
+            `).join('');
+
+            const awards = Array.isArray(awardData?.Awards) ? awardData.Awards : [];
+            const hasAwards = awardData?.Found === true && awards.length > 0;
+            let awardsHtml = '';
+
+            if (hasAwards) {
+                const wins = Number(awardData.Wins) || awards.filter((award) => award.Result === 'Won').length;
+                const nominations = Number(awardData.Nominations) || awards.filter((award) => award.Result === 'Nominated').length;
+                const awardRows = awards.map((award) => {
+                    const result = award.Result === 'Won'
+                        ? (i18n.t('EnhancedAwardWon') || 'Победа')
+                        : (i18n.t('EnhancedAwardNominated') || 'Номинация');
+                    const year = award.Year ? String(award.Year) : '';
+                    const recipients = Array.isArray(award.Recipients) && award.Recipients.length
+                        ? award.Recipients.join(', ')
+                        : '';
+                    const meta = [result, year, recipients].filter(Boolean).join(' · ');
+                    return `
+                        <li class="details-enhanced-award">
+                            <span class="details-enhanced-award-name">${escapeHtml(award.Name || '')}</span>
+                            <span class="details-enhanced-award-meta">${escapeHtml(meta)}</span>
+                        </li>
+                    `;
+                }).join('');
+
+                awardsHtml = `
+                    <section class="details-enhanced-awards">
+                        <button type="button" class="details-enhanced-awards-toggle" aria-expanded="false" aria-controls="details-enhanced-awards-list" tabindex="0">
+                            <span class="details-enhanced-awards-title">${escapeHtml(i18n.t('EnhancedAwards') || 'Награды')}</span>
+                            <span class="details-enhanced-awards-count">
+                                ${escapeHtml(i18n.t('EnhancedAwardWins') || 'Побед')}: ${wins}
+                                <span aria-hidden="true">·</span>
+                                ${escapeHtml(i18n.t('EnhancedAwardNominations') || 'Номинаций')}: ${nominations}
+                            </span>
+                            <span class="details-enhanced-awards-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <ul class="details-enhanced-awards-list" id="details-enhanced-awards-list" hidden>
+                            ${awardRows}
+                        </ul>
+                    </section>
+                `;
+            }
+
+            if (!releaseHtml && !awardsHtml) return;
+            container.innerHTML = `
+                ${releaseHtml ? `<div class="details-enhanced-release-list">${releaseHtml}</div>` : ''}
+                ${awardsHtml}
+            `;
+            container.classList.add('visible');
+
+            const toggle = container.querySelector('.details-enhanced-awards-toggle');
+            const list = container.querySelector('.details-enhanced-awards-list');
+            if (toggle && list) {
+                toggle.addEventListener('click', () => {
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                    list.hidden = expanded;
+                    toggle.classList.toggle('expanded', !expanded);
+                });
+            }
+        } catch (error) {
+            // Enhanced metadata is optional and must never block playback or details.
+            log.debug('Jellyfin Enhanced detail metadata unavailable:', error?.message || error);
+        }
+    }
+
+    /**
+     * Resolve release dates using the same TMDB release-type buckets as
+     * Jellyfin Enhanced's own details page.
+     * @private
+     */
+    async _getEnhancedReleaseDates(item, tmdbId, region) {
+        const formatDate = (value) => {
+            const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+            if (!match) return '';
+            const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+            if (
+                date.getFullYear() !== Number(match[1]) ||
+                date.getMonth() !== Number(match[2]) - 1 ||
+                date.getDate() !== Number(match[3])
+            ) return '';
+            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        };
+
+        const entry = (type, key, fallback, value) => {
+            const date = formatDate(value);
+            return date ? { type, label: i18n.t(key) || fallback, date } : null;
+        };
+
+        if (item.Type === 'Movie') {
+            const data = await api.get(`/JellyfinEnhanced/tmdb/movie/${encodeURIComponent(tmdbId)}/release_dates`);
+            const results = Array.isArray(data?.results) ? data.results : [];
+            const preferredRegion = String(region || 'US').toUpperCase();
+            const buckets = [
+                { type: 'cinema', key: 'EnhancedCinemaRelease', fallback: 'Кинотеатральный релиз', values: [1, 2, 3] },
+                { type: 'digital', key: 'EnhancedDigitalRelease', fallback: 'Цифровой релиз', values: [4] },
+                { type: 'physical', key: 'EnhancedPhysicalRelease', fallback: 'Физический носитель', values: [5] }
+            ];
+            return buckets.map((bucket) => {
+                const findIn = (countries) => {
+                    for (const country of countries) {
+                        const match = results.find((result) => result.iso_3166_1 === country);
+                        const dates = (match?.release_dates || [])
+                            .filter((release) => bucket.values.includes(release.type) && release.release_date)
+                            .sort((a, b) => String(a.release_date).localeCompare(String(b.release_date)));
+                        if (dates.length) return dates[0].release_date;
+                    }
+                    return '';
+                };
+                const first = findIn([preferredRegion, 'US'].filter((value, index, array) => value && array.indexOf(value) === index));
+                const fallbackDate = first || findIn(results.map((result) => result.iso_3166_1).filter(Boolean));
+                return entry(bucket.type, bucket.key, bucket.fallback, fallbackDate);
+            }).filter(Boolean);
+        }
+
+        if (item.Type === 'Episode' && item.PremiereDate) {
+            const premiere = entry('episode', 'EnhancedEpisodeRelease', 'Дата выхода эпизода', item.PremiereDate);
+            if (premiere) return [premiere];
+        }
+
+        if (item.Type === 'Series') {
+            const data = await api.get(`/JellyfinEnhanced/tmdb/tv/${encodeURIComponent(tmdbId)}`);
+            const date = data?.next_episode_to_air?.air_date || data?.last_episode_to_air?.air_date;
+            const result = entry('episode', 'EnhancedEpisodeRelease', 'Дата выхода эпизода', date);
+            return result ? [result] : [];
+        }
+
+        if (item.Type === 'Season') {
+            const data = await api.get(`/JellyfinEnhanced/tmdb/tv/${encodeURIComponent(tmdbId)}/season/${Number(item.IndexNumber) || 0}`);
+            const episodes = Array.isArray(data?.episodes) ? data.episodes.filter((episode) => episode.air_date) : [];
+            if (!episodes.length) return [];
+            const today = new Date();
+            const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const upcoming = episodes.find((episode) => episode.air_date >= todayIso);
+            const date = (upcoming || episodes[episodes.length - 1]).air_date;
+            const result = entry('episode', 'EnhancedEpisodeRelease', 'Дата выхода эпизода', date);
+            return result ? [result] : [];
+        }
+
+        return [];
     }
 
     async _loadWatchProviders() {
@@ -1032,6 +1243,7 @@ class DetailsPage extends Page {
 
             // Render all text content immediately — only needs this._item
             this._renderHeroText();
+            void this._loadEnhancedDetailsInfo();
             this._setupFavoriteButton();
             this._renderRichMetadata();
             void this._loadWatchProviders();
@@ -4325,6 +4537,7 @@ class DetailsPage extends Page {
         const sections = [
             // Actions is always first and visible - needed so we can find what's after it
             { name: 'details-actions', elementId: '#actions', isVisible: () => true },
+            { name: 'details-enhanced-info', elementId: '#enhanced-details-info', isVisible: () => !!this.$('#enhanced-details-info')?.querySelector('.details-enhanced-awards-toggle') },
             {
                 name: 'details-see-more',
                 elementId: '#details-overview',
@@ -4558,6 +4771,7 @@ class DetailsPage extends Page {
                 elementId: '#details-overview',
                 isVisible: () => this.$('.see-more-btn')?.style?.display !== 'none'
             },
+            { name: 'details-enhanced-info', elementId: '#enhanced-details-info', isVisible: () => !!this.$('#enhanced-details-info')?.querySelector('.details-enhanced-awards-toggle') },
             { name: 'details-actions', elementId: '#actions', isVisible: () => true } // Actions are always visible
         ];
 
