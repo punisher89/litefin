@@ -1752,5 +1752,6 @@
     "EnhancedPersonBirthPlace": "Birthplace",
     "EnhancedPersonYearOne": "year",
     "EnhancedPersonYearFew": "years",
-    "EnhancedPersonYearMany": "years"
+    "EnhancedPersonYearMany": "years",
+    "EnhancedAwardsList": "Awards list"
 }
