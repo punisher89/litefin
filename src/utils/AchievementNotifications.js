@@ -91,7 +91,7 @@ class AchievementNotifications {
      * Called directly from a user-initiated button press so optional audio can play.
      */
     showTest() {
-        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || '');
+        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || i18n.currentLang || '');
         this._ensureStyles();
         this._queue.unshift({
             badges: [{
@@ -282,7 +282,7 @@ class AchievementNotifications {
     _renderToast(payload, prefs) {
         const container = this._getContainer();
         const isMilestone = typeof payload.milestone === 'number';
-        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || '');
+        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || i18n.currentLang || '');
         const copyText = (ru, en) => russian ? ru : en;
         const badges = payload.badges || [];
         const badge = badges[0] || {};
