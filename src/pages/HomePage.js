@@ -1838,9 +1838,11 @@ class HomePage extends Page {
                     `/JellyfinEnhanced/user-settings/${encodeURIComponent(userId)}/settings.json`,
                     null,
                     { silent: true, warnOnError: false }
-                );
+                ).catch(() => null);
 
                 // null/unset is the plugin's default-on state; only explicit false opts out.
+                // If the personal document is temporarily unavailable, prefer the
+                // regular Jellyfin route rather than risk losing native poster tags.
                 return settings?.UseNativePosterTags !== false;
             } catch (error) {
                 log.debug('Native Poster Tags settings could not be resolved:', error?.message || error);
