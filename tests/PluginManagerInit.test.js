@@ -17,7 +17,7 @@ const hideSplashBlock = appSource.slice(
     appSource.indexOf('                timeManager.init();')
 );
 
-function evaluateInitBlock({
+async function evaluateInitBlock({
     authenticated = true,
     sessionCount = 2,
     hasPin = false,
@@ -75,17 +75,20 @@ function evaluateInitBlock({
 
     const appScope = {};
     context.appScope = appScope;
-    vm.runInNewContext(
-        `(function () {\n${initBlock}\n}).call(appScope);\n` +
-        `(function () {\n${hideSplashBlock}\n}).call(appScope);`,
+    await vm.runInNewContext(
+        `(async function () {\\n${initBlock}\\n}).call(appScope);`,
+        context
+    );
+    await vm.runInNewContext(
+        `(async function () {\\n${hideSplashBlock}\\n}).call(appScope);`,
         context
     );
 
     return calls;
 }
 
-test('Web: Re-initializes PluginManager on page refresh (e.g. /home) even with multiple sessions', () => {
-    const calls = evaluateInitBlock({
+test('Web: Re-initializes PluginManager on page refresh (e.g. /home) even with multiple sessions', async () => {
+    const calls = await evaluateInitBlock({
         authenticated: true,
         sessionCount: 2,
         isWeb: true,
@@ -96,8 +99,8 @@ test('Web: Re-initializes PluginManager on page refresh (e.g. /home) even with m
     assert.ok(initCall, 'PluginManager.init should be called on web refresh');
 });
 
-test('Web: Re-initializes PluginManager on details page refresh', () => {
-    const calls = evaluateInitBlock({
+test('Web: Re-initializes PluginManager on details page refresh', async () => {
+    const calls = await evaluateInitBlock({
         authenticated: true,
         sessionCount: 3,
         isWeb: true,
@@ -108,8 +111,8 @@ test('Web: Re-initializes PluginManager on details page refresh', () => {
     assert.ok(initCall, 'PluginManager.init should be called on details page refresh on web');
 });
 
-test('Web: Defers PluginManager if explicitly on /profiles with multiple sessions', () => {
-    const calls = evaluateInitBlock({
+test('Web: Defers PluginManager if explicitly on /profiles with multiple sessions', async () => {
+    const calls = await evaluateInitBlock({
         authenticated: true,
         sessionCount: 2,
         isWeb: true,
@@ -120,8 +123,8 @@ test('Web: Defers PluginManager if explicitly on /profiles with multiple session
     assert.equal(initCall, undefined, 'PluginManager.init should be deferred when sitting on /profiles on web');
 });
 
-test('TV: Defers PluginManager on cold boot when multiple sessions exist and rememberLastUser is false', () => {
-    const calls = evaluateInitBlock({
+test('TV: Defers PluginManager on cold boot when multiple sessions exist and rememberLastUser is false', async () => {
+    const calls = await evaluateInitBlock({
         authenticated: true,
         sessionCount: 2,
         isWeb: false,
@@ -133,8 +136,8 @@ test('TV: Defers PluginManager on cold boot when multiple sessions exist and rem
     assert.equal(initCall, undefined, 'PluginManager.init should be deferred on TV when multiple sessions exist');
 });
 
-test('TV: Initializes PluginManager immediately on single session boot', () => {
-    const calls = evaluateInitBlock({
+test('TV: Initializes PluginManager immediately on single session boot', async () => {
+    const calls = await evaluateInitBlock({
         authenticated: true,
         sessionCount: 1,
         isWeb: false,
@@ -146,8 +149,8 @@ test('TV: Initializes PluginManager immediately on single session boot', () => {
     assert.ok(initCall, 'PluginManager.init should be called on TV with single session');
 });
 
-test('TV: Initializes PluginManager immediately when rememberLastUser is true without PIN', () => {
-    const calls = evaluateInitBlock({
+test('TV: Initializes PluginManager immediately when rememberLastUser is true without PIN', async () => {
+    const calls = await evaluateInitBlock({
         authenticated: true,
         sessionCount: 2,
         isWeb: false,
