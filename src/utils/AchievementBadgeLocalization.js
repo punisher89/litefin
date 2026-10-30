@@ -359,3 +359,188 @@ export function localizeAchievementBadge(badge, language = '') {
         Description: description || badge.Description || badge.description
     };
 }
+
+
+// ---------------------------------------------------------------------------
+// Russian localization for the remaining server-driven Achievement Badges UI.
+// Built-in quest IDs, shop IDs and rank names are stable; unknown administrator
+// custom content deliberately remains untouched instead of being mistranslated.
+// ---------------------------------------------------------------------------
+
+const RUSSIAN_RANKS = {
+    Rookie: 'Новичок',
+    Novice: 'Начинающий',
+    Viewer: 'Зритель',
+    Regular: 'Постоянный зритель',
+    Enthusiast: 'Энтузиаст',
+    Binger: 'Марафонец',
+    Connoisseur: 'Ценитель',
+    Maestro: 'Маэстро',
+    Legend: 'Легенда',
+    Immortal: 'Бессмертный'
+};
+
+const RUSSIAN_QUESTS = {
+    'daily-watch-any': { title: 'Ежедневный просмотр', description: 'Посмотри любой материал сегодня.' },
+    'daily-movie': { title: 'Вечер кино', description: 'Посмотри один фильм сегодня.' },
+    'daily-ep-spree': { title: 'Марафон серий', description: 'Посмотри три эпизода сегодня.' },
+    'daily-lib-hop': { title: 'По библиотекам', description: 'Посмотри материалы из двух разных библиотек сегодня.' },
+    'daily-late-night': { title: 'Ночной просмотр', description: 'Устрой ночной сеанс.' },
+    'daily-early-bird': { title: 'Ранний старт', description: 'Посмотри что-нибудь ранним утром.' },
+    'daily-genre': { title: 'Исследователь жанров', description: 'Открой для себя новый жанр сегодня.' },
+    'daily-rewatch': { title: 'Любимый материал', description: 'Пересмотри один из своих любимых материалов.' },
+    'daily-double': { title: 'Двойной сеанс', description: 'Посмотри два фильма сегодня.' },
+    'daily-binge-lite': { title: 'Лёгкий марафон', description: 'Посмотри пять материалов сегодня.' },
+    'daily-runtime': { title: 'Долгий просмотр', description: 'Посмотри материал продолжительностью более двух часов.' },
+    'daily-short': { title: 'На скорую руку', description: 'Посмотри материал длительностью менее 30 минут.' },
+    'weekly-5-movies': { title: 'Киноман', description: 'Посмотри пять фильмов на этой неделе.' },
+    'weekly-20-episodes': { title: 'Спринтер сериалов', description: 'Посмотри 20 эпизодов на этой неделе.' },
+    'weekly-streak': { title: 'Постоянство', description: 'Смотри контент пять дней подряд.' },
+    'weekly-10-hours': { title: 'Неделя марафона', description: 'Посмотри контент в течение 10 часов на этой неделе.' },
+    'weekly-3-genres': { title: 'Неделя жанров', description: 'Посмотри материалы трёх разных жанров на этой неделе.' },
+    'weekly-finish-series': { title: 'Завершитель', description: 'Закончи просмотр одного сериала на этой неделе.' },
+    'weekly-late-3': { title: 'Ночной житель', description: 'Проведи три ночных сеанса на этой неделе.' },
+    'weekly-weekend': { title: 'Выходной марафон', description: 'Проведи четыре сеанса в выходные.' }
+};
+
+const RUSSIAN_CATALOG_ITEMS = {
+    'pu-xp-boost-1': ['Ускорение очков', 'Удваивает получение очков на 60 минут. При повторной активации время обновляется.'],
+    'pu-xp-boost-3': ['Ускорение очков ×3', 'Три усиления XP. Экономия 20 очков по сравнению с покупкой по одному.'],
+    'pu-double-credit-1': ['Двойной зачёт', 'Следующий просмотр засчитается дважды при начислении прогресса значков.'],
+    'pu-double-credit-3': ['Двойной зачёт ×3', 'Три усиления двойного зачёта. Экономия 25 очков по сравнению с покупкой по одному.'],
+    'pu-streak-freeze-1': ['Заморозка серии', 'Защитит серию просмотров от пропуска одного дня. В запасе может быть только одна.'],
+    'theme-default': ['По умолчанию', 'Классическое тёмное оформление Jellyfin.'],
+    'theme-sunset': ['Закат', 'Тёплый оранжево-розовый градиент профиля.'],
+    'theme-cyberpunk': ['Киберпанк', 'Неоновые оттенки пурпурного и бирюзового с лёгким эффектом помех.'],
+    'theme-pastel': ['Пастель', 'Мягкие сиреневые и мятные оттенки оформления профиля.'],
+    'theme-monochrome': ['Монохром', 'Чёрно-белое оформление с тонкими акцентными линиями.'],
+    'theme-noir': ['Нуар', 'Угольные и сепийные оттенки с атмосферой детективного кино.'],
+    'theme-aurora': ['Северное сияние', 'Изумрудный и индиго-градиент, напоминающий северное сияние.'],
+    'theme-crimson': ['Багровый', 'Глубокий тёмно-красный цвет с дымчатыми оттенками.'],
+    'theme-vaporwave': ['Вейпорвейв', 'Ярко-розовые и бирюзовые оттенки в стиле 80-х.'],
+    'theme-galaxy': ['Галактика', 'Космический пурпурный фон с мерцающими звёздами.'],
+    'theme-forest': ['Лес', 'Сосново-зелёные оттенки с мягкими золотистыми акцентами.'],
+    'theme-ocean': ['Океан', 'Глубокие синие оттенки с биолюминесцентными акцентами.'],
+    'theme-rosegold': ['Розовое золото', 'Нежно-розовые оттенки и тёплые золотистые акценты.'],
+    'theme-midnight': ['Полночь', 'Глубокий тёмно-синий фон с лёгким свечением индиго.'],
+    'frame-default': ['По умолчанию', 'Стандартная рамка значка со скруглёнными углами.'],
+    'frame-gilded': ['Позолоченная', 'Рамка с золотой окантовкой и мягким свечением.'],
+    'frame-holo': ['Голографическая', 'Переливающийся градиент, меняющийся при наведении.'],
+    'frame-frosted': ['Иней', 'Кристаллические грани с холодным голубым акцентом.'],
+    'frame-obsidian': ['Обсидиан', 'Тёмная рамка из вулканического стекла с красным свечением.'],
+    'frame-emerald': ['Изумрудная', 'Полированная нефритовая окантовка для мастеров.'],
+    'frame-neon': ['Неоновая', 'Яркая розовая электрическая окантовка в стиле synthwave.'],
+    'title-cinephile': ['Киноман', 'Автоматически открывается при наборе 1 000 очков за всё время.'],
+    'title-marathoner': ['Марафонец', 'Автоматически открывается при наборе 2 500 очков за всё время.'],
+    'title-curator': ['Куратор', 'Автоматически открывается при наборе 5 000 очков за всё время.'],
+    'title-night-owl': ['Ночная сова', 'Можно приобрести в магазине. Для тех, кто смотрит кино в три часа ночи.'],
+    'title-archivist': ['Архивариус', 'Можно приобрести в магазине. Для коллекционеров медиатеки.'],
+    'title-tastemaker': ['Законодатель вкуса', 'Можно приобрести в магазине. Для любителей самых разных жанров.'],
+    'title-binge-king': ['Король марафонов', 'Можно приобрести в магазине. Для покорителей длинных сериалов.'],
+    'title-completionist': ['Перфекционист', 'Автоматически открывается при наборе 10 000 очков за всё время. Высшая ступень.'],
+    'title-aficionado': ['Знаток', 'Можно приобрести в магазине. Для ценителей редкого контента.'],
+    'title-legend': ['Легенда', 'Автоматически открывается при наборе 7 500 очков за всё время.'],
+    'avatar-medal': ['Медаль', 'Классическая золотая медаль.'],
+    'avatar-trophy': ['Кубок', 'Для тех, кто привык побеждать.'],
+    'avatar-crown': ['Корона', 'Королевский стиль.'],
+    'avatar-clapper': ['Кинохлопушка', 'Мотор! Снимаем!'],
+    'avatar-flame': ['Пламя', 'Ты в ударе!'],
+    'avatar-owl': ['Ночная сова', 'Знак любителя ночных просмотров.'],
+    'avatar-diamond': ['Бриллиант', 'Премиальный внешний вид.'],
+    'avatar-rocket': ['Ракета', 'Режим научно-фантастического марафона.'],
+    'avatar-popcorn': ['Попкорн', 'Незаменимый атрибут киновечера.'],
+    'avatar-ghost': ['Привидение', 'Для поклонников фильмов ужасов.'],
+    'avatar-unicorn': ['Единорог', 'Редкий и волшебный символ.'],
+    'avatar-dragon': ['Дракон', 'Аватар мифического уровня.'],
+    'avatar-star': ['Звезда', 'Сияй ярче всех.'],
+    'avatar-controller': ['Геймпад', 'Игра начинается!'],
+    'bg-none': ['Без фона', 'Чистое оформление без анимированного фона.'],
+    'bg-blackhole': ['Чёрная дыра', 'Вращающийся аккреционный диск искажает фон страницы.'],
+    'bg-starfield': ['Звёздное поле', 'Мерцающие звёзды плывут по глубокому космосу.'],
+    'bg-nebula': ['Туманность', 'Медленно движущиеся пурпурные и бирюзовые облака.'],
+    'bg-matrix': ['Матрица', 'Настоящий поток зелёного кода в виде зацикленного видео.'],
+    'bg-aurora': ['Северное сияние', 'Млечный Путь и сияние над горным хребтом. Зацикленное видео.'],
+    'bg-fireflies': ['Светлячки', 'Лес со светлячками в стиле Minecraft. Зацикленное видео.'],
+    'bg-galaxy': ['Галактика', 'Медленно вращающаяся спираль галактики. Зацикленное видео.'],
+    'bg-moonlit-village': ['Лунная деревня', 'Уютная заснеженная деревня под лунным светом. Зацикленное видео.'],
+    'bg-rainy-station': ['Дождливая станция', 'Железнодорожная платформа под неспешным дождём. Зацикленное видео.'],
+    'border-none': ['Без рамки', 'Без дополнительной рамки профиля.'],
+    'border-gold-shimmer': ['Золотое мерцание', 'Анимированный золотой градиент проходит по краю карточки.'],
+    'border-plasma': ['Плазма', 'Неоновое свечение с меняющимися цветами.'],
+    'border-ember': ['Тлеющие угли', 'Пульсирующее красное свечение по краю.'],
+    'border-holo': ['Голографический край', 'Переливающаяся радужная окантовка.'],
+    'border-crystal': ['Кристалл', 'Холодная голубая окантовка с эффектом преломления света.']
+};
+
+const RUSSIAN_POWERUPS = {
+    xpboost: ['Ускорение очков', 'Удваивает получение очков на 60 минут. Повторная активация обновляет таймер.'],
+    doublecredit: ['Двойной зачёт', 'Следующий просмотр засчитывается дважды в прогрессе достижений.'],
+    streakfreeze: ['Заморозка серии', 'Автоматически защитит серию просмотров, если пропустить один день. В запасе может быть только одна.']
+};
+
+export function localizeAchievementRank(name, language = '') {
+    if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return name;
+    const key = String(name || '').trim();
+    return RUSSIAN_RANKS[key] || name;
+}
+
+export function localizeAchievementQuest(quest, language = '') {
+    if (!quest || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return quest;
+    const id = String(quest.Id || quest.id || '').trim().toLowerCase();
+    const localized = RUSSIAN_QUESTS[id];
+    if (!localized) return quest;
+    return {
+        ...quest,
+        Title: localized.title,
+        Description: localized.description
+    };
+}
+
+export function localizeAchievementCatalogItem(item, language = '') {
+    if (!item || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return item;
+    const id = String(item.Id || item.id || '').trim().toLowerCase();
+    const localized = RUSSIAN_CATALOG_ITEMS[id];
+    if (!localized) return item;
+    return {
+        ...item,
+        DisplayName: localized[0],
+        Description: localized[1]
+    };
+}
+
+export function localizeAchievementPowerUp(item, language = '') {
+    if (!item || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return item;
+    const type = String(item.Type || item.type || '').toLowerCase().replace(/[^a-z]/g, '');
+    const localized = RUSSIAN_POWERUPS[type];
+    if (!localized) return localizeAchievementCatalogItem(item, language);
+    return {
+        ...item,
+        DisplayName: localized[0],
+        Description: localized[1]
+    };
+}
+
+export function localizeAchievementPowerUpType(type, language = '') {
+    if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return type;
+    const key = String(type || '').toLowerCase().replace(/[^a-z]/g, '');
+    return RUSSIAN_POWERUPS[key]?.[0] || type;
+}
+
+export function localizeAchievementMessage(message, language = '') {
+    const text = String(message || '').trim();
+    if (!/^ru(?:[-_]|$)/i.test(String(language || '')) || !text) return text;
+    const exact = {
+        'Not enough score.': 'Недостаточно очков.',
+        'Insufficient score.': 'Недостаточно очков.',
+        'Purchase completed.': 'Покупка выполнена.',
+        'Power-up activated.': 'Усиление активировано.',
+        'Item equipped.': 'Предмет применён.',
+        'Score sent.': 'Очки переданы.',
+        'Quest rerolled successfully.': 'Задания обновлены.',
+        'The action could not be completed.': 'Не удалось выполнить действие.',
+        'You do not own this item.': 'У вас нет этого предмета.',
+        'This power-up is already active.': 'Это усиление уже активно.',
+        'You already have the maximum number of this power-up.': 'У вас уже максимальное количество этого усиления.'
+    };
+    return exact[text] || text;
+}
