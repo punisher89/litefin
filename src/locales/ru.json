@@ -1742,5 +1742,8 @@
     "EnhancedAwardNominated": "Номинация",
     "EnhancedPersonYears": "лет",
     "EnhancedPersonAtRelease": "на момент выхода",
-    "EnhancedPersonBirthPlace": "Место рождения"
+    "EnhancedPersonBirthPlace": "Место рождения",
+    "EnhancedPersonYearOne": "год",
+    "EnhancedPersonYearFew": "года",
+    "EnhancedPersonYearMany": "лет"
 }
