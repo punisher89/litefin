@@ -628,9 +628,24 @@ html[data-layout-media-rows="modern-posters"] .hero-poster .media-fallback {
     align-items: center;
     /* Center badges vertically */
     flex-wrap: wrap;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     font-size: 1.4rem;
     color: var(--jf-text-primary);
+}
+
+/* Review scores sit on their own line immediately below title metadata. */
+.details-ratings-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin: 0 0 16px;
+    min-height: 1.5em;
+    font-size: 1.45rem;
+}
+
+.details-ratings-row .meta-item {
+    margin: 0;
 }
 
 .meta-item {
