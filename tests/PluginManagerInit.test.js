@@ -69,6 +69,9 @@ async function evaluateInitBlock({
                 return Promise.resolve();
             }
         },
+        achievementNotifications: {
+            init: () => calls.push({ type: 'achievement-notifications-init' })
+        },
         api: { name: 'ApiClient' },
         focusManager: { name: 'FocusManager' }
     };
