@@ -1,6 +1,7 @@
 import Page from './Page.js';
 import { api } from '../api/index.js';
 import { i18n } from '../utils/i18n.js';
+import { localizeAchievementBadge } from '../utils/AchievementBadgeLocalization.js';
 import { logger } from '../utils/Logger.js';
 import { achievementNotifications } from '../utils/AchievementNotifications.js';
 import '../styles/achievements.css';
@@ -743,7 +744,7 @@ class AchievementsPage extends Page {
             .sort((a, b) => new Date(valueOf(b, 'UnlockedAt', 'unlockedAt')) - new Date(valueOf(a, 'UnlockedAt', 'unlockedAt')))
             .slice(0, 4);
         const recentHtml = recent.length
-            ? `<div class="achievements-recent">${recent.map((badge) => `<span title="${escapeHtml(valueOf(badge, 'Title', 'title'))}">${badgeIcon(badge)}</span>`).join('')}</div>`
+            ? `<div class="achievements-recent">${recent.map((badge) => `<span title="${escapeHtml(valueOf(localizeAchievementBadge(badge, document.documentElement.lang || i18n.currentLang), 'Title', 'title'))}">${badgeIcon(badge)}</span>`).join('')}</div>`
             : '';
 
         target.innerHTML = `
@@ -875,8 +876,9 @@ class AchievementsPage extends Page {
 
         const visible = badges.slice(0, this._visibleBadgeCount);
         grid.innerHTML = visible.map((badge) => {
-            const title = valueOf(badge, 'Title', 'title') || '';
-            const description = valueOf(badge, 'Description', 'description') || '';
+            const localizedBadge = localizeAchievementBadge(badge, document.documentElement.lang || i18n.currentLang);
+            const title = valueOf(localizedBadge, 'Title', 'title') || '';
+            const description = valueOf(localizedBadge, 'Description', 'description') || '';
             const category = valueOf(badge, 'Category', 'category') || '';
             const rarityRaw = valueOf(badge, 'Rarity', 'rarity') || 'Common';
             const rarity = String(rarityRaw).toLowerCase().replace(/[^a-z0-9-]/g, '');
