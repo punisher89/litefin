@@ -73,6 +73,9 @@ class DetailsPage extends Page {
         this._itemId = null;
         this._item = null;
         this._enhancedInfoRequestId = 0;
+        this._enhancedReleaseItemId = null;
+        this._enhancedReleaseEntries = [];
+        this._enhancedPersonInfoCache = new Map();
         this._nextUp = null;
         this._seasons = null;
         this._episodes = null;
@@ -904,6 +907,9 @@ class DetailsPage extends Page {
 
         const requestId = (this._enhancedInfoRequestId || 0) + 1;
         this._enhancedInfoRequestId = requestId;
+        this._enhancedReleaseItemId = item?.Id || null;
+        this._enhancedReleaseEntries = [];
+        this._renderHeroText();
         container.innerHTML = '';
         container.classList.remove('visible');
 
@@ -950,12 +956,9 @@ class DetailsPage extends Page {
             ]);
             if (!isCurrent()) return;
 
-            const releaseHtml = (releaseEntries || []).map((entry) => `
-                <div class="details-enhanced-release details-enhanced-release-${entry.type}">
-                    <span class="details-enhanced-release-label">${escapeHtml(entry.label)}</span>
-                    <strong>${escapeHtml(entry.date)}</strong>
-                </div>
-            `).join('');
+            this._enhancedReleaseItemId = itemId;
+            this._enhancedReleaseEntries = Array.isArray(releaseEntries) ? releaseEntries : [];
+            this._renderHeroText();
 
             const awards = Array.isArray(awardData?.Awards) ? awardData.Awards : [];
             const hasAwards = awardData?.Found === true && awards.length > 0;
@@ -964,19 +967,41 @@ class DetailsPage extends Page {
             if (hasAwards) {
                 const wins = Number(awardData.Wins) || awards.filter((award) => award.Result === 'Won').length;
                 const nominations = Number(awardData.Nominations) || awards.filter((award) => award.Result === 'Nominated').length;
-                const awardRows = awards.map((award) => {
-                    const result = award.Result === 'Won'
+                const sortedAwards = [...awards].sort((a, b) => {
+                    const yearDiff = (Number(b.Year) || 0) - (Number(a.Year) || 0);
+                    if (yearDiff) return yearDiff;
+                    return (a.Result === 'Won' ? 0 : 1) - (b.Result === 'Won' ? 0 : 1);
+                });
+                const awardIcon = (name) => {
+                    const text = String(name || '').toLowerCase();
+                    if (text.includes('academy award') || text.includes('oscar')) return '🏆';
+                    if (text.includes('golden globe')) return '🌐';
+                    if (text.includes('bafta')) return '🎭';
+                    if (text.includes('emmy')) return '📺';
+                    if (text.includes('screen actors guild')) return '🎬';
+                    if (text.includes('palme') || text.includes('cannes')) return '🌴';
+                    return '✦';
+                };
+                const awardRows = sortedAwards.map((award) => {
+                    const won = award.Result === 'Won';
+                    const result = won
                         ? (i18n.t('EnhancedAwardWon') || 'Победа')
                         : (i18n.t('EnhancedAwardNominated') || 'Номинация');
                     const year = award.Year ? String(award.Year) : '';
                     const recipients = Array.isArray(award.Recipients) && award.Recipients.length
                         ? award.Recipients.join(', ')
-                        : '';
-                    const meta = [result, year, recipients].filter(Boolean).join(' · ');
+                        : Array.isArray(award.Works) && award.Works.length
+                            ? award.Works.join(', ')
+                            : '';
                     return `
-                        <li class="details-enhanced-award">
-                            <span class="details-enhanced-award-name">${escapeHtml(award.Name || '')}</span>
-                            <span class="details-enhanced-award-meta">${escapeHtml(meta)}</span>
+                        <li class="details-enhanced-award ${won ? 'is-won' : 'is-nominated'}">
+                            <span class="details-enhanced-award-icon" aria-hidden="true">${awardIcon(award.Name)}</span>
+                            <div class="details-enhanced-award-main">
+                                <span class="details-enhanced-award-name">${escapeHtml(award.Name || '')}</span>
+                                ${recipients ? `<span class="details-enhanced-award-recipients">${escapeHtml(recipients)}</span>` : ''}
+                            </div>
+                            <span class="details-enhanced-award-result">${escapeHtml(result)}</span>
+                            ${year ? `<span class="details-enhanced-award-year">${escapeHtml(year)}</span>` : ''}
                         </li>
                     `;
                 }).join('');
@@ -984,13 +1009,13 @@ class DetailsPage extends Page {
                 awardsHtml = `
                     <section class="details-enhanced-awards">
                         <button type="button" class="details-enhanced-awards-toggle" aria-expanded="false" aria-controls="details-enhanced-awards-list" tabindex="0">
+                            <span class="details-enhanced-awards-emblem" aria-hidden="true">✦</span>
                             <span class="details-enhanced-awards-title">${escapeHtml(i18n.t('EnhancedAwards') || 'Награды')}</span>
                             <span class="details-enhanced-awards-count">
-                                ${escapeHtml(i18n.t('EnhancedAwardWins') || 'Побед')}: ${wins}
-                                <span aria-hidden="true">·</span>
-                                ${escapeHtml(i18n.t('EnhancedAwardNominations') || 'Номинаций')}: ${nominations}
+                                <span class="details-enhanced-awards-win-count">🏆 ${wins}</span>
+                                <span class="details-enhanced-awards-nomination-count">✧ ${nominations}</span>
                             </span>
-                            <span class="details-enhanced-awards-chevron" aria-hidden="true">▾</span>
+                            <span class="details-enhanced-awards-chevron" aria-hidden="true">⌄</span>
                         </button>
                         <ul class="details-enhanced-awards-list" id="details-enhanced-awards-list" hidden>
                             ${awardRows}
@@ -999,11 +1024,12 @@ class DetailsPage extends Page {
                 `;
             }
 
-            if (!releaseHtml && !awardsHtml) return;
-            container.innerHTML = `
-                ${releaseHtml ? `<div class="details-enhanced-release-list">${releaseHtml}</div>` : ''}
-                ${awardsHtml}
-            `;
+            if (!awardsHtml) {
+                container.innerHTML = '';
+                container.classList.remove('visible');
+                return;
+            }
+            container.innerHTML = awardsHtml;
             container.classList.add('visible');
 
             const toggle = container.querySelector('.details-enhanced-awards-toggle');
@@ -1109,6 +1135,49 @@ class DetailsPage extends Page {
         }
 
         return [];
+    }
+
+
+    /**
+     * Fetch cast metadata in bounded batches from Jellyfin Enhanced and attach
+     * the result to the person objects before their cards are rendered.
+     * @param {Array<object>} people
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _loadEnhancedPeopleInfo(people) {
+        if (!Array.isArray(people) || !people.length) return;
+        const ids = [...new Set(people
+            .map((person) => person?.Id)
+            .filter((id) => typeof id === 'string' && /^[0-9a-f-]{32,36}$/i.test(id)))];
+        if (!ids.length) return;
+
+        const missing = ids.filter((id) => !this._enhancedPersonInfoCache.has(id));
+        for (let offset = 0; offset < missing.length; offset += 100) {
+            const batch = missing.slice(offset, offset + 100);
+            try {
+                const response = await api.get('/JellyfinEnhanced/people/info', {
+                    ids: batch.join(','),
+                    itemId: this._itemId
+                });
+                const result = response?.people || response?.People || {};
+                batch.forEach((id) => {
+                    const key = Object.keys(result).find((candidate) => candidate.toLowerCase() === id.toLowerCase());
+                    const info = key ? result[key] : null;
+                    this._enhancedPersonInfoCache.set(id, info && typeof info === 'object' ? info : null);
+                });
+            } catch (error) {
+                // This metadata is optional. Keep cards usable if the plugin is missing.
+                log.debug('Jellyfin Enhanced person information unavailable:', error?.message || error);
+                batch.forEach((id) => this._enhancedPersonInfoCache.set(id, null));
+            }
+        }
+
+        people.forEach((person) => {
+            if (!person?.Id) return;
+            const info = this._enhancedPersonInfoCache.get(person.Id);
+            if (info) person._enhancedPersonInfo = info;
+        });
     }
 
     async _loadWatchProviders() {
@@ -1884,6 +1953,7 @@ class DetailsPage extends Page {
         this._people = this._item.People || [];
         const hideCast = storage.getItem('pref:hideCastSection') === 'true';
         if (this._people.length > 0 && !hideCast) {
+            await this._loadEnhancedPeopleInfo(this._people);
             this._renderPeople();
         } else if (hideCast) {
             const peopleSection = this.$('#people-section');
@@ -3252,6 +3322,20 @@ class DetailsPage extends Page {
         if (starRating) metaHtml += `<span class="meta-item meta-star">${starRating}</span>`;
         if (criticRating) metaHtml += `<span class="meta-item meta-tomato">${criticRating}</span>`;
         if (endsAtText) metaHtml += `<span class="meta-item meta-ends-at">${endsAtText}</span>`;
+
+        if (this._enhancedReleaseItemId === item.Id && Array.isArray(this._enhancedReleaseEntries)) {
+            const releaseIcons = { cinema: '🎬', digital: '▶', physical: '💿', episode: '📺' };
+            this._enhancedReleaseEntries.forEach((entry) => {
+                const icon = releaseIcons[entry.type] || '📅';
+                metaHtml += `
+                    <span class="meta-item details-enhanced-release-chip details-enhanced-release-${entry.type}" title="${escapeHtml(entry.label)}">
+                        <span aria-hidden="true">${icon}</span>
+                        <span class="details-enhanced-release-label">${escapeHtml(entry.label)}</span>
+                        <strong>${escapeHtml(entry.date)}</strong>
+                    </span>
+                `;
+            });
+        }
 
         // --- Added & Aired Dates ---
         // Retrieve merged dates display setting with graceful fallback to legacy preferences
@@ -4880,6 +4964,7 @@ class DetailsPage extends Page {
         const hideCast = storage.getItem('pref:hideCastSection') === 'true';
 
         if (guestStars.length > 0 && !hideCast) {
+            await this._loadEnhancedPeopleInfo(guestStars);
             this._renderGuestStars(guestStars);
         } else if (hideCast) {
             const guestStarsSection = this.$('#guest-stars-section');
