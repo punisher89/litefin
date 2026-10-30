@@ -501,7 +501,7 @@ class HomePage extends Page {
                                             ParentId: settingVal,
                                             Limit: homeRowLimit,
                                             IncludeItemTypes: type,
-                                            Fields: 'PrimaryImageAspectRatio,CanFilter,UserData',
+                                            Fields: 'PrimaryImageAspectRatio,CanFilter,UserData,ImageTags',
                                             Recursive: true
                                         },
                                         { suppressUnauthorized: true, warnOnError: true }
@@ -516,7 +516,7 @@ class HomePage extends Page {
                                             {
                                                 ParentId: settingVal,
                                                 Limit: homeRowLimit,
-                                                Fields: 'PrimaryImageAspectRatio,CanFilter,UserData',
+                                                Fields: 'PrimaryImageAspectRatio,CanFilter,UserData,ImageTags',
                                                 Recursive: true
                                             },
                                             { suppressUnauthorized: true, warnOnError: true }
@@ -580,7 +580,7 @@ class HomePage extends Page {
                                                 ParentId: smartCollection.Id,
                                                 Limit: homeRowLimit,
                                                 IncludeItemTypes: type,
-                                                Fields: 'PrimaryImageAspectRatio,CanFilter,UserData',
+                                                Fields: 'PrimaryImageAspectRatio,CanFilter,UserData,ImageTags',
                                                 Recursive: true
                                             },
                                             { suppressUnauthorized: true, warnOnError: true }
@@ -595,7 +595,7 @@ class HomePage extends Page {
                                                 {
                                                     ParentId: smartCollection.Id,
                                                     Limit: homeRowLimit,
-                                                    Fields: 'PrimaryImageAspectRatio,CanFilter,UserData',
+                                                    Fields: 'PrimaryImageAspectRatio,CanFilter,UserData,ImageTags',
                                                     Recursive: true
                                                 },
                                                 { suppressUnauthorized: true, warnOnError: true }
@@ -699,7 +699,7 @@ class HomePage extends Page {
                                         ParentId: col.id,
                                         Limit: homeRowLimit,
                                         IncludeItemTypes: 'Movie,Series',
-                                        Fields: 'PrimaryImageAspectRatio,CanFilter,UserData',
+                                        Fields: 'PrimaryImageAspectRatio,CanFilter,UserData,ImageTags',
                                         Recursive: true
                                     },
                                     { suppressUnauthorized: true, warnOnError: true }
@@ -714,7 +714,7 @@ class HomePage extends Page {
                                         {
                                             ParentId: col.id,
                                             Limit: homeRowLimit,
-                                            Fields: 'PrimaryImageAspectRatio,CanFilter,UserData',
+                                            Fields: 'PrimaryImageAspectRatio,CanFilter,UserData,ImageTags',
                                             Recursive: true
                                         },
                                         { suppressUnauthorized: true, warnOnError: true }
@@ -1819,7 +1819,7 @@ class HomePage extends Page {
         try {
             const batchMap = await api.getBatchLatest(libraryIds, {
                 limit: homeRowLimit,
-                fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag',
+                fields: 'ImageTags,BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag',
                 ...(hidePlayed ? { isPlayed: false } : {})
             });
 
