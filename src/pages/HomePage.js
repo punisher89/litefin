@@ -46,7 +46,7 @@ import { logger } from '../utils/Logger.js';
 import { i18n } from '../utils/i18n.js';
 import { imageCache } from '../utils/ImageCache.js';
 import { imageService } from '../utils/ImageService.js';
-import { prepareEnhancedPosterTags } from '../utils/EnhancedPosterTags.js';
+import { prepareEnhancedPosterTags, clearEnhancedPosterTagItemCache } from '../utils/EnhancedPosterTags.js';
 import CardRenderer from '../utils/CardRenderer.js';
 import { quickPlayItem } from '../utils/QuickPlay.js';
 import { homeLayoutManager } from '../utils/HomeLayoutManager.js';
@@ -1250,6 +1250,8 @@ class HomePage extends Page {
      * trickle in one by one as their API calls resolve.
      */
     async _startRenderPipeline() {
+        // Drop page-scoped JE metadata so server-side Spoiler Guard changes are reflected on revisit.
+        clearEnhancedPosterTagItemCache();
         this.setLoading(true);
         this.hideError();
 
