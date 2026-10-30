@@ -79,6 +79,8 @@ export function fireHomeRowPrefetch(userId) {
             const maxDays = parseInt(storage.getItem('pref:nextUpMaxDays'), 10);
             const daysLimit = isNaN(maxDays) ? 365 : maxDays;
             const mergedParams = { limit: homeRowLimit };
+            // Include poster tag fields in the early request that HomePage consumes.
+            mergedParams.fields = 'ImageTags,SeriesPrimaryImageTag,SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,Tags';
             mergedParams.watchedThreshold = Math.round(PlayerSettings.getWatchedThresholdFraction() * 100);
             if (daysLimit > 0) {
                 const cutoff = new Date();
