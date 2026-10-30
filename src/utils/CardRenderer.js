@@ -15,6 +15,8 @@ import { storage } from './StorageService.js';
 import { shouldShowScore } from './visibility.js';
 import { detailsIcons, getStaticIcon } from './Icons.js';
 import { platformInfo } from './PlatformInfo.js';
+import { renderEnhancedPosterTags, hasNativePosterTagStamp } from './EnhancedPosterTags.js';
+import '../styles/enhanced-poster-tags.css';
 
 class CardRenderer {
     /**
@@ -429,7 +431,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${item._enhancedPersonInfo ? JSON.stringify(item._enhancedPersonInfo) : ''}|${item.ImageTags?.Primary || ''}|${item.SeriesPrimaryImageTag || ''}|${item._nativePosterTagsEnabled ? 'native-poster-tags' : ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${item._enhancedPersonInfo ? JSON.stringify(item._enhancedPersonInfo) : ''}|${item._enhancedPosterTags ? JSON.stringify(item._enhancedPosterTags) : ''}|${item.ImageTags?.Primary || ''}|${item.SeriesPrimaryImageTag || ''}|${item._nativePosterTagsEnabled ? 'native-poster-tags' : ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -1009,7 +1011,8 @@ class CardRenderer {
         }
 
         // Quality Badge (Resolution/HDR)
-        const qualityBadgeHtml = CardRenderer.getQualityBadgeHtml(item);
+        const hasEnhancedQualityTags = !!(item._enhancedPosterTags && item._enhancedPosterTags.quality && item._enhancedPosterTags.quality.items && item._enhancedPosterTags.quality.items.length);
+        const qualityBadgeHtml = hasNativePosterTagStamp(item) || hasEnhancedQualityTags ? '' : CardRenderer.getQualityBadgeHtml(item);
 
         let seerrTypeBadgeHtml = '';
         let seerrBadgeHtml = '';
@@ -1473,6 +1476,7 @@ class CardRenderer {
             blurHash && !isBlurHashDisabled
                 ? `<canvas class="blurhash-canvas" data-blurhash="${blurHash}"></canvas>`
                 : '';
+        const enhancedPosterTagsHtml = renderEnhancedPosterTags(item);
         const imagePart = imageUrl
             ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
             : `${CardRenderer.getFallbackHtml(item, isLandscape, { hideInitials, isLibrary: type === 'library' })}`;
@@ -1583,6 +1587,7 @@ class CardRenderer {
             <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
                 <div class="card-image">
                     ${imagePart}
+                    ${enhancedPosterTagsHtml}
                     ${personInfoHtml}
                     ${progressHtml}
                     ${videoBadgeHtml}
