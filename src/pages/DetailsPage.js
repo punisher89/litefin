@@ -3397,7 +3397,7 @@ class DetailsPage extends Page {
             if (releaseChips) releaseMetaHtml = `<span class="details-enhanced-release-group">${releaseChips}</span>`;
         }
 
-        // Build the title metadata row; review scores are rendered separately below.
+        // Build the title metadata row with the native Jellyfin review scores.
         let metaHtml = '';
         if (gamePlatform)
             metaHtml += `<span class="meta-item meta-badge game-platform-pill">${escapeHtml(gamePlatform)}</span>`;
@@ -3405,6 +3405,8 @@ class DetailsPage extends Page {
         if (year) metaHtml += `<span class="meta-item">${year}</span>`;
         if (runtimeText) metaHtml += `<span class="meta-item">${runtimeText}</span>`;
         if (rating) metaHtml += `<span class="meta-item meta-badge">${rating}</span>`;
+        if (starRating) metaHtml += `<span class="meta-item meta-star">${starRating}</span>`;
+        if (criticRating) metaHtml += `<span class="meta-item meta-tomato">${criticRating}</span>`;
         if (endsAtText) metaHtml += `<span class="meta-item meta-ends-at">${endsAtText}</span>`;
 
         // --- Added & Aired Dates ---
@@ -3458,12 +3460,6 @@ class DetailsPage extends Page {
 
         // Release-date chips always occupy the final position in the metadata row.
         metaHtml += releaseMetaHtml;
-
-        // Keep Jellyfin community and critic scores in their own line below metadata.
-        const ratingsHtml = [
-            starRating ? `<span class="meta-item meta-star">${starRating}</span>` : '',
-            criticRating ? `<span class="meta-item meta-tomato">${criticRating}</span>` : ''
-        ].filter(Boolean).join('');
 
         let titleStyle = storage.getItem('pref:detailsTitleStyle') || 'both';
         const detailsLayout = this._getDetailsLayout(item);
@@ -3569,12 +3565,11 @@ class DetailsPage extends Page {
             techHtml = this._renderTechnicalDetails();
         }
 
-        // Finish appending metadata, review scores and technical specifications.
+        // Finish appending the metadata and technical specifications.
         heroHtml += `
             <div class="details-meta-row">
                 ${metaHtml}
             </div>
-            ${ratingsHtml ? `<div class="details-ratings-row">${ratingsHtml}</div>` : ''}
             ${techHtml}
         `;
 
