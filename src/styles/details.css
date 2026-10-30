@@ -2523,7 +2523,7 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
 
 
 
-/* Enhanced release chips sit in the same line as year, runtime and ratings. */
+/* Enhanced release chips use the first metadata line; ratings stay below. */
 .details-meta-row .details-enhanced-release-group {
     /* Keep release dates on their own line so they never squeeze or hide ratings. */
     display: inline-flex;
@@ -2533,7 +2533,8 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     gap: 5px;
     width: 100%;
     max-width: 100%;
-    margin-top: 4px;
+    margin-top: 0;
+    margin-bottom: 4px;
     overflow-x: auto;
     white-space: nowrap;
     vertical-align: middle;
@@ -2714,75 +2715,6 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
 .details-enhanced-awards-list::-webkit-scrollbar-track { background: rgba(255,255,255,.04); border-radius: 8px; }
 .details-enhanced-awards-list::-webkit-scrollbar-thumb { background: rgba(215,185,117,.45); border-radius: 8px; }
 
-/* Actor/crew cards: Enhanced age and birthplace labels directly on the poster. */
-.media-card .card-image { position: relative; }
-.media-card .lf-person-enhanced-info {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-end;
-    gap: 5px;
-    padding: 7px;
-    pointer-events: none;
-    box-sizing: border-box;
-}
-.media-card .lf-person-age-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    max-width: 100%;
-}
-.media-card .lf-person-age-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 100%;
-    padding: 4px 7px;
-    border-radius: 6px;
-    color: #fff;
-    background: rgba(64,133,86,.91);
-    border: 1px solid rgba(255,255,255,.22);
-    box-shadow: 0 2px 7px rgba(0,0,0,.35);
-    font-size: 11px;
-    font-weight: 750;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-.media-card .lf-person-age-chip.is-release {
-    margin-top: 4px;
-    background: rgba(54,112,160,.92);
-}
-.media-card .lf-person-age-chip.is-deceased {
-    background: rgba(145,57,57,.92);
-}
-.media-card .lf-person-birthplace {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: 14px 7px 5px;
-    border-radius: 0 0 8px 8px;
-    background: linear-gradient(to top, rgba(0,0,0,.88), rgba(0,0,0,.60) 65%, transparent);
-    color: #fff;
-    font-size: 10px;
-    line-height: 1.25;
-    text-shadow: 0 1px 3px #000;
-}
-.media-card .lf-person-birthplace > span:last-child {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.media-card.is-enhanced-deceased .card-image img {
-    filter: grayscale(100%) opacity(.78);
-}
 @media (max-width: 900px) {
     .details-enhanced-awards-toggle { flex-wrap: wrap; gap: 8px; }
     .details-enhanced-awards-count { flex: 1 1 100%; padding-left: 45px; }
@@ -2799,14 +2731,3 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     outline-offset: -2px;
 }
 
-.media-card .lf-person-enhanced-info {
-    justify-content: flex-end;
-    gap: 5px;
-}
-.media-card .lf-person-age-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    max-width: 100%;
-}
