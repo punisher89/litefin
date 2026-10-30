@@ -76,6 +76,8 @@ class DetailsPage extends Page {
         this._enhancedReleaseItemId = null;
         this._enhancedReleaseEntries = [];
         this._enhancedPersonInfoCache = new Map();
+        this._enhancedAwardsScrollCleanup = null;
+        this._enhancedAwardsScrollToggle = null;
         this._nextUp = null;
         this._seasons = null;
         this._episodes = null;
@@ -900,6 +902,58 @@ class DetailsPage extends Page {
      * features simply leave this optional section empty.
      * @private
      */
+    /**
+     * Temporarily routes TV remote arrows into the expanded awards list.
+     * The global focus manager otherwise consumes these keys for card navigation.
+     * @private
+     */
+    _openEnhancedAwardsKeyboardScroll(list, toggle) {
+        this._closeEnhancedAwardsKeyboardScroll(false);
+        if (!list || !toggle) return;
+
+        this._enhancedAwardsScrollToggle = toggle;
+        focusManager.suspend();
+
+        const scrollBy = (direction) => (event) => {
+            event?.preventDefault?.();
+            const step = Math.max(70, Math.round((list.clientHeight || 260) * 0.68));
+            list.scrollTop = Math.max(0, Math.min(list.scrollHeight, list.scrollTop + direction * step));
+        };
+        const leaveList = (event) => {
+            event?.preventDefault?.();
+            this._closeEnhancedAwardsKeyboardScroll(true);
+        };
+
+        const unsubscribe = [
+            eventBus.on('key:down', scrollBy(1)),
+            eventBus.on('key:up', scrollBy(-1)),
+            eventBus.on('key:left', leaveList),
+            eventBus.on('key:right', leaveList),
+            eventBus.on('key:enter', leaveList)
+        ];
+        this._enhancedAwardsScrollCleanup = () => {
+            unsubscribe.forEach((off) => off());
+            focusManager.resume();
+        };
+
+        list.focus();
+    }
+
+    /**
+     * Restore the global TV navigation after leaving the awards list.
+     * @private
+     */
+    _closeEnhancedAwardsKeyboardScroll(restoreFocus = false) {
+        if (this._enhancedAwardsScrollCleanup) {
+            const cleanup = this._enhancedAwardsScrollCleanup;
+            this._enhancedAwardsScrollCleanup = null;
+            cleanup();
+        }
+        const toggle = this._enhancedAwardsScrollToggle;
+        this._enhancedAwardsScrollToggle = null;
+        if (restoreFocus && toggle && document.contains(toggle)) toggle.focus();
+    }
+
     async _loadEnhancedDetailsInfo() {
         const container = this.$('#enhanced-details-info');
         const item = this._item;
@@ -1040,6 +1094,12 @@ class DetailsPage extends Page {
                     toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
                     list.hidden = expanded;
                     toggle.classList.toggle('expanded', !expanded);
+
+                    if (expanded) {
+                        this._closeEnhancedAwardsKeyboardScroll(true);
+                    } else {
+                        this._openEnhancedAwardsKeyboardScroll(list, toggle);
+                    }
                 });
             }
         } catch (error) {
@@ -3328,16 +3388,19 @@ class DetailsPage extends Page {
 
         if (this._enhancedReleaseItemId === item.Id && Array.isArray(this._enhancedReleaseEntries)) {
             const releaseIcons = { cinema: '🎬', digital: '▶', physical: '💿', episode: '📺' };
-            this._enhancedReleaseEntries.forEach((entry) => {
+            const releaseChips = this._enhancedReleaseEntries.map((entry) => {
                 const icon = releaseIcons[entry.type] || '📅';
-                metaHtml += `
-                    <span class="meta-item details-enhanced-release-chip details-enhanced-release-${entry.type}" title="${escapeHtml(entry.label)}">
+                const label = escapeHtml(entry.label);
+                const date = escapeHtml(entry.date);
+                return `
+                    <span class="meta-item details-enhanced-release-chip details-enhanced-release-${entry.type}"
+                        title="${label}" aria-label="${label}: ${date}">
                         <span aria-hidden="true">${icon}</span>
-                        <span class="details-enhanced-release-label">${escapeHtml(entry.label)}</span>
-                        <strong>${escapeHtml(entry.date)}</strong>
+                        <strong>${date}</strong>
                     </span>
                 `;
-            });
+            }).join('');
+            if (releaseChips) metaHtml += `<span class="details-enhanced-release-group">${releaseChips}</span>`;
         }
 
         // --- Added & Aired Dates ---
@@ -7549,6 +7612,8 @@ class DetailsPage extends Page {
     }
 
     destroy() {
+        this._closeEnhancedAwardsKeyboardScroll(false);
+
         // --------------------------------------------------------------------
         // Flag this instance as destroyed.
         // This acts as a circuit breaker for any pending, asynchronous API calls
