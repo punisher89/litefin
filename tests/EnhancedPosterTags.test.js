@@ -101,6 +101,16 @@ test('poster tag groups are built from the server-provided batch metadata', () =
     assert.equal(groups.genre.position, 'top-right');
 });
 
+test('English without an explicit region uses the US flag fallback', () => {
+    const data = {
+        Id: 'item-en',
+        Type: 'Movie',
+        MediaStreams: [{ Type: 'Audio', Language: 'en', Codec: 'aac', Channels: 2 }]
+    };
+    const groups = buildEnhancedPosterTagGroups(data, settings, config, 'latest');
+    assert.deepEqual(groups.language.items, [{ code: 'en', country: 'US' }]);
+});
+
 test('poster tags honor disabled groups and rating row scopes', () => {
     const data = {
         Id: 'item-2',
