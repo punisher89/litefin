@@ -332,6 +332,7 @@ class LazyLoader {
 
                 img.classList.add('loaded');
                 img.removeAttribute('data-lazy-loading');
+                if (img.classList.contains('lf-native-poster-tags')) return;
 
                 const parent = img.parentElement;
                 if (parent) {
@@ -573,6 +574,17 @@ class LazyLoader {
      * @param {HTMLElement} img
      */
     _handleImageError(img) {
+        // Native poster-tag overlays are optional: hide only the small overlay
+        // if a server/plugin version cannot serve it; preserve the wide artwork.
+        if (img && img.classList && img.classList.contains('lf-native-poster-tags')) {
+            img.style.display = 'none';
+            img.removeAttribute('data-src');
+            img.removeAttribute('data-lazy-loading');
+            img.onerror = null;
+            img.onload = null;
+            return;
+        }
+
         // Prevent browser from retrying the broken URL
         const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         img.src = placeholder;
