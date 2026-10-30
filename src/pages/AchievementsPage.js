@@ -8,7 +8,7 @@ const log = logger.create('AchievementsPage');
 
 const GAME_TEXT = {
     ru: {
-        game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        eyebrow: 'JELLYFIN · ЦЕНТР ДОСТИЖЕНИЙ', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -32,7 +32,7 @@ const GAME_TEXT = {
         inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин'
     },
     en: {
-        game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        eyebrow: 'JELLYFIN · ACHIEVEMENT CENTER', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -136,6 +136,32 @@ function badgeIcon(badge) {
     return '🏆';
 }
 
+function localizedBadgeValue(value, kind) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const language = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
+    if (!language.startsWith('ru')) return raw;
+
+    const key = raw.toLowerCase().replace(/[_-]+/g, ' ').trim();
+    const dictionaries = {
+        rarity: {
+            common: 'Обычное', uncommon: 'Необычное', rare: 'Редкое',
+            epic: 'Эпическое', legendary: 'Легендарное', mythic: 'Мифическое',
+            unique: 'Уникальное', special: 'Особое'
+        },
+        category: {
+            movie: 'Фильмы', movies: 'Фильмы', film: 'Фильмы', films: 'Фильмы',
+            series: 'Сериалы', tv: 'Телевидение', episode: 'Сериалы',
+            music: 'Музыка', book: 'Книги', books: 'Книги',
+            game: 'Игры', games: 'Игры', general: 'Общие',
+            watchtime: 'Время просмотра', 'watch time': 'Время просмотра',
+            playback: 'Просмотр', streak: 'Серии просмотров',
+            social: 'Социальные', collection: 'Коллекции'
+        }
+    };
+    return dictionaries[kind]?.[key] || raw;
+}
+
 function progressPercent(current, target) {
     const goal = Number(target) || 0;
     if (goal <= 0) return 0;
@@ -164,7 +190,7 @@ class AchievementsPage extends Page {
                 <main class="page-content achievements-content">
                     <header class="achievements-header">
                         <div>
-                            <div class="achievements-eyebrow">JELLYFIN · ACHIEVEMENT BADGES</div>
+                            <div class="achievements-eyebrow">${escapeHtml(gameText('eyebrow'))}</div>
                             <h1>${escapeHtml(i18n.t('Achievements'))}</h1>
                         </div>
                         <button class="achievements-refresh focusable" id="achievements-refresh" type="button" tabindex="0">
@@ -326,9 +352,9 @@ class AchievementsPage extends Page {
             this._userPath = userPath;
             const [summary, rank, badges, quests, leaderboard] = await Promise.all([
                 api.get(`${userPath}/summary`),
-                api.get(`${userPath}/rank`),
+                api.get(`${userPath}/rank?lang=${encodeURIComponent(language)}`),
                 api.get(`${userPath}?lang=${encodeURIComponent(language)}`),
-                api.get(`${userPath}/quests`),
+                api.get(`${userPath}/quests?lang=${encodeURIComponent(language)}`),
                 api.get('/Plugins/AchievementBadges/leaderboard?limit=5').catch(() => [])
             ]);
 
@@ -843,7 +869,10 @@ class AchievementsPage extends Page {
             const title = valueOf(badge, 'Title', 'title') || '';
             const description = valueOf(badge, 'Description', 'description') || '';
             const category = valueOf(badge, 'Category', 'category') || '';
-            const rarity = String(valueOf(badge, 'Rarity', 'rarity') || 'Common').toLowerCase().replace(/[^a-z0-9-]/g, '');
+            const rarityRaw = valueOf(badge, 'Rarity', 'rarity') || 'Common';
+            const rarity = String(rarityRaw).toLowerCase().replace(/[^a-z0-9-]/g, '');
+            const rarityLabel = localizedBadgeValue(rarityRaw, 'rarity');
+            const categoryLabel = localizedBadgeValue(category, 'category');
             const current = Number(valueOf(badge, 'CurrentValue', 'currentValue') || 0);
             const goal = Number(valueOf(badge, 'TargetValue', 'targetValue') || 0);
             const unlocked = !!valueOf(badge, 'Unlocked', 'unlocked');
@@ -856,11 +885,11 @@ class AchievementsPage extends Page {
                     <div class="achievement-badge-info">
                         <div class="achievement-badge-title-row">
                             <strong>${escapeHtml(title)}</strong>
-                            <span class="achievement-rarity">${escapeHtml(valueOf(badge, 'Rarity', 'rarity') || '')}</span>
+                            <span class="achievement-rarity">${escapeHtml(rarityLabel)}</span>
                         </div>
                         <p>${escapeHtml(description)}</p>
                         <div class="achievement-badge-meta">
-                            <span>${escapeHtml(category)}</span>
+                            <span>${escapeHtml(categoryLabel)}</span>
                             ${unlockedAt ? `<span>${escapeHtml(i18n.t('AchievementEarnedOn', [dateText]))}</span>` : `<span>${current} / ${goal}</span>`}
                         </div>
                         ${!unlocked && goal > 0 ? `<div class="achievement-progress"><span style="width:${percent}%"></span></div>` : ''}
