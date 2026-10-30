@@ -272,11 +272,6 @@ export default {
         const defaultTomato = metaRow.querySelector('.meta-tomato');
         if (defaultTomato) defaultTomato.style.display = 'none';
 
-        // MDBList is the selected multi-provider rating source for this item.
-        // Hide the native Jellyfin score row only when MDBList data is actually available.
-        const defaultRatingsRow = pageEl.querySelector('.details-ratings-row');
-        if (defaultRatingsRow) defaultRatingsRow.style.display = 'none';
-
         // Check if our row already exists to prevent duplicates
         if (pageEl.querySelector('.mdblist-ratings-row')) return;
 
@@ -322,9 +317,10 @@ export default {
 
         html += '</div>';
 
-        // Keep provider ratings on their own line immediately below title metadata.
-        // Technical specifications and awards remain below this row.
-        metaRow.insertAdjacentHTML('afterend', html);
+        // Keep provider ratings below the technical specifications, as before.
+        const techRow = pageEl.querySelector('.details-tech-row');
+        const targetRow = techRow || metaRow;
+        targetRow.insertAdjacentHTML('afterend', html);
 
         // Add subtle entrance animation with spring curve
         requestAnimationFrame(() => {
