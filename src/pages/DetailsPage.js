@@ -3394,12 +3394,13 @@ class DetailsPage extends Page {
         }
 
         // Release dates share the title metadata row with year, runtime and ratings.
-        let metaHtml = releaseMetaHtml;
+        let metaHtml = '';
         if (gamePlatform)
             metaHtml += `<span class="meta-item meta-badge game-platform-pill">${escapeHtml(gamePlatform)}</span>`;
         if (ttbLabel) metaHtml += `<span class="meta-item meta-badge game-ttb-pill">${escapeHtml(ttbLabel)}</span>`;
         if (year) metaHtml += `<span class="meta-item">${year}</span>`;
         if (runtimeText) metaHtml += `<span class="meta-item">${runtimeText}</span>`;
+        metaHtml += releaseMetaHtml;
         if (rating) metaHtml += `<span class="meta-item meta-badge">${rating}</span>`;
         if (starRating) metaHtml += `<span class="meta-item meta-star">${starRating}</span>`;
         if (criticRating) metaHtml += `<span class="meta-item meta-tomato">${criticRating}</span>`;
