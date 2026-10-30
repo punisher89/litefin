@@ -255,7 +255,7 @@ function extractLanguages(data, config) {
         const parts = code.replace('_', '-').split('-');
         const base = lower(parts[0]);
         if (!base || base === 'und' || base === 'root') continue;
-        const region = parts.find((part) => /^[A-Za-z]{2}$/.test(part));
+        const region = parts.slice(1).find((part) => /^[A-Za-z]{2}$/.test(part));
         const country = region ? region.toUpperCase() : map[base];
         if (!country || seen.has(country)) continue;
         seen.add(country);
