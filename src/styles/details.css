@@ -2401,3 +2401,122 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     font-size: 0.85rem;
     margin: 0.3rem 0;
 }
+
+
+/* Jellyfin Enhanced: movie release dates and awards inside the details hero. */
+.details-enhanced-info {
+    display: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 14px 0 8px;
+    width: 100%;
+    max-width: 860px;
+    color: var(--jf-text-primary);
+}
+.details-enhanced-info.visible {
+    display: flex;
+}
+.details-enhanced-release-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.details-enhanced-release {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    min-height: 34px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.09);
+    border: 1px solid rgba(255,255,255,.13);
+    color: var(--jf-text-secondary);
+    font-size: .9rem;
+    line-height: 1.25;
+}
+.details-enhanced-release strong {
+    color: var(--jf-text-primary);
+    font-weight: 700;
+}
+.details-enhanced-release-cinema { border-left: 3px solid #d9a441; }
+.details-enhanced-release-digital { border-left: 3px solid #6ba7e8; }
+.details-enhanced-release-physical { border-left: 3px solid #80b99a; }
+.details-enhanced-awards {
+    width: 100%;
+    max-width: 720px;
+}
+.details-enhanced-awards-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: auto;
+    max-width: 100%;
+    min-height: 42px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 12px;
+    background: rgba(255,255,255,.08);
+    color: var(--jf-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.details-enhanced-awards-toggle:focus,
+.details-enhanced-awards-toggle.focused {
+    outline: 2px solid var(--jf-accent, #4da3ff);
+    outline-offset: 2px;
+}
+.details-enhanced-awards-title {
+    font-weight: 700;
+}
+.details-enhanced-awards-count {
+    color: var(--jf-text-secondary);
+    font-size: .88rem;
+}
+.details-enhanced-awards-chevron {
+    margin-left: 4px;
+    transition: transform .18s ease;
+}
+.details-enhanced-awards-toggle.expanded .details-enhanced-awards-chevron {
+    transform: rotate(180deg);
+}
+.details-enhanced-awards-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    width: 100%;
+    max-height: 260px;
+    overflow-y: auto;
+    background: rgba(0,0,0,.20);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 10px;
+}
+.details-enhanced-awards-list[hidden] {
+    display: none;
+}
+.details-enhanced-award {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.details-enhanced-award:last-child {
+    border-bottom: 0;
+}
+.details-enhanced-award-name {
+    color: var(--jf-text-primary);
+    font-weight: 600;
+}
+.details-enhanced-award-meta {
+    color: var(--jf-text-secondary);
+    font-size: .82rem;
+}
+@media (max-width: 900px) {
+    .details-enhanced-release-list { gap: 6px; }
+    .details-enhanced-release { font-size: .82rem; padding: 6px 9px; }
+    .details-enhanced-awards-toggle { flex-wrap: wrap; gap: 7px; }
+}
