@@ -266,11 +266,7 @@ export default {
         const metaRow = pageEl.querySelector('.details-meta-row');
         if (!metaRow) return;
 
-        // Hide default standard ratings (star and tomato)
-        const defaultStar = metaRow.querySelector('.meta-star');
-        if (defaultStar) defaultStar.style.display = 'none';
-        const defaultTomato = metaRow.querySelector('.meta-tomato');
-        if (defaultTomato) defaultTomato.style.display = 'none';
+        // Keep native Jellyfin ratings (star and tomato) visible in the metadata row.
 
         // Check if our row already exists to prevent duplicates
         if (pageEl.querySelector('.mdblist-ratings-row')) return;
