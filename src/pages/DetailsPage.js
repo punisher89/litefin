@@ -827,6 +827,8 @@ class DetailsPage extends Page {
                 'Altitude',
                 'DateCreated',
                 'PremiereDate',
+                'CommunityRating',
+                'CriticRating',
                 'ProviderIds',
                 'SeriesTmdbId'
             ];
@@ -1341,6 +1343,8 @@ class DetailsPage extends Page {
                 'Altitude',
                 'DateCreated',
                 'PremiereDate',
+                'CommunityRating',
+                'CriticRating',
                 'ProviderIds',
                 'SeriesTmdbId'
             ];
