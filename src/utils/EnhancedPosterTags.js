@@ -385,16 +385,16 @@ async function loadMissingItems(ids, userId) {
 
 export async function prepareEnhancedPosterTags(items, contextType = '') {
     if (!Array.isArray(items) || !items.length) return items;
-    const snapshot = await getSettingsSnapshot();
-    if (!snapshot) return items;
-
-    const userId = snapshot.userId;
     const candidates = items.filter((item) =>
         item && item.Id && SUPPORTED_TYPES.has(item.Type) &&
         !item._isGenreCard && !item._isStudioCard && !item._isNetworkCard &&
         !hasNativePosterTagStamp(item)
     );
     if (!candidates.length) return items;
+
+    const snapshot = await getSettingsSnapshot();
+    if (!snapshot) return items;
+    const userId = snapshot.userId;
 
     const now = Date.now();
     const missing = candidates
