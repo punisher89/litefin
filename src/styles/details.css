@@ -2520,3 +2520,250 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     .details-enhanced-release { font-size: .82rem; padding: 6px 9px; }
     .details-enhanced-awards-toggle { flex-wrap: wrap; gap: 7px; }
 }
+
+
+
+/* Enhanced release chips sit in the same line as year, runtime and ratings. */
+.details-meta-row .details-enhanced-release-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 8px 7px 0;
+    padding: 5px 10px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 999px;
+    background: rgba(255,255,255,.075);
+    color: var(--jf-text-secondary);
+    font-size: .78em;
+    line-height: 1.35;
+    vertical-align: middle;
+}
+.details-meta-row .details-enhanced-release-chip strong {
+    color: var(--jf-text-primary);
+    font-weight: 700;
+}
+.details-meta-row .details-enhanced-release-cinema { border-color: rgba(218,169,76,.36); }
+.details-meta-row .details-enhanced-release-digital { border-color: rgba(107,167,232,.36); }
+.details-meta-row .details-enhanced-release-physical { border-color: rgba(128,185,154,.36); }
+
+/* Awards banner and scrollable list, inspired by Jellyfin Enhanced's own details section. */
+.details-enhanced-info {
+    display: none;
+    width: 100%;
+    max-width: 900px;
+    margin: 12px 0 18px;
+}
+.details-enhanced-info.visible { display: block; }
+.details-enhanced-awards {
+    width: 100%;
+    border: 1px solid rgba(225,188,104,.30);
+    border-radius: 15px;
+    overflow: hidden;
+    background: linear-gradient(115deg, rgba(123,91,35,.20), rgba(50,43,31,.35) 48%, rgba(255,255,255,.035));
+    box-shadow: 0 8px 24px rgba(0,0,0,.16);
+}
+.details-enhanced-awards-toggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    min-height: 58px;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--jf-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.details-enhanced-awards-toggle:focus,
+.details-enhanced-awards-toggle.focused {
+    outline: 2px solid var(--jf-accent, #d4ad55);
+    outline-offset: -3px;
+}
+.details-enhanced-awards-emblem {
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: rgba(222,183,93,.18);
+    color: #f2d27f;
+    font-size: 22px;
+}
+.details-enhanced-awards-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 1.05rem;
+    font-weight: 750;
+    letter-spacing: .01em;
+}
+.details-enhanced-awards-count {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px 12px;
+    color: var(--jf-text-secondary);
+    font-size: .82rem;
+}
+.details-enhanced-awards-win-count { color: #f1d17c; font-weight: 700; }
+.details-enhanced-awards-nomination-count { color: #bdc8d4; font-weight: 650; }
+.details-enhanced-awards-chevron {
+    flex: 0 0 auto;
+    color: #e4c77e;
+    font-size: 1.4rem;
+    transition: transform .18s ease;
+}
+.details-enhanced-awards-toggle.expanded .details-enhanced-awards-chevron { transform: rotate(180deg); }
+.details-enhanced-awards-list {
+    list-style: none;
+    margin: 0;
+    padding: 3px 14px 12px;
+    max-height: 320px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(215,185,117,.6) rgba(255,255,255,.06);
+    border-top: 1px solid rgba(225,188,104,.16);
+    background: rgba(0,0,0,.13);
+}
+.details-enhanced-awards-list[hidden] { display: none !important; }
+.details-enhanced-award {
+    display: grid;
+    grid-template-columns: 30px minmax(0,1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 4px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
+}
+.details-enhanced-award:last-child { border-bottom: 0; }
+.details-enhanced-award-icon {
+    display: grid;
+    place-items: center;
+    width: 29px;
+    height: 29px;
+    border-radius: 9px;
+    background: rgba(255,255,255,.075);
+    color: #e9d29a;
+    font-size: 16px;
+}
+.details-enhanced-award-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 3px;
+}
+.details-enhanced-award-name {
+    color: var(--jf-text-primary);
+    font-size: .92rem;
+    line-height: 1.35;
+    font-weight: 650;
+}
+.details-enhanced-award-recipients {
+    color: var(--jf-text-secondary);
+    font-size: .78rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+.details-enhanced-award-result {
+    padding: 4px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    font-size: .72rem;
+    font-weight: 750;
+}
+.details-enhanced-award.is-won .details-enhanced-award-result {
+    color: #f5d987;
+    background: rgba(216,174,76,.16);
+    border: 1px solid rgba(216,174,76,.25);
+}
+.details-enhanced-award.is-nominated .details-enhanced-award-result {
+    color: #c6d0db;
+    background: rgba(170,190,210,.10);
+    border: 1px solid rgba(170,190,210,.17);
+}
+.details-enhanced-award-year {
+    min-width: 42px;
+    text-align: right;
+    color: var(--jf-text-secondary);
+    font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+}
+.details-enhanced-awards-list::-webkit-scrollbar { width: 7px; }
+.details-enhanced-awards-list::-webkit-scrollbar-track { background: rgba(255,255,255,.04); border-radius: 8px; }
+.details-enhanced-awards-list::-webkit-scrollbar-thumb { background: rgba(215,185,117,.45); border-radius: 8px; }
+
+/* Actor/crew cards: Enhanced age and birthplace labels directly on the poster. */
+.media-card .card-image { position: relative; }
+.media-card .lf-person-enhanced-info {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 7px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+.media-card .lf-person-age-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 4px 7px;
+    border-radius: 6px;
+    color: #fff;
+    background: rgba(64,133,86,.91);
+    border: 1px solid rgba(255,255,255,.22);
+    box-shadow: 0 2px 7px rgba(0,0,0,.35);
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.media-card .lf-person-age-chip.is-release {
+    margin-top: 4px;
+    background: rgba(54,112,160,.92);
+}
+.media-card .lf-person-age-chip.is-deceased {
+    background: rgba(145,57,57,.92);
+}
+.media-card .lf-person-birthplace {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 14px 7px 5px;
+    border-radius: 0 0 8px 8px;
+    background: linear-gradient(to top, rgba(0,0,0,.88), rgba(0,0,0,.60) 65%, transparent);
+    color: #fff;
+    font-size: 10px;
+    line-height: 1.25;
+    text-shadow: 0 1px 3px #000;
+}
+.media-card .lf-person-birthplace > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.media-card.is-enhanced-deceased .card-image img {
+    filter: grayscale(100%) opacity(.78);
+}
+@media (max-width: 900px) {
+    .details-enhanced-awards-toggle { flex-wrap: wrap; gap: 8px; }
+    .details-enhanced-awards-count { flex: 1 1 100%; padding-left: 45px; }
+}
+@media (max-width: 560px) {
+    .details-enhanced-award { grid-template-columns: 26px minmax(0,1fr) auto; }
+    .details-enhanced-award-icon { width: 25px; height: 25px; }
+    .details-enhanced-award-year { grid-column: 2; text-align: left; }
+    .details-meta-row .details-enhanced-release-chip { font-size: .68em; margin-right: 4px; padding: 4px 7px; }
+}
