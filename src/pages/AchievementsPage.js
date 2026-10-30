@@ -352,9 +352,9 @@ class AchievementsPage extends Page {
             this._userPath = userPath;
             const [summary, rank, badges, quests, leaderboard] = await Promise.all([
                 api.get(`${userPath}/summary`),
-                api.get(`${userPath}/rank?lang=${encodeURIComponent(language)}`),
+                api.get(`${userPath}/rank`),
                 api.get(`${userPath}?lang=${encodeURIComponent(language)}`),
-                api.get(`${userPath}/quests?lang=${encodeURIComponent(language)}`),
+                api.get(`${userPath}/quests`),
                 api.get('/Plugins/AchievementBadges/leaderboard?limit=5').catch(() => [])
             ]);
 
