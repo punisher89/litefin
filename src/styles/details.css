@@ -2525,12 +2525,15 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
 
 /* Enhanced release chips sit in the same line as year, runtime and ratings. */
 .details-meta-row .details-enhanced-release-group {
+    /* Keep release dates on their own line so they never squeeze or hide ratings. */
     display: inline-flex;
-    flex: 0 1 auto;
+    flex: 0 0 100%;
     align-items: center;
     flex-wrap: nowrap;
     gap: 5px;
+    width: 100%;
     max-width: 100%;
+    margin-top: 4px;
     overflow-x: auto;
     white-space: nowrap;
     vertical-align: middle;
