@@ -241,7 +241,29 @@ const RUSSIAN_TITLES = {
     "book-audio-listener": "Аудиослушатель",
     "book-audio-companion": "Спутник аудиокниг",
     "book-audio-veteran": "Ветеран аудиокниг",
-    "book-series-finisher": "Завершитель книжных серий"
+    "book-series-finisher": "Завершитель книжных серий",
+    "artist-sampler": "Любопытный слушатель",
+    "artist-listener": "Постоянный слушатель",
+    "artist-fan": "Поклонник исполнителя",
+    "artist-devotee": "Преданный поклонник",
+    "artist-discography": "Полная дискография",
+    "hidden-first-anniversary": "Первая годовщина",
+    "hidden-late-night-sage": "Мастер ночных просмотров",
+    "hidden-quadruple-feature": "Четверной кинопоказ",
+    "hidden-dawn-chorus": "Хор рассвета",
+    "hidden-universal-watcher": "Универсальный зритель",
+    "hidden-archivist-supreme": "Верховный архивариус",
+    "hidden-deep-cut": "Глубокое погружение",
+    "hidden-saga-marathon": "Марафон саги",
+    "game-first-boot": "Первый запуск",
+    "game-arcade-regular": "Завсегдатай аркады",
+    "game-arcade-rat": "Аркадный фанат",
+    "game-cartridge-collector": "Коллекционер картриджей",
+    "game-backlog": "Игровой бэклог",
+    "game-marathon": "Игровой марафон",
+    "game-long-haul": "Дистанционный игрок",
+    "game-console-wars": "Битва консолей",
+    "game-retro-sommelier": "Ценитель ретроигр"
 };
 
 function plural(value, forms) {
@@ -314,6 +336,13 @@ function localizedDescription(raw) {
         const genres = { horror:'ужасов', comedy:'комедий', drama:'драм', action:'боевиков', 'sci-fi':'фантастики', animated:'анимации', crime:'криминальных историй', romance:'романтических историй', thriller:'триллеров', fantasy:'фэнтези' };
         return `Посмотри ${m[1]} материалов в жанре ${genres[m[2].toLowerCase()]}.`;
     }
+    if ((m = text.match(/^Hear (\d+)% of one artist's tracks\.$/i))) return `Послушай ${m[1]}% треков одного исполнителя.`;
+    if (text === "Hear every track an artist has in the library.") return 'Послушай все треки исполнителя, которые есть в медиатеке.';
+    if (text === 'Play your first game session.') return 'Запусти свою первую игровую сессию.';
+    if ((m = text.match(/^Play (\d+) game sessions\.$/i))) return `Проведи ${m[1]} игровых сессий.`;
+    if ((m = text.match(/^Play (\d+) different games\.$/i))) return `Поиграй в ${m[1]} разных игр.`;
+    if ((m = text.match(/^Play for (\d+) hours?\.$/i))) return `Играй в течение ${m[1]} ${plural(m[1], ['час','часа','часов'])}.`;
+    if ((m = text.match(/^Play games on (\d+) different platforms\.$/i))) return `Поиграй на ${m[1]} разных платформах.`;
     if ((m = text.match(/^Watch (\d+) documentaries\.$/i))) return `Посмотри ${m[1]} документальных фильмов.`;
     if ((m = text.match(/^Watch (\d+) thrillers\.$/i))) return `Посмотри ${m[1]} триллеров.`;
     if ((m = text.match(/^Reach 100% completion in (\d+) libraries\.$/i))) return `Достигни 100% завершения в ${m[1]} библиотеках.`;
