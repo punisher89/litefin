@@ -1730,5 +1730,14 @@
     "YearLabel": "Год: {0}",
     "YearValue": "{0} г.",
     "Yes": "Да",
-    "Zoom": "Зум"
+    "Zoom": "Зум",
+    "EnhancedCinemaRelease": "Кинотеатральный релиз",
+    "EnhancedDigitalRelease": "Цифровой релиз",
+    "EnhancedPhysicalRelease": "Физический носитель",
+    "EnhancedEpisodeRelease": "Дата выхода эпизода",
+    "EnhancedAwards": "Награды",
+    "EnhancedAwardWins": "Побед",
+    "EnhancedAwardNominations": "Номинаций",
+    "EnhancedAwardWon": "Победа",
+    "EnhancedAwardNominated": "Номинация"
 }
