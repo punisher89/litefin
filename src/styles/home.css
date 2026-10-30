@@ -277,6 +277,12 @@ html[data-layout-media-rows="modern-posters"] .media-row--skeleton .media-card.s
     padding-bottom: 56.25%;
 }
 
+/* Preserve the full JE-stamped poster inside the wide Continue Watching card. */
+.media-card.native-poster-tags-resume .card-image img {
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.62);
+}
+
 .media-card.square .card-image {
     /* PADDING HACK for 1:1 Ratio */
     padding-bottom: 100%;
