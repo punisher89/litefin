@@ -3375,17 +3375,7 @@ class DetailsPage extends Page {
             else if (map.C) ttbLabel = `Completionist: ${map.C}h`;
         }
 
-        let metaHtml = '';
-        if (gamePlatform)
-            metaHtml += `<span class="meta-item meta-badge game-platform-pill">${escapeHtml(gamePlatform)}</span>`;
-        if (ttbLabel) metaHtml += `<span class="meta-item meta-badge game-ttb-pill">${escapeHtml(ttbLabel)}</span>`;
-        if (year) metaHtml += `<span class="meta-item">${year}</span>`;
-        if (runtimeText) metaHtml += `<span class="meta-item">${runtimeText}</span>`;
-        if (rating) metaHtml += `<span class="meta-item meta-badge">${rating}</span>`;
-        if (starRating) metaHtml += `<span class="meta-item meta-star">${starRating}</span>`;
-        if (criticRating) metaHtml += `<span class="meta-item meta-tomato">${criticRating}</span>`;
-        if (endsAtText) metaHtml += `<span class="meta-item meta-ends-at">${endsAtText}</span>`;
-
+        let releaseMetaHtml = '';
         if (this._enhancedReleaseItemId === item.Id && Array.isArray(this._enhancedReleaseEntries)) {
             const releaseIcons = { cinema: '🎬', digital: '▶', physical: '💿', episode: '📺' };
             const releaseChips = this._enhancedReleaseEntries.map((entry) => {
@@ -3400,8 +3390,21 @@ class DetailsPage extends Page {
                     </span>
                 `;
             }).join('');
-            if (releaseChips) metaHtml += `<span class="details-enhanced-release-group">${releaseChips}</span>`;
+            if (releaseChips) releaseMetaHtml = `<span class="details-enhanced-release-group">${releaseChips}</span>`;
         }
+
+        // Release dates occupy the first metadata line. Ratings and core facts
+        // remain on the next line, exactly where users expect to find them.
+        let metaHtml = releaseMetaHtml;
+        if (gamePlatform)
+            metaHtml += `<span class="meta-item meta-badge game-platform-pill">${escapeHtml(gamePlatform)}</span>`;
+        if (ttbLabel) metaHtml += `<span class="meta-item meta-badge game-ttb-pill">${escapeHtml(ttbLabel)}</span>`;
+        if (year) metaHtml += `<span class="meta-item">${year}</span>`;
+        if (runtimeText) metaHtml += `<span class="meta-item">${runtimeText}</span>`;
+        if (rating) metaHtml += `<span class="meta-item meta-badge">${rating}</span>`;
+        if (starRating) metaHtml += `<span class="meta-item meta-star">${starRating}</span>`;
+        if (criticRating) metaHtml += `<span class="meta-item meta-tomato">${criticRating}</span>`;
+        if (endsAtText) metaHtml += `<span class="meta-item meta-ends-at">${endsAtText}</span>`;
 
         // --- Added & Aired Dates ---
         // Retrieve merged dates display setting with graceful fallback to legacy preferences
