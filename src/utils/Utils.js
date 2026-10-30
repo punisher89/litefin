@@ -579,7 +579,7 @@ export function parseSubtitleMetadata(r) {
     // Format & framerate & download counts
     const format = (r.Format || '').toUpperCase();
     const frameRate = r.FrameRate ? `${r.FrameRate} fps` : '';
-    const downloads = r.DownloadCount != null ? `↓ ${r.DownloadCount.toLocaleString()}` : '';
+    const downloads = r.DownloadCount != null ? `↓ ${r.DownloadCount.toLocaleString('en-US')}` : '';
 
     return {
         id: r.Id,
