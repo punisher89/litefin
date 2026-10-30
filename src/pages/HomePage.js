@@ -46,6 +46,7 @@ import { logger } from '../utils/Logger.js';
 import { i18n } from '../utils/i18n.js';
 import { imageCache } from '../utils/ImageCache.js';
 import { imageService } from '../utils/ImageService.js';
+import { prepareEnhancedPosterTags } from '../utils/EnhancedPosterTags.js';
 import CardRenderer from '../utils/CardRenderer.js';
 import { quickPlayItem } from '../utils/QuickPlay.js';
 import { homeLayoutManager } from '../utils/HomeLayoutManager.js';
@@ -1741,7 +1742,15 @@ class HomePage extends Page {
             // A background prefetch (see _prefetchRow) may already have the request
             // in flight — reuse that promise so the network round-trip overlaps
             // with whatever triggered this load instead of restarting from zero.
-            const items = await (descriptor._prefetchPromise || descriptor.fetchFn());
+            const fetchedItems = await (descriptor._prefetchPromise || descriptor.fetchFn());
+            const items = Array.isArray(fetchedItems) ? fetchedItems : [];
+
+            if (!this._isMounted) return false;
+
+            // Jellyfin Enhanced tag data is fetched once per row in a bounded batch.
+            // The helper caches both settings and item metadata, and skips posters
+            // already carrying JE's native image-composite token.
+            await prepareEnhancedPosterTags(items, descriptor.contextType || descriptor.id);
 
             if (!this._isMounted) return false;
 
