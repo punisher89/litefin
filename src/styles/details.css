@@ -2797,7 +2797,8 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
 }
 
 .media-card .lf-person-enhanced-info {
-    justify-content: space-between;
+    justify-content: flex-end;
+    gap: 5px;
 }
 .media-card .lf-person-age-stack {
     display: flex;
