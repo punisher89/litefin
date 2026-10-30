@@ -3393,7 +3393,7 @@ class DetailsPage extends Page {
             if (releaseChips) releaseMetaHtml = `<span class="details-enhanced-release-group">${releaseChips}</span>`;
         }
 
-        // Release dates share the title metadata row with year, runtime and ratings.
+        // Build the title metadata row; review scores are rendered separately below.
         let metaHtml = '';
         if (gamePlatform)
             metaHtml += `<span class="meta-item meta-badge game-platform-pill">${escapeHtml(gamePlatform)}</span>`;
