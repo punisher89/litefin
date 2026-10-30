@@ -20,37 +20,37 @@
 }
 
 .lf-je-tag-group--top-left {
-    top: 7px;
-    left: 7px;
+    top: 8px;
+    left: 8px;
 }
 
 .lf-je-tag-group--top-right {
-    top: 7px;
-    right: 7px;
+    top: 8px;
+    right: 8px;
 }
 
 .lf-je-tag-group--bottom-left {
-    bottom: 7px;
-    left: 7px;
+    bottom: 8px;
+    left: 8px;
 }
 
 .lf-je-tag-group--bottom-right {
-    bottom: 7px;
-    right: 7px;
+    bottom: 8px;
+    right: 8px;
 }
 
 .lf-je-tag {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 19px;
+    min-height: 23px;
     box-sizing: border-box;
-    padding: 3px 6px;
+    padding: 4px 7px;
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 4px;
     background: rgba(12, 18, 27, 0.88);
     color: #fff;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.015em;
     line-height: 1.1;
@@ -67,8 +67,8 @@
 }
 
 .lf-je-tag--language {
-    min-width: 23px;
-    padding: 3px 5px;
+    min-width: 25px;
+    padding: 4px 6px;
     background: rgba(25, 52, 60, 0.94);
 }
 
@@ -80,10 +80,27 @@
     background: rgba(78, 36, 42, 0.94);
 }
 
+/* Reserve space for the native Jellyfin/Litefin indicators in the same corner. */
+.media-card.has-unplayed-count .lf-je-tag-group--top-right {
+    top: 44px;
+}
+
+.media-card.has-episode-badge .lf-je-tag-group--top-left {
+    top: 38px;
+}
+
+.media-card.has-bottom-left-badges .lf-je-tag-group--bottom-left {
+    bottom: 42px;
+}
+
+.media-card.has-played-badge .lf-je-tag-group--bottom-right {
+    bottom: 42px;
+}
+
 @media (max-width: 900px) {
     .lf-je-tag {
-        min-height: 17px;
-        padding: 2px 5px;
-        font-size: 9px;
+        min-height: 19px;
+        padding: 3px 5px;
+        font-size: 10px;
     }
 }
