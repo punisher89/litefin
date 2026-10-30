@@ -279,6 +279,9 @@ function localizedDescription(raw) {
     if (text === 'Watch something between 7pm and 10pm.') return 'Посмотри что-нибудь между 19:00 и 22:00.';
     if (text === 'Play your first music track.') return 'Включи свой первый музыкальный трек.';
     if (text === 'Finish your first book.') return 'Закончи чтение своей первой книги.';
+    if (text === 'Hit 100% in a library.') return 'Достигни полного завершения одной библиотеки.';
+    if (text === 'Reach 100% completion in 1 library.') return 'Достигни 100% завершения в одной библиотеке.';
+    if (text === 'Reach 100% completion in 3 libraries.') return 'Достигни 100% завершения в трёх библиотеках.';
 
     if ((m = text.match(/^Watch (\d+) items?\.$/i))) return `Посмотри ${m[1]} ${plural(m[1], ['материал','материала','материалов'])}.`;
     if ((m = text.match(/^Watch (\d+) films?\.$/i))) return `Посмотри ${m[1]} ${plural(m[1], ['фильм','фильма','фильмов'])}.`;
@@ -312,6 +315,8 @@ function localizedDescription(raw) {
         return `Посмотри ${m[1]} материалов в жанре ${genres[m[2].toLowerCase()]}.`;
     }
     if ((m = text.match(/^Watch (\d+) documentaries\.$/i))) return `Посмотри ${m[1]} документальных фильмов.`;
+    if ((m = text.match(/^Watch (\d+) thrillers\.$/i))) return `Посмотри ${m[1]} триллеров.`;
+    if ((m = text.match(/^Reach 100% completion in (\d+) libraries\.$/i))) return `Достигни 100% завершения в ${m[1]} библиотеках.`;
     if ((m = text.match(/^Reach prestige level (\d+)\.$/i))) return `Достигни ${m[1]}-го уровня престижа.`;
     if ((m = text.match(/^Earn ([\d,]+) lifetime score\.$/i))) return `Набери ${m[1]} очков за всё время.`;
     if ((m = text.match(/^Reach a (\d+)x playback combo\.$/i))) return `Достигни серии из ${m[1]} воспроизведений подряд.`;
