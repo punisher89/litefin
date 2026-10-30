@@ -439,6 +439,7 @@ class LazyLoader {
 
             img.classList.add('loaded');
             img.removeAttribute('data-lazy-loading');
+            if (img.classList.contains('lf-native-poster-tags')) return;
 
             const parent = img.parentElement;
             if (parent) {
