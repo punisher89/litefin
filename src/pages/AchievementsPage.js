@@ -60,7 +60,7 @@ const GAME_TEXT = {
 };
 
 function gameText(key, replacements = {}) {
-    const language = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
+    const language = String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en').toLowerCase();
     const dictionary = language.startsWith('ru') ? GAME_TEXT.ru : GAME_TEXT.en;
     let text = dictionary[key] || GAME_TEXT.en[key] || key;
     Object.keys(replacements).forEach((name) => {
@@ -75,7 +75,7 @@ function arrayOf(object, ...keys) {
 }
 
 function cosmeticKindLabel(kind) {
-    const ru = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase().startsWith('ru');
+    const ru = String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en').toLowerCase().startsWith('ru');
     const labels = ru
         ? { ProfileTheme: 'Тема профиля', BadgeFrame: 'Рамка значка', RankTitle: 'Титул', Avatar: 'Аватар', Background: 'Фон', ProfileBorder: 'Рамка профиля' }
         : { ProfileTheme: 'Profile theme', BadgeFrame: 'Badge frame', RankTitle: 'Rank title', Avatar: 'Avatar', Background: 'Background', ProfileBorder: 'Profile border' };
@@ -141,7 +141,7 @@ function badgeIcon(badge) {
 function localizedBadgeValue(value, kind) {
     const raw = String(value || '').trim();
     if (!raw) return '';
-    const language = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
+    const language = String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en').toLowerCase();
     if (!language.startsWith('ru')) return raw;
 
     const key = raw.toLowerCase().replace(/[_-]+/g, ' ').trim();
