@@ -719,3 +719,144 @@
         flex: 1 1 calc(50% - 8px);
     }
 }
+
+
+
+/* Shared geometry: keep every Achievements section on the same centered column. */
+.achievements-content {
+    width: 100%;
+    max-width: 1320px;
+    box-sizing: border-box;
+    padding: 28px 30px 58px;
+}
+.achievements-section {
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: 22px;
+    padding: 20px;
+    border: 1px solid var(--border-color, rgba(255,255,255,.09));
+    border-radius: 20px;
+    background: var(--card-background, rgba(255,255,255,.035));
+}
+.achievements-section h2 {
+    margin: 0 0 16px;
+    font-size: 20px;
+}
+.achievements-section-heading {
+    min-height: 30px;
+    margin-bottom: 14px;
+}
+.achievements-overview {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    gap: 12px;
+}
+.achievement-stat,
+.achievement-quest-group,
+.achievements-leaderboard,
+.achievement-badge,
+.achievement-game-card,
+.achievement-gift-form {
+    box-sizing: border-box;
+    min-width: 0;
+}
+.achievement-stat,
+.achievement-quest-group {
+    border-radius: 15px;
+}
+.achievements-quests,
+.achievements-grid,
+.achievement-game-grid {
+    width: 100%;
+    align-items: stretch;
+}
+.achievements-game-section {
+    padding: 20px;
+}
+.achievements-game-heading {
+    min-height: 68px;
+    padding-bottom: 16px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,.09));
+}
+.achievements-game-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 9px;
+    width: 100%;
+}
+.achievement-game-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 45px;
+    padding: 9px 12px;
+    text-align: center;
+}
+.achievement-game-panel {
+    box-sizing: border-box;
+    min-height: 240px;
+    padding: 18px;
+    margin-top: 14px;
+    border: 1px solid var(--border-color, rgba(255,255,255,.09));
+    border-radius: 15px;
+    background: rgba(255,255,255,.025);
+}
+.achievement-game-panel[hidden] { display: none !important; }
+.achievement-game-panel > .achievement-game-description:first-child { margin: 0 0 14px; }
+.achievement-game-panel h3 {
+    margin: 8px 0 12px;
+    font-size: 15px;
+}
+.achievement-game-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 11px;
+}
+.achievement-game-card {
+    min-height: 118px;
+    height: 100%;
+    border-radius: 13px;
+    background: var(--card-background, rgba(255,255,255,.035));
+}
+.achievement-game-card-content > p {
+    overflow-wrap: anywhere;
+}
+.achievement-gift-form {
+    margin-top: 12px;
+    max-width: none;
+    border-radius: 13px;
+    background: var(--card-background, rgba(255,255,255,.035));
+}
+.achievements-leaderboard {
+    border-radius: 13px;
+}
+.achievement-badge {
+    border-radius: 13px;
+    background: var(--card-background, rgba(255,255,255,.035));
+}
+.achievement-badge-icon {
+    border-radius: 12px;
+}
+.achievements-count {
+    min-width: 32px;
+    text-align: right;
+}
+@media (max-width: 900px) {
+    .achievements-content { padding: 20px 18px 42px; }
+    .achievements-section { padding: 16px; }
+    .achievements-game-section { padding: 16px; }
+    .achievements-game-tabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .achievement-game-panel { padding: 14px; min-height: 200px; }
+}
+@media (max-width: 600px) {
+    .achievements-section { padding: 14px; border-radius: 16px; }
+    .achievements-quests,
+    .achievements-grid,
+    .achievement-game-grid { grid-template-columns: 1fr; }
+    .achievement-game-panel { min-height: 0; }
+    .achievement-game-card { min-height: 0; }
+    .achievements-game-heading { align-items: flex-start; }
+}
