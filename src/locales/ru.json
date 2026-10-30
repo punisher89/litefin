@@ -1745,5 +1745,6 @@
     "EnhancedPersonBirthPlace": "Место рождения",
     "EnhancedPersonYearOne": "год",
     "EnhancedPersonYearFew": "года",
-    "EnhancedPersonYearMany": "лет"
+    "EnhancedPersonYearMany": "лет",
+    "EnhancedAwardsList": "Список наград"
 }
