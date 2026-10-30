@@ -1737,5 +1737,14 @@
     "YearLabel": "Year: {0}",
     "YearValue": "{0} year",
     "Yes": "Yes",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "EnhancedCinemaRelease": "Cinema release",
+    "EnhancedDigitalRelease": "Digital release",
+    "EnhancedPhysicalRelease": "Physical release",
+    "EnhancedEpisodeRelease": "Episode release",
+    "EnhancedAwards": "Awards",
+    "EnhancedAwardWins": "Wins",
+    "EnhancedAwardNominations": "Nominations",
+    "EnhancedAwardWon": "Won",
+    "EnhancedAwardNominated": "Nominated"
 }
