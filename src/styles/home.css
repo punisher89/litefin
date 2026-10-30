@@ -505,3 +505,25 @@ html[data-layout-tier="ultra-legacy"] .media-card.focused .card-overlay-label {
     color: #000;
 }
 
+
+
+/* Jellyfin Enhanced Native Poster Tags on wide home rows.
+   The wide Thumb/Backdrop remains untouched; this compact Primary poster
+   carries the user's signed Enhanced tags without changing row geometry. */
+.media-card.landscape .card-image img.lf-native-poster-tags {
+    top: 8% !important;
+    left: 10px !important;
+    width: 23% !important;
+    height: 84% !important;
+    object-fit: cover !important;
+    border-radius: calc(var(--jf-border-radius) - 2px) !important;
+    border: 2px solid rgba(255,255,255,.72);
+    box-shadow: 0 4px 14px rgba(0,0,0,.55);
+    z-index: 7 !important;
+    opacity: 0;
+    pointer-events: none;
+    background: rgba(0,0,0,.35);
+}
+.media-card.landscape .card-image img.lf-native-poster-tags.loaded {
+    opacity: 1;
+}
