@@ -1,7 +1,15 @@
 import Page from './Page.js';
 import { api } from '../api/index.js';
 import { i18n } from '../utils/i18n.js';
-import { localizeAchievementBadge } from '../utils/AchievementBadgeLocalization.js';
+import {
+    localizeAchievementBadge,
+    localizeAchievementQuest,
+    localizeAchievementCatalogItem,
+    localizeAchievementPowerUp,
+    localizeAchievementPowerUpType,
+    localizeAchievementRank,
+    localizeAchievementMessage
+} from '../utils/AchievementBadgeLocalization.js';
 import { logger } from '../utils/Logger.js';
 import { achievementNotifications } from '../utils/AchievementNotifications.js';
 import '../styles/achievements.css';
@@ -424,7 +432,7 @@ class AchievementsPage extends Page {
     _setGameStatus(message, isError = false) {
         const status = this.$('#achievement-game-status');
         if (!status) return;
-        status.textContent = message || '';
+        status.textContent = localizeAchievementMessage(message || '', document.documentElement.lang || i18n.currentLang || 'en');
         status.classList.toggle('is-error', !!isError);
         status.hidden = !message;
     }
@@ -446,6 +454,7 @@ class AchievementsPage extends Page {
         const grid = this.$('#achievement-arsenal-grid');
         const countNode = this.$('#achievement-powerup-count');
         if (!grid) return;
+        const language = document.documentElement.lang || i18n.currentLang || 'en';
         const inventory = arrayOf(this._loadout.powerups, 'Inventory', 'inventory');
         const total = inventory.reduce((sum, item) => sum + Number(valueOf(item, 'Count', 'count') || 0), 0);
         if (countNode) countNode.textContent = `${gameText('quantity')}: ${total}`;
@@ -455,11 +464,12 @@ class AchievementsPage extends Page {
         }
         grid.innerHTML = inventory.map((item) => {
             const type = String(valueOf(item, 'Type', 'type') || '');
-            const name = valueOf(item, 'DisplayName', 'displayName') || type;
+            const localizedItem = localizeAchievementPowerUp(item, language);
+            const name = valueOf(localizedItem, 'DisplayName', 'displayName') || type;
             const count = Number(valueOf(item, 'Count', 'count') || 0);
             const active = !!valueOf(item, 'Active', 'active');
             const activeUntil = valueOf(item, 'ActiveUntil', 'activeUntil');
-            const desc = valueOf(item, 'Description', 'description') || '';
+            const desc = valueOf(localizedItem, 'Description', 'description') || '';
             const isFreeze = type.toLowerCase() === 'streakfreeze';
             const canUse = count > 0 && !isFreeze && !(active && type.toLowerCase() === 'doublecredit');
             const icon = type.toLowerCase() === 'xpboost' ? '⚡' : type.toLowerCase() === 'doublecredit' ? '✖️2' : '❄️';
@@ -486,10 +496,12 @@ class AchievementsPage extends Page {
         const cosmetics = arrayOf(this._loadout.catalog, 'Cosmetics', 'cosmetics');
         const owned = new Set(arrayOf(this._loadout.cosmetics, 'Owned', 'owned').map(String));
         const score = Number(valueOf(this._loadout.bank, 'ScoreBank', 'scoreBank') ?? valueOf(this._loadout.powerups, 'ScoreBank', 'scoreBank') ?? 0);
+        const language = document.documentElement.lang || i18n.currentLang || 'en';
         const renderItem = (item, isCosmetic) => {
             const id = String(valueOf(item, 'Id', 'id') || '');
-            const name = valueOf(item, 'DisplayName', 'displayName') || id;
-            const description = valueOf(item, 'Description', 'description') || '';
+            const localizedItem = localizeAchievementCatalogItem(item, language);
+            const name = valueOf(localizedItem, 'DisplayName', 'displayName') || id;
+            const description = valueOf(localizedItem, 'Description', 'description') || '';
             const price = Number(valueOf(item, 'PriceScore', 'priceScore') || 0);
             const milestone = Number(valueOf(item, 'MilestoneScore', 'milestoneScore') || 0);
             const isOwned = isCosmetic && owned.has(id);
@@ -499,7 +511,7 @@ class AchievementsPage extends Page {
             const previewColor = typeof preview === 'string' && /^#[0-9a-f]{3,8}$/i.test(preview) ? preview : '';
             const previewGlyph = previewColor ? '✦' : (preview || (isCosmetic ? '🎨' : '⚡'));
             const rawKind = valueOf(item, 'Kind', 'kind') || '';
-            const kind = isCosmetic ? cosmeticKindLabel(rawKind) : (String(valueOf(item, 'Type', 'type') || '').toLowerCase() === 'xpboost' ? 'XP Boost' : String(valueOf(item, 'Type', 'type') || '').toLowerCase() === 'doublecredit' ? 'Double Credit' : 'Streak Freeze');
+            const kind = isCosmetic ? cosmeticKindLabel(rawKind) : localizeAchievementPowerUpType(valueOf(item, 'Type', 'type') || '', language);
             const button = isOwned
                 ? `<span class="achievement-owned-label">✓ ${escapeHtml(gameText('owned'))}</span>`
                 : isMilestone
@@ -526,6 +538,7 @@ class AchievementsPage extends Page {
         const catalog = arrayOf(this._loadout.catalog, 'Cosmetics', 'cosmetics');
         const owned = new Set(arrayOf(this._loadout.cosmetics, 'Owned', 'owned').map(String));
         const equipped = this._loadout.cosmetics || {};
+        const language = document.documentElement.lang || i18n.currentLang || 'en';
         const items = catalog.filter((item) => owned.has(String(valueOf(item, 'Id', 'id') || '')));
         if (!items.length) {
             target.innerHTML = `<p class="achievements-muted">${escapeHtml(gameText('noCosmetics'))}</p>`;
@@ -533,7 +546,8 @@ class AchievementsPage extends Page {
         }
         target.innerHTML = items.map((item) => {
             const id = String(valueOf(item, 'Id', 'id') || '');
-            const name = valueOf(item, 'DisplayName', 'displayName') || id;
+            const localizedItem = localizeAchievementCatalogItem(item, language);
+            const name = valueOf(localizedItem, 'DisplayName', 'displayName') || id;
             const kind = String(valueOf(item, 'Kind', 'kind') || '');
             const equippedId = valueOf(equipped, cosmeticEquipField(kind), cosmeticEquipField(kind).charAt(0).toLowerCase() + cosmeticEquipField(kind).slice(1));
             const isEquipped = equippedId === id;
@@ -545,7 +559,7 @@ class AchievementsPage extends Page {
                     <div class="achievement-game-card-content">
                         <strong>${escapeHtml(name)}</strong>
                         <small>${escapeHtml(cosmeticKindLabel(kind))}</small>
-                        <p>${escapeHtml(valueOf(item, 'Description', 'description') || '')}</p>
+                        <p>${escapeHtml(valueOf(localizedItem, 'Description', 'description') || '')}</p>
                         ${isEquipped ? `<span class="achievement-owned-label is-equipped">✓ ${escapeHtml(gameText('equipped'))}</span>` : `<button class="achievement-action-button focusable" type="button" data-achievement-equip="${escapeHtml(id)}" data-achievement-name="${escapeHtml(name)}" tabindex="0">${escapeHtml(gameText('equip'))}</button>`}
                     </div>
                 </article>`;
@@ -600,7 +614,7 @@ class AchievementsPage extends Page {
             this._setGameStatus(gameText('rerollOk'));
         } catch (err) {
             log.warn(`Achievement Badges ${period} quest reroll failed:`, err);
-            this._setGameStatus(err.message || gameText('actionFailed'), true);
+            this._setGameStatus(gameText('actionFailed'), true);
             button.disabled = false;
         }
     }
@@ -617,10 +631,10 @@ class AchievementsPage extends Page {
             if (valueOf(result, 'Success', 'success') === false) throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
             await this._loadLoadout();
             this._renderLoadout();
-            this._setGameStatus(valueOf(result, 'Message', 'message') || gameText('purchaseOk'));
+            this._setGameStatus(gameText('purchaseOk'));
         } catch (err) {
             log.warn('Achievement Badges shop purchase failed:', err);
-            this._setGameStatus(err.message || gameText('actionFailed'), true);
+            this._setGameStatus(gameText('actionFailed'), true);
             button.disabled = false;
         }
     }
@@ -636,10 +650,10 @@ class AchievementsPage extends Page {
             const result = await api.post(`${this._userPath}/powerups/use/${encodeURIComponent(type)}`, {});
             await this._loadLoadout();
             this._renderLoadout();
-            this._setGameStatus(valueOf(result, 'Message', 'message') || gameText('useOk'));
+            this._setGameStatus(gameText('useOk'));
         } catch (err) {
             log.warn('Achievement Badges power-up activation failed:', err);
-            this._setGameStatus(err.message || gameText('actionFailed'), true);
+            this._setGameStatus(gameText('actionFailed'), true);
             button.disabled = false;
         }
     }
@@ -655,10 +669,10 @@ class AchievementsPage extends Page {
             if (valueOf(result, 'Success', 'success') === false) throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
             await this._loadLoadout();
             this._renderLoadout();
-            this._setGameStatus(valueOf(result, 'Message', 'message') || gameText('equipOk'));
+            this._setGameStatus(gameText('equipOk'));
         } catch (err) {
             log.warn('Achievement Badges cosmetic equip failed:', err);
-            this._setGameStatus(err.message || gameText('actionFailed'), true);
+            this._setGameStatus(gameText('actionFailed'), true);
             button.disabled = false;
         }
     }
@@ -685,10 +699,10 @@ class AchievementsPage extends Page {
             if (valueOf(result, 'Success', 'success') === false) throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
             await this._loadLoadout();
             this._renderLoadout();
-            this._setGameStatus(valueOf(result, 'Message', 'message') || gameText('giftOk'));
+            this._setGameStatus(gameText('giftOk'));
         } catch (err) {
             log.warn('Achievement Badges score gift failed:', err);
-            this._setGameStatus(err.message || gameText('actionFailed'), true);
+            this._setGameStatus(gameText('actionFailed'), true);
         } finally {
             if (button) button.disabled = false;
         }
@@ -733,8 +747,9 @@ class AchievementsPage extends Page {
         const unlocked = Number(valueOf(summary, 'Unlocked', 'unlocked') || 0);
         const total = Number(valueOf(summary, 'Total', 'total') || this._data.badges.length);
         const percent = Number(valueOf(summary, 'Percentage', 'percentage') || 0);
-        const rankName = valueOf(tier, 'Name', 'name') || '—';
-        const nextName = valueOf(nextTier, 'Name', 'name');
+        const language = document.documentElement.lang || i18n.currentLang || 'en';
+        const rankName = localizeAchievementRank(valueOf(tier, 'Name', 'name') || '—', language);
+        const nextName = localizeAchievementRank(valueOf(nextTier, 'Name', 'name'), language);
         const rankProgress = Math.max(0, Math.min(100, Number(valueOf(rank, 'ProgressToNext', 'progressToNext') || 0)));
         const streak = Number(valueOf(summary, 'CurrentWatchStreak', 'currentWatchStreak') || 0);
         const bestStreak = Number(valueOf(summary, 'BestWatchStreak', 'bestWatchStreak') || 0);
@@ -782,11 +797,13 @@ class AchievementsPage extends Page {
         if (!target) return;
         const daily = valueOf(this._data.quests, 'Daily', 'daily') || [];
         const weekly = valueOf(this._data.quests, 'Weekly', 'weekly') || [];
+        const language = document.documentElement.lang || i18n.currentLang || 'en';
         const renderList = (items) => {
             if (!Array.isArray(items) || !items.length) return `<p class="achievements-muted">${escapeHtml(i18n.t('AchievementNoQuests'))}</p>`;
             return items.map((quest) => {
-                const title = valueOf(quest, 'Title', 'title') || '';
-                const description = valueOf(quest, 'Description', 'description') || '';
+                const localizedQuest = localizeAchievementQuest(quest, language);
+                const title = valueOf(localizedQuest, 'Title', 'title') || '';
+                const description = valueOf(localizedQuest, 'Description', 'description') || '';
                 const current = Number(valueOf(quest, 'Current', 'current') || 0);
                 const goal = Number(valueOf(quest, 'Target', 'target') || 0);
                 const completed = !!valueOf(quest, 'Completed', 'completed');
