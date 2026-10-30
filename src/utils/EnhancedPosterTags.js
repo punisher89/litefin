@@ -371,7 +371,8 @@ async function loadMissingItems(ids, userId) {
                 }
             }
             for (const id of batch) {
-                if (!itemCache.has(id)) {
+                const cached = itemCache.get(id);
+                if (!cached || cached.expiresAt <= Date.now()) {
                     itemCache.set(id, { data: null, expiresAt: Date.now() + NEGATIVE_TTL });
                 }
             }
@@ -404,12 +405,14 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
             return !cached || cached.expiresAt <= now;
         });
 
-    if (Date.now() < endpointUnavailableUntil) return items;
-    await loadMissingItems(missing, userId);
+    if (Date.now() >= endpointUnavailableUntil) {
+        await loadMissingItems(missing, userId);
+    }
 
     const firstEpisodeIds = [];
     for (const item of candidates) {
-        const record = itemCache.get(String(item.Id))?.data;
+        const cached = itemCache.get(String(item.Id));
+        const record = cached && cached.expiresAt > Date.now() ? cached.data : null;
         if (record && record.FirstEpisode && record.FirstEpisode.NeedsStreamFetch && record.FirstEpisode.Id) {
             firstEpisodeIds.push(String(record.FirstEpisode.Id));
         }
@@ -419,11 +422,13 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
     }
 
     for (const item of candidates) {
-        const record = itemCache.get(String(item.Id))?.data;
+        const cached = itemCache.get(String(item.Id));
+        const record = cached && cached.expiresAt > Date.now() ? cached.data : null;
         if (!record) continue;
         const renderData = { ...record };
         if (renderData.FirstEpisode && renderData.FirstEpisode.Id) {
-            const episode = itemCache.get(String(renderData.FirstEpisode.Id))?.data;
+            const episodeEntry = itemCache.get(String(renderData.FirstEpisode.Id));
+            const episode = episodeEntry && episodeEntry.expiresAt > Date.now() ? episodeEntry.data : null;
             if (episode) {
                 renderData.MediaStreams = episode.MediaStreams || renderData.MediaStreams;
                 renderData.MediaSources = episode.MediaSources || renderData.MediaSources;
