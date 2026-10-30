@@ -201,6 +201,12 @@ class AchievementNotifications {
     }
 
     _queueBadges(badges, prefs) {
+        const video = document.querySelector('video');
+        const watching = !!(video && !video.paused && !video.ended);
+        const muteVisualDuringPlayback = prefs.MuteToastsDuringPlayback === true
+            || prefs.muteToastsDuringPlayback === true;
+        if (watching && muteVisualDuringPlayback) return;
+
         const grouping = String(prefs.UnlockToastGrouping || prefs.unlockToastGrouping || 'grouped').toLowerCase();
         if (grouping === 'individual' || badges.length === 1) {
             badges.forEach((badge) => this._queue.push({ badges: [badge] }));
@@ -253,6 +259,8 @@ class AchievementNotifications {
     _renderToast(payload, prefs) {
         const container = this._getContainer();
         const isMilestone = typeof payload.milestone === 'number';
+        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || '');
+        const copyText = (ru, en) => russian ? ru : en;
         const badges = payload.badges || [];
         const badge = badges[0] || {};
         const rarity = isMilestone ? 'legendary' : String(badge.Rarity || 'common').toLowerCase();
@@ -272,7 +280,7 @@ class AchievementNotifications {
 
         const eyebrow = document.createElement('div');
         eyebrow.className = 'lf-ab-eyebrow';
-        eyebrow.textContent = isMilestone ? 'Achievement milestone' : (rarity === 'common' || rarity === 'uncommon' ? 'Achievement unlocked' : 'Rare achievement unlocked');
+        eyebrow.textContent = isMilestone ? copyText('Достигнут рубеж', 'Achievement milestone') : (rarity === 'common' || rarity === 'uncommon' ? copyText('Достижение получено', 'Achievement unlocked') : copyText('Редкое достижение получено', 'Rare achievement unlocked'));
 
         const title = document.createElement('div');
         title.className = 'lf-ab-title';
@@ -284,20 +292,20 @@ class AchievementNotifications {
         points.className = 'lf-ab-points';
 
         if (isMilestone) {
-            title.textContent = 'Library milestone reached';
-            detail.textContent = payload.milestone + '% of achievements completed';
+            title.textContent = copyText('Новый игровой рубеж', 'Library milestone reached');
+            detail.textContent = payload.milestone + copyText('% достижений выполнено', '% of achievements completed');
         } else if (badges.length > 1) {
-            title.textContent = badges.length + ' achievements unlocked';
-            detail.textContent = badges.slice(0, 3).map((entry) => entry.Title || entry.title || 'Achievement').join(' · ');
+            title.textContent = badges.length + copyText(' достижений получено', ' achievements unlocked');
+            detail.textContent = badges.slice(0, 3).map((entry) => entry.Title || entry.title || copyText('Достижение', 'Achievement')).join(' · ');
             if (badges.length > 3) detail.textContent += ' +' + (badges.length - 3);
         } else {
-            title.textContent = badge.Title || badge.title || 'Achievement unlocked';
-            detail.textContent = badge.Description || badge.description || 'Keep watching to unlock more achievements.';
+            title.textContent = badge.Title || badge.title || copyText('Достижение получено', 'Achievement unlocked');
+            detail.textContent = badge.Description || badge.description || copyText('Продолжай смотреть, чтобы открыть новые достижения.', 'Keep watching to unlock more achievements.');
         }
 
         const totalPoints = badges.reduce((sum, entry) => sum + (Number(entry.ScorePoints || entry.scorePoints) || 0), 0);
         if (totalPoints > 0) {
-            points.textContent = '+' + totalPoints + ' points';
+            points.textContent = '+' + totalPoints + copyText(' очков', ' points');
             copy.appendChild(points);
         }
 
