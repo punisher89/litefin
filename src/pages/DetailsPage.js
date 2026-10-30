@@ -3400,10 +3400,7 @@ class DetailsPage extends Page {
         if (ttbLabel) metaHtml += `<span class="meta-item meta-badge game-ttb-pill">${escapeHtml(ttbLabel)}</span>`;
         if (year) metaHtml += `<span class="meta-item">${year}</span>`;
         if (runtimeText) metaHtml += `<span class="meta-item">${runtimeText}</span>`;
-        metaHtml += releaseMetaHtml;
         if (rating) metaHtml += `<span class="meta-item meta-badge">${rating}</span>`;
-        if (starRating) metaHtml += `<span class="meta-item meta-star">${starRating}</span>`;
-        if (criticRating) metaHtml += `<span class="meta-item meta-tomato">${criticRating}</span>`;
         if (endsAtText) metaHtml += `<span class="meta-item meta-ends-at">${endsAtText}</span>`;
 
         // --- Added & Aired Dates ---
@@ -3454,6 +3451,16 @@ class DetailsPage extends Page {
         if (datesFormattedString) {
             metaHtml += `<span class="meta-item meta-item-dates">${datesFormattedString}</span>`;
         }
+
+        // Release-date chips always occupy the final position in the metadata row.
+        metaHtml += releaseMetaHtml;
+
+        // Keep Jellyfin community and critic scores in their own line below metadata.
+        const ratingsHtml = [
+            starRating ? `<span class="meta-item meta-star">${starRating}</span>` : '',
+            criticRating ? `<span class="meta-item meta-tomato">${criticRating}</span>` : ''
+        ].filter(Boolean).join('');
+
         let titleStyle = storage.getItem('pref:detailsTitleStyle') || 'both';
         const detailsLayout = this._getDetailsLayout(item);
         if (detailsLayout === 'backdropMinimal' || detailsLayout === 'backdropLeft') {
@@ -3558,11 +3565,12 @@ class DetailsPage extends Page {
             techHtml = this._renderTechnicalDetails();
         }
 
-        // Finish appending standard metadata row and technical specifications.
+        // Finish appending metadata, review scores and technical specifications.
         heroHtml += `
             <div class="details-meta-row">
                 ${metaHtml}
             </div>
+            ${ratingsHtml ? `<div class="details-ratings-row">${ratingsHtml}</div>` : ''}
             ${techHtml}
         `;
 
