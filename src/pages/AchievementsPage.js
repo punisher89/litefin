@@ -169,7 +169,6 @@ function localizedBadgeValue(value, kind) {
             social: 'Социальные', collection: 'Коллекции',
             'getting started': 'Начало пути',
             binge: 'Марафоны',
-            films: 'Фильмы',
             'night watching': 'Ночные просмотры',
             'morning watching': 'Утренние просмотры',
             'weekend watching': 'Просмотры в выходные',
