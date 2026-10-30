@@ -1325,6 +1325,10 @@ class CardRenderer {
         if (hasBottomBadges) {
             cssClass += ' has-bottom-badges';
         }
+        if (unplayedCountBadgeHtml) cssClass += ' has-unplayed-count';
+        if (episodeBadgeHtml) cssClass += ' has-episode-badge';
+        if (playedBadgeHtml) cssClass += ' has-played-badge';
+        if (versionCountBadgeHtml || favoriteBadgeHtml) cssClass += ' has-bottom-left-badges';
 
         // Live TV Channel card classification
         if (item.Type === 'TvChannel') {
