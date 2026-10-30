@@ -853,6 +853,35 @@ class CardRenderer {
                 });
             }
         }
+        // Jellyfin Enhanced Native Poster Tags are stamped into authenticated
+        // Primary image tags (the -jet token). Wide home rows use Thumb/Backdrop
+        // for their main artwork, so add a small lazy-loaded Primary poster only
+        // when Enhanced has actually stamped one for this user.
+        let nativePosterTagHtml = '';
+        if (isLandscape && !item._imageUrl && ['Movie', 'Series', 'Season', 'Episode', 'BoxSet', 'Video'].includes(item.Type)) {
+            let posterOwnerId = itemId;
+            let posterTag = item.ImageTags?.Primary;
+            if (item.Type === 'Episode' && item.SeriesId && item.SeriesPrimaryImageTag) {
+                posterOwnerId = item.SeriesId;
+                posterTag = item.SeriesPrimaryImageTag;
+            }
+            if (posterOwnerId && posterTag && /-jet[0-9a-f]{23}(?:-jeu[0-9a-f]{12})?$/i.test(posterTag)) {
+                const posterParams = imageService.getParams('poster', contextType);
+                const savedType = resolvedImageType;
+                const savedTag = resolvedImageTag;
+                const posterUrl = _imgUrl(posterOwnerId, 'Primary', {
+                    maxWidth: Math.min(posterParams.maxWidth || 240, 360),
+                    quality: posterParams.quality,
+                    tag: posterTag
+                });
+                resolvedImageType = savedType;
+                resolvedImageTag = savedTag;
+                if (posterUrl) {
+                    nativePosterTagHtml = `<img src="${placeholder}" data-src="${posterUrl}" class="lazy lf-native-poster-tags" data-lf-overlay="true" alt="" aria-hidden="true" />`;
+                }
+            }
+        }
+
         // =====================================================================
         // BlurHash Resolution Strategy
         // =====================================================================
@@ -1418,7 +1447,7 @@ class CardRenderer {
                 ? `<canvas class="blurhash-canvas" data-blurhash="${blurHash}"></canvas>`
                 : '';
         const imagePart = imageUrl
-            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
+            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />${nativePosterTagHtml}`
             : `${CardRenderer.getFallbackHtml(item, isLandscape, { hideInitials, isLibrary: type === 'library' })}`;
         const finalContextType = contextType || item.Type;
 
