@@ -26,6 +26,9 @@
 @import './layout.css';
 @import './components.css';
 
+/* Shared media-card overlays */
+@import './enhanced-poster-tags.css';
+
 /* Application shell and shared structural styles */
 @import './sidebar.css';
 
