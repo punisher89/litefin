@@ -2772,3 +2772,14 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     outline: 2px solid var(--jf-accent, #d4ad55);
     outline-offset: -2px;
 }
+
+.media-card .lf-person-enhanced-info {
+    justify-content: space-between;
+}
+.media-card .lf-person-age-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    max-width: 100%;
+}
