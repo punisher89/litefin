@@ -20,6 +20,7 @@ const VALID_CORNERS = new Set(['top-left', 'top-right', 'bottom-left', 'bottom-r
 let settingsSnapshot = null;
 let settingsUserId = null;
 let settingsFetchedAt = 0;
+let settingsLoaded = false;
 let settingsPromise = null;
 let endpointUnavailableUntil = 0;
 const itemCache = new Map();
@@ -67,11 +68,12 @@ async function getSettingsSnapshot(force = false) {
     if (!userId) return null;
     const now = Date.now();
 
-    if (!force && settingsSnapshot && settingsUserId === userId && now - settingsFetchedAt < SETTINGS_TTL) {
+    if (!force && settingsLoaded && settingsUserId === userId && now - settingsFetchedAt < SETTINGS_TTL) {
         return settingsSnapshot;
     }
     if (!force && settingsPromise && settingsUserId === userId) return settingsPromise;
 
+    if (settingsUserId !== userId) settingsLoaded = false;
     settingsUserId = userId;
     settingsPromise = (async () => {
         try {
@@ -102,10 +104,12 @@ async function getSettingsSnapshot(force = false) {
                 config
             };
             settingsFetchedAt = Date.now();
+            settingsLoaded = true;
             return settingsSnapshot;
         } catch (error) {
             settingsSnapshot = null;
             settingsFetchedAt = Date.now();
+            settingsLoaded = true;
             log.debug('Jellyfin Enhanced poster-tag settings are unavailable:', error && error.message);
             return null;
         } finally {
@@ -423,21 +427,28 @@ export function renderEnhancedPosterTags(item) {
     const groups = item && item._enhancedPosterTags;
     if (!groups || !Object.keys(groups).length || hasNativePosterTagStamp(item)) return '';
     const output = [];
+    const byPosition = {};
     for (const key of ['quality', 'genre', 'language', 'rating', 'age']) {
         const group = groups[key];
         if (!group || !Array.isArray(group.items) || !group.items.length) continue;
-        const values = group.items.map((entry) => {
+        const position = cleanPosition(group.position, 'top-left');
+        if (!byPosition[position]) byPosition[position] = [];
+        for (const entry of group.items) {
             if (entry && typeof entry === 'object') {
-                const label = entry.country || entry.code || '';
-                return '<span class="lf-je-tag lf-je-tag--' + key + '" title="' + escapeHtml(label) + '">' +
-                    escapeHtml(label) + '</span>';
+                const country = String(entry.country || '').toUpperCase();
+                const flag = country.length === 2
+                    ? String.fromCodePoint(127397 + country.charCodeAt(0), 127397 + country.charCodeAt(1))
+                    : String(entry.code || '');
+                byPosition[position].push('<span class="lf-je-tag lf-je-tag--' + key + '" title="' +
+                    escapeHtml(String(entry.code || country)) + '">' + escapeHtml(flag) + '</span>');
+            } else {
+                byPosition[position].push('<span class="lf-je-tag lf-je-tag--' + key + '">' + escapeHtml(entry) + '</span>');
             }
-            return '<span class="lf-je-tag lf-je-tag--' + key + '">' + escapeHtml(entry) + '</span>';
-        }).join('');
-        output.push(
-            '<div class="lf-je-tag-group lf-je-tag-group--' + group.position + ' lf-je-tag-group--' + key + '">' +
-            values + '</div>'
-        );
+        }
+    }
+    for (const position of Object.keys(byPosition)) {
+        output.push('<div class="lf-je-tag-group lf-je-tag-group--' + position + '">' +
+            byPosition[position].join('') + '</div>');
     }
     return output.length ? '<div class="lf-je-poster-tags">' + output.join('') + '</div>' : '';
 }
@@ -446,6 +457,7 @@ export function clearEnhancedPosterTagCache() {
     settingsSnapshot = null;
     settingsUserId = null;
     settingsFetchedAt = 0;
+    settingsLoaded = false;
     settingsPromise = null;
     endpointUnavailableUntil = 0;
     itemCache.clear();
