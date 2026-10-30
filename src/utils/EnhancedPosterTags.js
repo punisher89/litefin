@@ -465,6 +465,11 @@ export function renderEnhancedPosterTags(item) {
     return output.length ? '<div class="lf-je-poster-tags">' + output.join('') + '</div>' : '';
 }
 
+export function clearEnhancedPosterTagItemCache() {
+    // A fresh homepage visit must see current Spoiler Guard and library-access filtering.
+    itemCache.clear();
+}
+
 export function clearEnhancedPosterTagCache() {
     settingsSnapshot = null;
     settingsUserId = null;
