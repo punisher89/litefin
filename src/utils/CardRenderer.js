@@ -429,7 +429,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${item._enhancedPersonInfo ? JSON.stringify(item._enhancedPersonInfo) : ''}|${item.ImageTags?.Primary || ''}|${item.SeriesPrimaryImageTag || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${item._enhancedPersonInfo ? JSON.stringify(item._enhancedPersonInfo) : ''}|${item.ImageTags?.Primary || ''}|${item.SeriesPrimaryImageTag || ''}|${item._nativePosterTagsEnabled ? 'native-poster-tags' : ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -625,7 +625,7 @@ class CardRenderer {
             if (item.Type === 'Episode') {
                 // Spoiler Prevention: For NextUp/Upcoming/Resume, prefer Series Thumb/Backdrop
                 const preferEpisodeImages = prefs.preferEpisodeImages;
-                const isSpoilerFree = !preferEpisodeImages && ['nextUp', 'upcoming', 'resume'].includes(contextType);
+                const isSpoilerFree = !preferEpisodeImages && ['nextUp', 'upcoming', 'resume'].includes(contextType) && !item._nativePosterTagsEnabled;
 
                 // Episodes: Primary (Episode Thumb) -> Series Thumb -> Parent Thumb -> Backdrop
                 // If spoiler free, skip Primary logic unless nothing else exists
@@ -705,6 +705,14 @@ class CardRenderer {
                     imageUrl = item._dynamicThumbUrl;
                 }
                 // Movies/Series Landscape: Thumb -> Backdrop -> Primary
+                if (item._nativePosterTagsEnabled && item.ImageTags?.Primary) {
+                    // Native Poster Tags are stamped into the Primary image tag.
+                    imageUrl = _imgUrl(itemId, 'Primary', {
+                        maxWidth: params.maxWidth,
+                        quality: params.quality,
+                        tag: item.ImageTags.Primary
+                    });
+                } else
                 else if (item.ImageTags?.Thumb) {
                     imageUrl = _imgUrl(itemId, 'Thumb', {
                         maxWidth: params.maxWidth,
@@ -1291,6 +1299,7 @@ class CardRenderer {
         // In Expanded Posters layout, person cards (cast/crew/guest stars) render as square (1:1) cards.
         if (type === 'square' || type === 'artist' || (isExpanded && type === 'person')) cssClass = 'media-card square';
         if (isPersonDeceased) cssClass += ' is-enhanced-deceased';
+        if (type === 'resume' && item._nativePosterTagsEnabled) cssClass += ' native-poster-tags-resume';
 
         // -------------------------------------------------------------
         // PROGRESS MARKER CLASS
