@@ -1255,11 +1255,22 @@ class CardRenderer {
             ? (enhancedPersonInfo.birthPlace ?? enhancedPersonInfo.BirthPlace)
             : '';
         const isPersonDeceased = !!(enhancedPersonInfo && (enhancedPersonInfo.isDeceased ?? enhancedPersonInfo.IsDeceased));
+        const personAgeUnit = (value) => {
+            const amount = Math.abs(Number(value));
+            const lang = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
+            if (!lang.startsWith('ru')) return amount === 1 ? 'year' : 'years';
+            const mod100 = amount % 100;
+            const mod10 = amount % 10;
+            if (mod100 >= 11 && mod100 <= 14) return i18n.t('EnhancedPersonYearMany') || 'лет';
+            if (mod10 === 1) return i18n.t('EnhancedPersonYearOne') || 'год';
+            if (mod10 >= 2 && mod10 <= 4) return i18n.t('EnhancedPersonYearFew') || 'года';
+            return i18n.t('EnhancedPersonYearMany') || 'лет';
+        };
         const personInfoHtml = enhancedPersonInfo ? `
             <div class="lf-person-enhanced-info">
                 ${personAge !== null && personAge !== undefined ? `
                     <span class="lf-person-age-chip ${isPersonDeceased ? 'is-deceased' : ''}">
-                        ${isPersonDeceased ? '✝' : '🎂'} ${Number(personAge)} ${escapeHtml(i18n.t('EnhancedPersonYears') || 'лет')}
+                        ${isPersonDeceased ? '✝' : '🎂'} ${Number(personAge)} ${escapeHtml(personAgeUnit(personAge))}
                     </span>` : ''}
                 ${personAgeAtRelease !== null && personAgeAtRelease !== undefined ? `
                     <span class="lf-person-age-chip is-release">🎬 ${Number(personAgeAtRelease)} ${escapeHtml(i18n.t('EnhancedPersonAtRelease') || 'на момент выхода')}
