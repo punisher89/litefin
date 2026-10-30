@@ -712,8 +712,7 @@ class CardRenderer {
                         quality: params.quality,
                         tag: item.ImageTags.Primary
                     });
-                } else
-                else if (item.ImageTags?.Thumb) {
+                } else if (item.ImageTags?.Thumb) {
                     imageUrl = _imgUrl(itemId, 'Thumb', {
                         maxWidth: params.maxWidth,
                         quality: params.quality,
