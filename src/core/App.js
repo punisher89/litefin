@@ -33,6 +33,7 @@ import { exitDialog } from '../ui/ExitDialog.js';
 import { pinDialog } from '../ui/PinDialog.js';
 import { pinManager } from '../utils/PinManager.js';
 import { customHeadersDialog } from '../ui/CustomHeadersDialog.js';
+import { achievementNotifications } from '../utils/AchievementNotifications.js';
 
 // Base Page class for route proxies and page lifecycle coordination
 import Page from '../pages/Page.js';
@@ -1375,6 +1376,7 @@ class App {
                             toast: null // Toast component reference wired up once UI is ready
                         })
                         .catch((err) => log.error('pluginManager.init failed:', err));
+                    achievementNotifications.init();
                 }
 
                 timeManager.init();
@@ -1700,12 +1702,14 @@ class App {
             log.info('User logged out - resetting to login page');
             // Clear server plugin detection cache on logout (new server/user after login may differ)
             pluginManager.destroy();
+            achievementNotifications.destroy();
             router.reset('/login');
         });
 
         eventBus.on('auth:expired', () => {
             log.warn('Session expired - resetting to login page');
             pluginManager.destroy();
+            achievementNotifications.destroy();
             router.reset('/login');
         });
 
@@ -1722,6 +1726,7 @@ class App {
             // before redirecting to the user selection view, ensuring no background
             // plugins continue fetching endpoints during the profile select flow.
             pluginManager.destroy();
+            achievementNotifications.destroy();
 
             router.reset('/profiles');
         });
@@ -1745,6 +1750,7 @@ class App {
                     toast: null // Toast wired up once UI is ready
                 })
                 .catch((err) => log.error('pluginManager.init (post-login) failed:', err));
+            achievementNotifications.init();
         });
 
         // Handle application exit
