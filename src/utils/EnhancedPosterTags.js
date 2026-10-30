@@ -79,7 +79,7 @@ async function getSettingsSnapshot(force = false) {
         endpointUnavailableUntil = 0;
     }
     settingsUserId = userId;
-    settingsPromise = (async () => {
+    const requestPromise = (async () => {
         try {
             const config = await api.get('/JellyfinEnhanced/public-config', null, {
                 silent: true,
@@ -103,6 +103,7 @@ async function getSettingsSnapshot(force = false) {
             if (!enabledSettings(settings)) {
                 settingsSnapshot = null;
                 settingsFetchedAt = Date.now();
+                settingsLoaded = true;
                 return null;
             }
 
@@ -115,17 +116,20 @@ async function getSettingsSnapshot(force = false) {
             settingsLoaded = true;
             return settingsSnapshot;
         } catch (error) {
-            settingsSnapshot = null;
-            settingsFetchedAt = Date.now();
-            settingsLoaded = true;
-            log.debug('Jellyfin Enhanced poster-tag settings are unavailable:', error && error.message);
+            if ((api._userId || api.userId) === userId) {
+                settingsSnapshot = null;
+                settingsFetchedAt = Date.now();
+                settingsLoaded = true;
+                log.debug('Jellyfin Enhanced poster-tag settings are unavailable:', error && error.message);
+            }
             return null;
         } finally {
-            settingsPromise = null;
+            if (settingsPromise === requestPromise) settingsPromise = null;
         }
     })();
+    settingsPromise = requestPromise;
 
-    return settingsPromise;
+    return requestPromise;
 }
 
 function extractQuality(data, settings) {
