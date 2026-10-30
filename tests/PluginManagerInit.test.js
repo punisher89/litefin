@@ -79,11 +79,11 @@ async function evaluateInitBlock({
     const appScope = {};
     context.appScope = appScope;
     await vm.runInNewContext(
-        `(async function () {\\n${initBlock}\\n}).call(appScope);`,
+        `(async function () {\n${initBlock}\n}).call(appScope);`,
         context
     );
     await vm.runInNewContext(
-        `(async function () {\\n${hideSplashBlock}\\n}).call(appScope);`,
+        `(async function () {\n${hideSplashBlock}\n}).call(appScope);`,
         context
     );
 
