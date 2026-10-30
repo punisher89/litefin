@@ -242,7 +242,7 @@ function extractLanguages(data, config) {
         .map((entry) => lower(entry).trim())
         .filter(Boolean);
     const map = {
-        en: 'GB', ru: 'RU', ja: 'JP', fr: 'FR', de: 'DE', es: 'ES',
+        en: 'US', ru: 'RU', ja: 'JP', fr: 'FR', de: 'DE', es: 'ES',
         it: 'IT', pt: 'PT', zh: 'CN', ko: 'KR', ar: 'SA', tr: 'TR',
         pl: 'PL', uk: 'UA', nl: 'NL', sv: 'SE', no: 'NO', da: 'DK',
         fi: 'FI', cs: 'CZ', el: 'GR', he: 'IL', hi: 'IN', th: 'TH',
