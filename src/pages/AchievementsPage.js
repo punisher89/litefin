@@ -356,7 +356,7 @@ class AchievementsPage extends Page {
             // The public test route confirms the server plugin before user-scoped calls.
             await api.get('/Plugins/AchievementBadges/test');
 
-            const language = String(document.documentElement.lang || 'en').toLowerCase().split('-')[0];
+            const language = String(document.documentElement.lang || i18n.currentLang || 'en').toLowerCase().split('-')[0];
             const userPath = `/Plugins/AchievementBadges/users/${encodeURIComponent(userId)}`;
             this._userId = userId;
             this._userPath = userPath;
