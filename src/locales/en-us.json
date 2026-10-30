@@ -1749,5 +1749,8 @@
     "EnhancedAwardNominated": "Nominated",
     "EnhancedPersonYears": "years",
     "EnhancedPersonAtRelease": "at release",
-    "EnhancedPersonBirthPlace": "Birthplace"
+    "EnhancedPersonBirthPlace": "Birthplace",
+    "EnhancedPersonYearOne": "year",
+    "EnhancedPersonYearFew": "years",
+    "EnhancedPersonYearMany": "years"
 }
