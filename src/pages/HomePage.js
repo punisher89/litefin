@@ -754,7 +754,11 @@ class HomePage extends Page {
                     // this period must not be surfaced in the merged dashboard row.
                     const maxDays = parseInt(storage.getItem('pref:nextUpMaxDays'), 10);
                     const daysLimit = isNaN(maxDays) ? 365 : maxDays;
+                    const nativePosterTagsActive = await this._isNativePosterTagsEnabled();
                     const mergedParams = { limit: homeRowLimit };
+                    // The merged plugin endpoint returns minimal DTOs by default.
+                    // Ask for Primary image tags so Jellyfin Enhanced can stamp them.
+                    mergedParams.fields = 'ImageTags,SeriesPrimaryImageTag,SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,Tags';
 
                     // Retrieve configured mark as watched threshold fraction and percentage
                     const thresholdFraction = PlayerSettings.getWatchedThresholdFraction();
@@ -814,6 +818,12 @@ class HomePage extends Page {
 
                                 return true;
                             });
+
+                            if (nativePosterTagsActive) {
+                                filteredPluginItems.forEach((item) => {
+                                    item._nativePosterTagsEnabled = true;
+                                });
+                            }
 
                             if (filteredPluginItems.length > 0) {
                                 log.info(
@@ -886,7 +896,8 @@ class HomePage extends Page {
                         })
                         .map((item) => ({
                             ...item,
-                            _isResume: true
+                            _isResume: true,
+                            ...(nativePosterTagsActive ? { _nativePosterTagsEnabled: true } : {})
                         }));
 
                     const nextUpItems = (nextUpRes?.Items || [])
@@ -908,7 +919,8 @@ class HomePage extends Page {
                         })
                         .map((item) => ({
                             ...item,
-                            _isResume: false
+                            _isResume: false,
+                            ...(nativePosterTagsActive ? { _nativePosterTagsEnabled: true } : {})
                         }));
 
                     // ──────────────────────────────────────────────────────────
@@ -1009,6 +1021,7 @@ class HomePage extends Page {
                 cardType: 'resume',
                 contextType: 'resume',
                 fetchFn: async () => {
+                    const nativePosterTagsActive = await this._isNativePosterTagsEnabled();
                     // Consume the in-flight request fired by _fireRowPrefetch()
                     // (parallel with Views) instead of issuing a new one.
                     const preflight = this._consumePrefetch('resume');
@@ -1037,6 +1050,12 @@ class HomePage extends Page {
 
                         return true;
                     });
+
+                    if (nativePosterTagsActive) {
+                        filtered.forEach((item) => {
+                            item._nativePosterTagsEnabled = true;
+                        });
+                    }
 
                     return filtered.length > 0 ? filtered : null;
                 }
