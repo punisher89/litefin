@@ -2523,18 +2523,16 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
 
 
 
-/* Enhanced release chips use the first metadata line; ratings stay below. */
+/* Release dates stay on one compact line beside year, runtime and ratings. */
 .details-meta-row .details-enhanced-release-group {
-    /* Keep release dates on their own line so they never squeeze or hide ratings. */
     display: inline-flex;
-    flex: 0 0 100%;
+    flex: 0 1 auto;
     align-items: center;
     flex-wrap: nowrap;
     gap: 5px;
-    width: 100%;
+    width: auto;
     max-width: 100%;
-    margin-top: 0;
-    margin-bottom: 4px;
+    margin: 0 12px 4px 0;
     overflow-x: auto;
     white-space: nowrap;
     vertical-align: middle;
