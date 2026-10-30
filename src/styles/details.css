@@ -2538,7 +2538,7 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
 
 
 
-/* Release dates stay on one compact line beside year, runtime and ratings. */
+/* Release dates stay together at the far end of the title metadata line. */
 .details-meta-row .details-enhanced-release-group {
     display: inline-flex;
     flex: 0 1 auto;
@@ -2547,7 +2547,7 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     gap: 5px;
     width: auto;
     max-width: 100%;
-    margin: 0 12px 4px 0;
+    margin: 0 0 4px auto;
     overflow-x: auto;
     white-space: nowrap;
     vertical-align: middle;
