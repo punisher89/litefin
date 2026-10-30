@@ -517,11 +517,13 @@ export function localizeAchievementQuest(quest, language = '') {
     if (!quest || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return quest;
     const id = String(quest.Id || quest.id || '').trim().toLowerCase();
     const localized = RUSSIAN_QUESTS[id];
-    if (!localized) return quest;
+    const originalDescription = quest.Description || quest.description || '';
+    const description = localized?.description || localizedDescription(originalDescription);
+    if (!localized && (!description || description === originalDescription)) return quest;
     return {
         ...quest,
-        Title: localized.title,
-        Description: localized.description
+        Title: localized?.title || quest.Title || quest.title,
+        Description: description || originalDescription
     };
 }
 
