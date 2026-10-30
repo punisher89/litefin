@@ -860,3 +860,22 @@
     .achievement-game-card { min-height: 0; }
     .achievements-game-heading { align-items: flex-start; }
 }
+
+
+/* Rarity chips use the same compact visual language as the rest of the page. */
+.achievement-rarity {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 7px;
+    border: 1px solid var(--border-color, rgba(255,255,255,.12));
+    border-radius: 999px;
+    background: rgba(255,255,255,.045);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: .02em;
+}
+.achievement-badge.rarity-common .achievement-rarity { color: #aeb7c2; }
+.achievement-badge.rarity-uncommon .achievement-rarity { color: #74c99a; border-color: rgba(116,201,154,.28); }
+.achievement-badge.rarity-rare .achievement-rarity { color: #71b8ef; border-color: rgba(113,184,239,.30); }
+.achievement-badge.rarity-epic .achievement-rarity { color: #c29af2; border-color: rgba(194,154,242,.32); }
+.achievement-badge.rarity-legendary .achievement-rarity { color: #efc86e; border-color: rgba(239,200,110,.35); }
