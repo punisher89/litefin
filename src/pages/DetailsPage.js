@@ -1017,7 +1017,7 @@ class DetailsPage extends Page {
                             </span>
                             <span class="details-enhanced-awards-chevron" aria-hidden="true">⌄</span>
                         </button>
-                        <ul class="details-enhanced-awards-list" id="details-enhanced-awards-list" hidden>
+                        <ul class="details-enhanced-awards-list" id="details-enhanced-awards-list" tabindex="0" aria-label="${escapeHtml(i18n.t('EnhancedAwardsList') || 'Список наград')}" hidden>
                             ${awardRows}
                         </ul>
                     </section>
@@ -1152,7 +1152,8 @@ class DetailsPage extends Page {
             .filter((id) => typeof id === 'string' && /^[0-9a-f-]{32,36}$/i.test(id)))];
         if (!ids.length) return;
 
-        const cacheKeyForPerson = (id) => `${this._itemId}:${id}`;
+        const normalizePersonId = (id) => String(id).replace(/-/g, '').toLowerCase();
+        const cacheKeyForPerson = (id) => `${this._itemId}:${normalizePersonId(id)}`;
         const missing = ids.filter((id) => !this._enhancedPersonInfoCache.has(cacheKeyForPerson(id)));
         for (let offset = 0; offset < missing.length; offset += 100) {
             const batch = missing.slice(offset, offset + 100);
@@ -1163,7 +1164,8 @@ class DetailsPage extends Page {
                 });
                 const result = response?.people || response?.People || {};
                 batch.forEach((id) => {
-                    const key = Object.keys(result).find((candidate) => candidate.toLowerCase() === id.toLowerCase());
+                    const normalizedId = normalizePersonId(id);
+                    const key = Object.keys(result).find((candidate) => normalizePersonId(candidate) === normalizedId);
                     const info = key ? result[key] : null;
                     this._enhancedPersonInfoCache.set(cacheKeyForPerson(id), info && typeof info === 'object' ? info : null);
                 });
