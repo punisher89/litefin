@@ -84,6 +84,27 @@ class AchievementNotifications {
         log.info('Achievement Badges notifications initialized');
     }
 
+    /**
+     * Show a local demonstration toast without creating or unlocking a server badge.
+     * Called directly from a user-initiated button press so optional audio can play.
+     */
+    showTest() {
+        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || '');
+        this._ensureStyles();
+        this._queue.unshift({
+            badges: [{
+                Id: 'litefin-local-notification-test',
+                Rarity: 'legendary',
+                Title: russian ? 'Тестовое уведомление' : 'Test notification',
+                Description: russian
+                    ? 'Проверка уведомлений Achievement Badges в Litefin.'
+                    : 'Achievement Badges notifications are working in Litefin.',
+                ScorePoints: 0
+            }]
+        });
+        this._drainQueue(this._prefs || {});
+    }
+
     destroy() {
         if (this._timer) {
             window.clearInterval(this._timer);
