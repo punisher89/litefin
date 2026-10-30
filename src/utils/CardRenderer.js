@@ -877,7 +877,7 @@ class CardRenderer {
                 resolvedImageType = savedType;
                 resolvedImageTag = savedTag;
                 if (posterUrl) {
-                    nativePosterTagHtml = `<img src="${placeholder}" data-src="${posterUrl}" class="lazy lf-native-poster-tags" data-lf-overlay="true" alt="" aria-hidden="true" />`;
+                    nativePosterTagHtml = `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${posterUrl}" class="lazy lf-native-poster-tags" data-lf-overlay="true" alt="" aria-hidden="true" />`;
                 }
             }
         }
