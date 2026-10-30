@@ -1076,6 +1076,17 @@ class DetailsPage extends Page {
             if (premiere) return [premiere];
         }
 
+        if (item.Type === 'Episode') {
+            const seasonNumber = Number(item.ParentIndexNumber);
+            const episodeNumber = Number(item.IndexNumber);
+            if (!Number.isFinite(seasonNumber) || !Number.isFinite(episodeNumber) || episodeNumber < 1) return [];
+            const data = await api.get(
+                `/JellyfinEnhanced/tmdb/tv/${encodeURIComponent(tmdbId)}/season/${seasonNumber}/episode/${episodeNumber}`
+            );
+            const result = entry('episode', 'EnhancedEpisodeRelease', 'Дата выхода эпизода', data?.air_date);
+            return result ? [result] : [];
+        }
+
         if (item.Type === 'Series') {
             const data = await api.get(`/JellyfinEnhanced/tmdb/tv/${encodeURIComponent(tmdbId)}`);
             const date = data?.next_episode_to_air?.air_date || data?.last_episode_to_air?.air_date;
@@ -1085,7 +1096,9 @@ class DetailsPage extends Page {
 
         if (item.Type === 'Season') {
             const data = await api.get(`/JellyfinEnhanced/tmdb/tv/${encodeURIComponent(tmdbId)}/season/${Number(item.IndexNumber) || 0}`);
-            const episodes = Array.isArray(data?.episodes) ? data.episodes.filter((episode) => episode.air_date) : [];
+            const episodes = Array.isArray(data?.episodes)
+                ? data.episodes.filter((episode) => episode.air_date).sort((a, b) => String(a.air_date).localeCompare(String(b.air_date)))
+                : [];
             if (!episodes.length) return [];
             const today = new Date();
             const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
