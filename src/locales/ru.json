@@ -1739,5 +1739,8 @@
     "EnhancedAwardWins": "Побед",
     "EnhancedAwardNominations": "Номинаций",
     "EnhancedAwardWon": "Победа",
-    "EnhancedAwardNominated": "Номинация"
+    "EnhancedAwardNominated": "Номинация",
+    "EnhancedPersonYears": "лет",
+    "EnhancedPersonAtRelease": "на момент выхода",
+    "EnhancedPersonBirthPlace": "Место рождения"
 }
