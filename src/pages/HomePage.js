@@ -169,6 +169,10 @@ class HomePage extends Page {
          */
         this._libraries = [];
 
+        // Cached once per HomePage instance; avoids repeatedly querying JE settings.
+        this._nativePosterTagsPromise = null;
+        this._nativePosterTagsEnabled = false;
+
         /**
          * Hero Carousel instance
          * @type {HeroCarousel}
@@ -1239,10 +1243,20 @@ class HomePage extends Page {
         try {
             log.info(`Starting progressive render pipeline for user ${preAuth.uid}`);
 
+            // Resolve Native Poster Tags before considering the in-memory page cache.
+            // Cached ImageTags may predate a JE setting change, so use fresh metadata
+            // whenever the server is stamping posters for this native client.
+            const nativePosterTagsActive = await this._isNativePosterTagsEnabled();
+            if (!this._isMounted) return;
+
             // ─── Step 0: Try to restore from cached data ────────────────────
-            // On back-navigation, avoid all network calls and render from cache.
-            const cache = this._getValidCache();
+            // On back-navigation, avoid all network calls and render from cache,
+            // except when native poster tags require fresh authenticated image tags.
+            const cache = nativePosterTagsActive ? null : this._getValidCache();
             this._wasPageCached = !!cache;
+            if (nativePosterTagsActive) {
+                log.info('Native Poster Tags are active; refreshing Home rows to obtain JE-stamped poster tags.');
+            }
 
             // Track promises for hero carousel and library thumb enrichment
             // so we can await them alongside P0/P1 rows in Step 6.
@@ -1804,9 +1818,44 @@ class HomePage extends Page {
      * Pre-fetches all visible latest library rows in 1 single HTTP request via Litefin plugin.
      * @param {RowDescriptor[]} descriptors
      */
+    async _isNativePosterTagsEnabled() {
+        if (this._nativePosterTagsPromise) return this._nativePosterTagsPromise;
+
+        this._nativePosterTagsPromise = (async () => {
+            const userId = api._userId || api.userId;
+            if (!userId) return false;
+
+            try {
+                // This is the administrator's master delivery switch. If it is
+                // off, the personal nullable preference cannot enable native tags.
+                const config = await api.get('/JellyfinEnhanced/public-config', null, {
+                    silent: true,
+                    warnOnError: false
+                });
+                if (config?.NativePosterTagsEnabled !== true) return false;
+
+                const settings = await api.get(
+                    `/JellyfinEnhanced/user-settings/${encodeURIComponent(userId)}/settings.json`,
+                    null,
+                    { silent: true, warnOnError: false }
+                );
+
+                // null/unset is the plugin's default-on state; only explicit false opts out.
+                return settings?.UseNativePosterTags !== false;
+            } catch (error) {
+                log.debug('Native Poster Tags settings could not be resolved:', error?.message || error);
+                return false;
+            }
+        })();
+
+        this._nativePosterTagsEnabled = await this._nativePosterTagsPromise;
+        return this._nativePosterTagsEnabled;
+    }
+
     async _preFetchLatestRows(descriptors) {
+        const nativePosterTagsActive = await this._isNativePosterTagsEnabled();
         const useBatchPlugin = storage.getItem('pref:useBatchLatestPlugin') !== 'false';
-        if (!useBatchPlugin) return;
+        if (!useBatchPlugin || nativePosterTagsActive) return;
 
         const latestDescriptors = (descriptors || []).filter((d) => d.id?.startsWith('latest-'));
         if (latestDescriptors.length === 0) return;
