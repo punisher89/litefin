@@ -54,6 +54,11 @@ async function evaluateInitBlock({
         platformInfo: {
             isWeb
         },
+        fireHomeRowPrefetch: (userId) => calls.push({ type: 'prefetch', userId }),
+        isFallbackFont: () => false,
+        layoutManager: {
+            getUiFont: () => 'system'
+        },
         window: {
             location: {
                 hash: initialHash
