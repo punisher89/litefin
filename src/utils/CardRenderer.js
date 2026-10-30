@@ -861,9 +861,16 @@ class CardRenderer {
         if (isLandscape && !item._imageUrl && ['Movie', 'Series', 'Season', 'Episode', 'BoxSet', 'Video'].includes(item.Type)) {
             let posterOwnerId = itemId;
             let posterTag = item.ImageTags?.Primary;
-            if (item.Type === 'Episode' && item.SeriesId && item.SeriesPrimaryImageTag) {
-                posterOwnerId = item.SeriesId;
-                posterTag = item.SeriesPrimaryImageTag;
+            if (item.Type === 'Episode') {
+                // Keep Continue Watching / Next Up spoiler-safe: prefer the
+                // stamped series poster, and only use episode artwork when the
+                // user explicitly enabled episode images in card preferences.
+                if (item.SeriesId && item.SeriesPrimaryImageTag) {
+                    posterOwnerId = item.SeriesId;
+                    posterTag = item.SeriesPrimaryImageTag;
+                } else if (!prefs.preferEpisodeImages) {
+                    posterTag = '';
+                }
             }
             if (posterOwnerId && posterTag && /-jet[0-9a-f]{23}(?:-jeu[0-9a-f]{12})?$/i.test(posterTag)) {
                 const posterParams = imageService.getParams('poster', contextType);
