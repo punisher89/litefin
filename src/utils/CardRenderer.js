@@ -429,7 +429,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${item.ImageTags?.Primary || ''}|${item.SeriesPrimaryImageTag || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -853,41 +853,9 @@ class CardRenderer {
                 });
             }
         }
-        // Jellyfin Enhanced Native Poster Tags are stamped into authenticated
-        // Primary image tags (the -jet token). Wide home rows use Thumb/Backdrop
-        // for their main artwork, so add a small lazy-loaded Primary poster only
-        // when Enhanced has actually stamped one for this user.
-        let nativePosterTagHtml = '';
-        if (isLandscape && !item._imageUrl && ['Movie', 'Series', 'Season', 'Episode', 'BoxSet', 'Video'].includes(item.Type)) {
-            let posterOwnerId = itemId;
-            let posterTag = item.ImageTags?.Primary;
-            if (item.Type === 'Episode') {
-                // Keep Continue Watching / Next Up spoiler-safe: prefer the
-                // stamped series poster, and only use episode artwork when the
-                // user explicitly enabled episode images in card preferences.
-                if (item.SeriesId && item.SeriesPrimaryImageTag) {
-                    posterOwnerId = item.SeriesId;
-                    posterTag = item.SeriesPrimaryImageTag;
-                } else if (!prefs.preferEpisodeImages) {
-                    posterTag = '';
-                }
-            }
-            if (posterOwnerId && posterTag && /-jet[0-9a-f]{23}(?:-jeu[0-9a-f]{12})?$/i.test(posterTag)) {
-                const posterParams = imageService.getParams('poster', contextType);
-                const savedType = resolvedImageType;
-                const savedTag = resolvedImageTag;
-                const posterUrl = _imgUrl(posterOwnerId, 'Primary', {
-                    maxWidth: Math.min(posterParams.maxWidth || 240, 360),
-                    quality: posterParams.quality,
-                    tag: posterTag
-                });
-                resolvedImageType = savedType;
-                resolvedImageTag = savedTag;
-                if (posterUrl) {
-                    nativePosterTagHtml = `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${posterUrl}" class="lazy lf-native-poster-tags" data-lf-overlay="true" alt="" aria-hidden="true" />`;
-                }
-            }
-        }
+        // Native Poster Tags are included in Jellyfin Enhanced's authenticated Primary image tag.
+        // Standard poster branches above pass item.ImageTags.Primary (or the safe Series tag)
+        // through unchanged; landscape cards intentionally keep their Thumb/Backdrop artwork.
 
         // =====================================================================
         // BlurHash Resolution Strategy
@@ -1454,7 +1422,7 @@ class CardRenderer {
                 ? `<canvas class="blurhash-canvas" data-blurhash="${blurHash}"></canvas>`
                 : '';
         const imagePart = imageUrl
-            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />${nativePosterTagHtml}`
+            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
             : `${CardRenderer.getFallbackHtml(item, isLandscape, { hideInitials, isLibrary: type === 'library' })}`;
         const finalContextType = contextType || item.Type;
 
