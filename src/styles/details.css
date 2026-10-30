@@ -2524,18 +2524,33 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
 
 
 /* Enhanced release chips sit in the same line as year, runtime and ratings. */
+.details-meta-row .details-enhanced-release-group {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 5px;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    vertical-align: middle;
+    scrollbar-width: none;
+}
+.details-meta-row .details-enhanced-release-group::-webkit-scrollbar { display: none; }
 .details-meta-row .details-enhanced-release-chip {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
-    gap: 6px;
-    margin: 0 8px 7px 0;
-    padding: 5px 10px;
+    gap: 4px;
+    margin: 0;
+    padding: 4px 7px;
     border: 1px solid rgba(255,255,255,.14);
     border-radius: 999px;
     background: rgba(255,255,255,.075);
     color: var(--jf-text-secondary);
-    font-size: .78em;
-    line-height: 1.35;
+    font-size: .76em;
+    line-height: 1.2;
+    white-space: nowrap;
     vertical-align: middle;
 }
 .details-meta-row .details-enhanced-release-chip strong {
@@ -2705,10 +2720,18 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    justify-content: space-between;
+    justify-content: flex-end;
+    gap: 5px;
     padding: 7px;
     pointer-events: none;
     box-sizing: border-box;
+}
+.media-card .lf-person-age-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    max-width: 100%;
 }
 .media-card .lf-person-age-chip {
     display: inline-flex;
