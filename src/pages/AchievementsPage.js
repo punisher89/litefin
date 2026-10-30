@@ -733,7 +733,7 @@ class AchievementsPage extends Page {
         button.disabled = true;
         this._setGameStatus(gameText('loadingGame'));
         try {
-            const result = await api.post(`${this._userPath}/powerups/use/${encodeURIComponent(type)}`, {});
+            await api.post(`${this._userPath}/powerups/use/${encodeURIComponent(type)}`, {});
             await this._loadLoadout();
             this._renderLoadout();
             this._setGameStatus(gameText('useOk'));
