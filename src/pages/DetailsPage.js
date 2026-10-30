@@ -1152,7 +1152,8 @@ class DetailsPage extends Page {
             .filter((id) => typeof id === 'string' && /^[0-9a-f-]{32,36}$/i.test(id)))];
         if (!ids.length) return;
 
-        const missing = ids.filter((id) => !this._enhancedPersonInfoCache.has(id));
+        const cacheKeyForPerson = (id) => `${this._itemId}:${id}`;
+        const missing = ids.filter((id) => !this._enhancedPersonInfoCache.has(cacheKeyForPerson(id)));
         for (let offset = 0; offset < missing.length; offset += 100) {
             const batch = missing.slice(offset, offset + 100);
             try {
@@ -1164,18 +1165,18 @@ class DetailsPage extends Page {
                 batch.forEach((id) => {
                     const key = Object.keys(result).find((candidate) => candidate.toLowerCase() === id.toLowerCase());
                     const info = key ? result[key] : null;
-                    this._enhancedPersonInfoCache.set(id, info && typeof info === 'object' ? info : null);
+                    this._enhancedPersonInfoCache.set(cacheKeyForPerson(id), info && typeof info === 'object' ? info : null);
                 });
             } catch (error) {
                 // This metadata is optional. Keep cards usable if the plugin is missing.
                 log.debug('Jellyfin Enhanced person information unavailable:', error?.message || error);
-                batch.forEach((id) => this._enhancedPersonInfoCache.set(id, null));
+                batch.forEach((id) => this._enhancedPersonInfoCache.set(cacheKeyForPerson(id), null));
             }
         }
 
         people.forEach((person) => {
             if (!person?.Id) return;
-            const info = this._enhancedPersonInfoCache.get(person.Id);
+            const info = this._enhancedPersonInfoCache.get(cacheKeyForPerson(person.Id));
             if (info) person._enhancedPersonInfo = info;
         });
     }
