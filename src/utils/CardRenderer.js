@@ -1268,13 +1268,15 @@ class CardRenderer {
         };
         const personInfoHtml = enhancedPersonInfo ? `
             <div class="lf-person-enhanced-info">
-                ${personAge !== null && personAge !== undefined ? `
-                    <span class="lf-person-age-chip ${isPersonDeceased ? 'is-deceased' : ''}">
-                        ${isPersonDeceased ? '✝' : '🎂'} ${Number(personAge)} ${escapeHtml(personAgeUnit(personAge))}
-                    </span>` : ''}
-                ${personAgeAtRelease !== null && personAgeAtRelease !== undefined ? `
-                    <span class="lf-person-age-chip is-release">🎬 ${Number(personAgeAtRelease)} ${escapeHtml(i18n.t('EnhancedPersonAtRelease') || 'на момент выхода')}
-                    </span>` : ''}
+                <div class="lf-person-age-stack">
+                    ${personAge !== null && personAge !== undefined ? `
+                        <span class="lf-person-age-chip ${isPersonDeceased ? 'is-deceased' : ''}">
+                            ${isPersonDeceased ? '✝' : '🎂'} ${Number(personAge)} ${escapeHtml(personAgeUnit(personAge))}
+                        </span>` : ''}
+                    ${personAgeAtRelease !== null && personAgeAtRelease !== undefined ? `
+                        <span class="lf-person-age-chip is-release">🎬 ${Number(personAgeAtRelease)} ${escapeHtml(personAgeUnit(personAgeAtRelease))} ${escapeHtml(i18n.t('EnhancedPersonAtRelease') || 'на момент выхода')}
+                        </span>` : ''}
+                </div>
                 ${personBirthPlace ? `
                     <span class="lf-person-birthplace" title="${escapeHtml(personBirthPlace)}">
                         <span aria-hidden="true">📍</span>
