@@ -22,6 +22,19 @@
 .achievements-header {
     margin-bottom: 26px;
 }
+.achievements-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+.achievements-header-actions .achievements-refresh {
+    flex: 0 0 auto;
+}
+.achievements-test-notification {
+    border-color: rgba(203,169,89,.42);
+}
 
 .achievements-eyebrow {
     color: var(--accent-color, #8f8f9b);
