@@ -2,6 +2,7 @@ import Page from './Page.js';
 import { api } from '../api/index.js';
 import { i18n } from '../utils/i18n.js';
 import { logger } from '../utils/Logger.js';
+import { achievementNotifications } from '../utils/AchievementNotifications.js';
 import '../styles/achievements.css';
 
 const log = logger.create('AchievementsPage');
@@ -29,7 +30,7 @@ const GAME_TEXT = {
         actionFailed: 'Не удалось выполнить действие.', notEnough: 'Недостаточно очков.', milestone: 'Откроется за достижения прогресса',
         activeUntil: 'Действует до', loadingUsers: 'Список пользователей загружается…',
         shopPowerups: 'Усиления', shopCosmetics: 'Оформление профиля',
-        inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин'
+        inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Тест уведомления'
     },
     en: {
         eyebrow: 'JELLYFIN · ACHIEVEMENT CENTER', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
@@ -53,7 +54,7 @@ const GAME_TEXT = {
         actionFailed: 'The action could not be completed.', notEnough: 'Not enough score.', milestone: 'Unlocked through progress milestones',
         activeUntil: 'Active until', loadingUsers: 'Loading user list…',
         shopPowerups: 'Power-ups', shopCosmetics: 'Profile cosmetics',
-        inventory: 'In inventory', balance: 'Balance', viewShop: 'Open shop'
+        inventory: 'In inventory', balance: 'Balance', viewShop: 'Open shop', testNotifications: 'Test notification'
     }
 };
 
@@ -193,9 +194,14 @@ class AchievementsPage extends Page {
                             <div class="achievements-eyebrow">${escapeHtml(gameText('eyebrow'))}</div>
                             <h1>${escapeHtml(i18n.t('Achievements'))}</h1>
                         </div>
-                        <button class="achievements-refresh focusable" id="achievements-refresh" type="button" tabindex="0">
-                            <span aria-hidden="true">↻</span> ${escapeHtml(i18n.t('AchievementRefresh'))}
-                        </button>
+                        <div class="achievements-header-actions">
+                            <button class="achievements-refresh focusable achievements-test-notification" id="achievements-test-notification" type="button" tabindex="0">
+                                <span aria-hidden="true">🔔</span> ${escapeHtml(gameText('testNotifications'))}
+                            </button>
+                            <button class="achievements-refresh focusable" id="achievements-refresh" type="button" tabindex="0">
+                                <span aria-hidden="true">↻</span> ${escapeHtml(i18n.t('AchievementRefresh'))}
+                            </button>
+                        </div>
                     </header>
 
                     <div class="achievements-error" id="achievements-error" role="status" hidden></div>
@@ -288,6 +294,9 @@ class AchievementsPage extends Page {
     _bindEvents() {
         const refresh = this.$('#achievements-refresh');
         if (refresh) refresh.addEventListener('click', () => this._load(true));
+
+        const testNotifications = this.$('#achievements-test-notification');
+        if (testNotifications) testNotifications.addEventListener('click', () => achievementNotifications.showTest());
 
         this.el.querySelectorAll('[data-achievement-filter]').forEach((button) => {
             button.addEventListener('click', () => {
