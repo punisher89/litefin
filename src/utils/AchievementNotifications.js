@@ -11,6 +11,7 @@
 import { api } from '../api/ApiClient.js';
 import { storage } from './StorageService.js';
 import { localizeAchievementBadge } from './AchievementBadgeLocalization.js';
+import { i18n } from './i18n.js';
 import { logger } from './Logger.js';
 
 const log = logger.create('AchievementNotifications');
@@ -319,12 +320,12 @@ class AchievementNotifications {
         } else if (badges.length > 1) {
             title.textContent = badges.length + copyText(' достижений получено', ' achievements unlocked');
             detail.textContent = badges.slice(0, 3).map((entry) => {
-                const localized = localizeAchievementBadge(entry, document.documentElement.lang || 'en');
+                const localized = localizeAchievementBadge(entry, document.documentElement.lang || i18n.currentLang || 'en');
                 return localized.Title || localized.title || copyText('Достижение', 'Achievement');
             }).join(' · ');
             if (badges.length > 3) detail.textContent += ' +' + (badges.length - 3);
         } else {
-            const localized = localizeAchievementBadge(badge, document.documentElement.lang || 'en');
+            const localized = localizeAchievementBadge(badge, document.documentElement.lang || i18n.currentLang || 'en');
             title.textContent = localized.Title || localized.title || copyText('Достижение получено', 'Achievement unlocked');
             detail.textContent = localized.Description || localized.description || copyText('Продолжай смотреть, чтобы открыть новые достижения.', 'Keep watching to unlock more achievements.');
         }
