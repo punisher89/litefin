@@ -73,7 +73,11 @@ async function getSettingsSnapshot(force = false) {
     }
     if (!force && settingsPromise && settingsUserId === userId) return settingsPromise;
 
-    if (settingsUserId !== userId) settingsLoaded = false;
+    if (settingsUserId !== userId) {
+        settingsLoaded = false;
+        itemCache.clear(); // Tag data is filtered by user permissions and Spoiler Guard.
+        endpointUnavailableUntil = 0;
+    }
     settingsUserId = userId;
     settingsPromise = (async () => {
         try {
@@ -84,14 +88,18 @@ async function getSettingsSnapshot(force = false) {
             if (!config || config.NativePosterTagsEnabled !== true) {
                 settingsSnapshot = null;
                 settingsFetchedAt = Date.now();
+                settingsLoaded = true;
                 return null;
             }
+
+            if ((api._userId || api.userId) !== userId) return null;
 
             const settings = await api.get(
                 '/JellyfinEnhanced/user-settings/' + encodeURIComponent(userId) + '/settings.json',
                 null,
                 { silent: true, warnOnError: false }
             );
+            if ((api._userId || api.userId) !== userId) return null;
             if (!enabledSettings(settings)) {
                 settingsSnapshot = null;
                 settingsFetchedAt = Date.now();
