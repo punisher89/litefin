@@ -2767,3 +2767,8 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     .details-enhanced-award-year { grid-column: 2; text-align: left; }
     .details-meta-row .details-enhanced-release-chip { font-size: .68em; margin-right: 4px; padding: 4px 7px; }
 }
+
+.details-enhanced-awards-list:focus {
+    outline: 2px solid var(--jf-accent, #d4ad55);
+    outline-offset: -2px;
+}
