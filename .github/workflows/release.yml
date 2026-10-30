@@ -72,37 +72,46 @@ jobs:
       - name: Generate Release Body
         id: release_body
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
-          
-          FEATURES=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -E '^feat' || true)
-          BUGS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -E '^fix' || true)
-          
-          CHANGELOG="# Changes\n"
-          
-          if [ -n "$FEATURES" ]; then
-            CHANGELOG="${CHANGELOG}## New Features:\n"
-            while IFS= read -r line; do
-              clean_line=$(echo "$line" | sed -E 's/^feat\(([^)]+)\): /- /' | sed -E 's/^feat: /- /')
-              CHANGELOG="${CHANGELOG}${clean_line}\n"
-            done <<< "$FEATURES"
-            CHANGELOG="${CHANGELOG}\n"
+          VERSION=$(node -p "require('./package.json').version")
+          NOTES_FILE=".github/releases/v${VERSION}.md"
+
+          # Prefer a curated, version-specific changelog when one is available.
+          # Fall back to Conventional Commit summaries for routine releases.
+          if [ -f "$NOTES_FILE" ]; then
+            CHANGELOG=$(cat "$NOTES_FILE")
+          else
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+            FEATURES=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -E '^feat' || true)
+            BUGS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -E '^fix' || true)
+
+            CHANGELOG="# Changes\\n"
+
+            if [ -n "$FEATURES" ]; then
+              CHANGELOG="${CHANGELOG}## New Features:\\n"
+              while IFS= read -r line; do
+                clean_line=$(echo "$line" | sed -E 's/^feat\\(([^)]+)\\): /- /' | sed -E 's/^feat: /- /')
+                CHANGELOG="${CHANGELOG}${clean_line}\\n"
+              done <<< "$FEATURES"
+              CHANGELOG="${CHANGELOG}\\n"
+            fi
+
+            if [ -n "$BUGS" ]; then
+              CHANGELOG="${CHANGELOG}## Bug fixes:\\n"
+              while IFS= read -r line; do
+                clean_line=$(echo "$line" | sed -E 's/^fix\\(([^)]+)\\): /- \\1: /' | sed -E 's/^fix: /- /')
+                CHANGELOG="${CHANGELOG}${clean_line}\\n"
+              done <<< "$BUGS"
+              CHANGELOG="${CHANGELOG}\\n"
+            fi
           fi
-          
-          if [ -n "$BUGS" ]; then
-            CHANGELOG="${CHANGELOG}## Bug fixes:\n"
-            while IFS= read -r line; do
-               clean_line=$(echo "$line" | sed -E 's/^fix\(([^)]+)\): /- \1: /' | sed -E 's/^fix: /- /')
-               CHANGELOG="${CHANGELOG}${clean_line}\n"
-            done <<< "$BUGS"
-            CHANGELOG="${CHANGELOG}\n"
-          fi
-          
-          FOOTER=$(cat .github/RELEASE_NOTES_FOOTER.md)
-          
-          echo "content<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo "$FOOTER" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+
+          {
+            echo "content<<EOF"
+            echo -e "$CHANGELOG"
+            cat .github/RELEASE_NOTES_FOOTER.md
+            echo
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       # Build and Package Litefin Client Plugin (Modern tier only for official releases)
       - name: Build and Package Litefin Client Plugin (Modern)
