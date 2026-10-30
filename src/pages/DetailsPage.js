@@ -298,11 +298,11 @@ class DetailsPage extends Page {
 
                             <!-- Overview -->
                             <div id="watch-providers-container" class="hidden"></div>
-                            <div id="enhanced-details-info" class="details-enhanced-info"></div>
                             <div class="details-overview">
                                 <div class="overview-text ${getOverviewClampClass()}" tabindex="-1"></div>
                                 <button class="see-more-btn" tabindex="0" data-i18n="${shouldAlwaysShowOverviewButton() ? 'DetailedView' : 'ShowMore'}">${getOverviewButtonText()}</button>
                             </div>
+                            <div id="enhanced-details-info" class="details-enhanced-info"></div>
 
                         </div>
                     </div>
@@ -3393,8 +3393,7 @@ class DetailsPage extends Page {
             if (releaseChips) releaseMetaHtml = `<span class="details-enhanced-release-group">${releaseChips}</span>`;
         }
 
-        // Release dates occupy the first metadata line. Ratings and core facts
-        // remain on the next line, exactly where users expect to find them.
+        // Release dates share the title metadata row with year, runtime and ratings.
         let metaHtml = releaseMetaHtml;
         if (gamePlatform)
             metaHtml += `<span class="meta-item meta-badge game-platform-pill">${escapeHtml(gamePlatform)}</span>`;
@@ -4703,12 +4702,12 @@ class DetailsPage extends Page {
         const sections = [
             // Actions is always first and visible - needed so we can find what's after it
             { name: 'details-actions', elementId: '#actions', isVisible: () => true },
-            { name: 'details-enhanced-info', elementId: '#enhanced-details-info', isVisible: () => !!this.$('#enhanced-details-info')?.querySelector('.details-enhanced-awards-toggle') },
             {
                 name: 'details-see-more',
                 elementId: '#details-overview',
                 isVisible: () => this.$('.see-more-btn')?.style?.display !== 'none'
             },
+            { name: 'details-enhanced-info', elementId: '#enhanced-details-info', isVisible: () => !!this.$('#enhanced-details-info')?.querySelector('.details-enhanced-awards-toggle') },
             { name: 'details-rich-meta', elementId: '#rich-meta', isVisible: () => !!this.$('#rich-meta')?.innerHTML },
             // Collection rows (BoxSet contents)
             {
@@ -4932,12 +4931,12 @@ class DetailsPage extends Page {
             },
             // Standard
             { name: 'details-rich-meta', elementId: '#rich-meta', isVisible: () => !!this.$('#rich-meta')?.innerHTML },
+            { name: 'details-enhanced-info', elementId: '#enhanced-details-info', isVisible: () => !!this.$('#enhanced-details-info')?.querySelector('.details-enhanced-awards-toggle') },
             {
                 name: 'details-see-more',
                 elementId: '#details-overview',
                 isVisible: () => this.$('.see-more-btn')?.style?.display !== 'none'
             },
-            { name: 'details-enhanced-info', elementId: '#enhanced-details-info', isVisible: () => !!this.$('#enhanced-details-info')?.querySelector('.details-enhanced-awards-toggle') },
             { name: 'details-actions', elementId: '#actions', isVisible: () => true } // Actions are always visible
         ];
 
