@@ -84,10 +84,33 @@ function arrayOf(object, ...keys) {
 
 function cosmeticKindLabel(kind) {
     const ru = String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en').toLowerCase().startsWith('ru');
+    const normalized = String(kind || '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .trim()
+        .toLowerCase();
     const labels = ru
-        ? { ProfileTheme: 'Тема профиля', BadgeFrame: 'Рамка значка', RankTitle: 'Титул', Avatar: 'Аватар', Background: 'Фон', ProfileBorder: 'Рамка профиля' }
-        : { ProfileTheme: 'Profile theme', BadgeFrame: 'Badge frame', RankTitle: 'Rank title', Avatar: 'Avatar', Background: 'Background', ProfileBorder: 'Profile border' };
-    return labels[kind] || kind || (ru ? 'Предмет' : 'Item');
+        ? {
+              'profile theme': 'Тема профиля',
+              'badge frame': 'Рамка значка',
+              'rank title': 'Титул',
+              avatar: 'Аватар',
+              background: 'Фон',
+              'profile border': 'Рамка профиля',
+              'animated background': 'Анимированный фон',
+              'avatar frame': 'Рамка аватара'
+          }
+        : {
+              'profile theme': 'Profile theme',
+              'badge frame': 'Badge frame',
+              'rank title': 'Rank title',
+              avatar: 'Avatar',
+              background: 'Background',
+              'profile border': 'Profile border',
+              'animated background': 'Animated background',
+              'avatar frame': 'Avatar frame'
+          };
+    return labels[normalized] || (ru ? 'Предмет' : kind || 'Item');
 }
 
 function cosmeticEquipField(kind) {
@@ -206,6 +229,30 @@ function localizedBadgeValue(value, kind) {
         }
     };
     return dictionaries[kind]?.[key] || raw;
+}
+
+function achievementLocale() {
+    return String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en-US').replace(/_/g, '-');
+}
+
+function achievementNumber(value) {
+    const number = Number(value) || 0;
+    try {
+        return number.toLocaleString(achievementLocale());
+    } catch (_) {
+        return String(number);
+    }
+}
+
+function achievementDate(value, dateOnly = false) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    try {
+        return dateOnly ? date.toLocaleDateString(achievementLocale()) : date.toLocaleString(achievementLocale());
+    } catch (_) {
+        return dateOnly ? date.toLocaleDateString() : date.toLocaleString();
+    }
 }
 
 function progressPercent(current, target) {
@@ -480,7 +527,7 @@ class AchievementsPage extends Page {
             return;
         }
         const bankScore = Number(valueOf(this._loadout.bank, 'ScoreBank', 'scoreBank') ?? valueOf(this._loadout.powerups, 'ScoreBank', 'scoreBank') ?? 0);
-        if (balance) balance.textContent = bankScore.toLocaleString();
+        if (balance) balance.textContent = achievementNumber(bankScore);
         this._renderArsenal();
         this._renderShop();
         this._renderCosmetics();
@@ -501,7 +548,7 @@ class AchievementsPage extends Page {
         grid.innerHTML = inventory.map((item) => {
             const type = String(valueOf(item, 'Type', 'type') || '');
             const localizedItem = localizeAchievementPowerUp(item, language);
-            const name = valueOf(localizedItem, 'DisplayName', 'displayName') || type;
+            const name = valueOf(localizedItem, 'DisplayName', 'displayName') || localizeAchievementPowerUpType(type, language) || type;
             const count = Number(valueOf(item, 'Count', 'count') || 0);
             const active = !!valueOf(item, 'Active', 'active');
             const activeUntil = valueOf(item, 'ActiveUntil', 'activeUntil');
@@ -516,7 +563,7 @@ class AchievementsPage extends Page {
                         <strong>${escapeHtml(name)}</strong>
                         <p>${escapeHtml(desc || (isFreeze ? gameText('automatic') : ''))}</p>
                         <div class="achievement-game-card-meta"><span>${escapeHtml(gameText('inventory'))}: <b>${count}</b></span>${active ? `<span class="is-active">${escapeHtml(gameText('active'))}</span>` : ''}</div>
-                        ${activeUntil ? `<small>${escapeHtml(gameText('activeUntil'))}: ${escapeHtml(new Date(activeUntil).toLocaleString())}</small>` : ''}
+                        ${activeUntil ? `<small>${escapeHtml(gameText('activeUntil'))}: ${escapeHtml(achievementDate(activeUntil))}</small>` : ''}
                         ${isFreeze ? `<small>${escapeHtml(gameText('automatic'))}</small>` : ''}
                         ${canUse ? `<button class="achievement-action-button focusable" type="button" data-achievement-use="${escapeHtml(type)}" tabindex="0">${escapeHtml(gameText('use'))}</button>` : ''}
                     </div>
@@ -551,7 +598,7 @@ class AchievementsPage extends Page {
             const button = isOwned
                 ? `<span class="achievement-owned-label">✓ ${escapeHtml(gameText('owned'))}</span>`
                 : isMilestone
-                    ? `<span class="achievement-owned-label">${escapeHtml(gameText('milestone'))}: ${milestone.toLocaleString()} ⭐</span>`
+                    ? `<span class="achievement-owned-label">${escapeHtml(gameText('milestone'))}: ${achievementNumber(milestone)} ⭐</span>`
                     : `<button class="achievement-action-button focusable" type="button" data-achievement-buy="${escapeHtml(id)}" data-achievement-name="${escapeHtml(name)}" data-achievement-price="${price}" tabindex="0" ${!affordable ? 'disabled' : ''}>${escapeHtml(gameText('buy'))}</button>`;
             return `
                 <article class="achievement-game-card achievement-shop-card ${!affordable && !isOwned && !isMilestone ? 'is-unaffordable' : ''}">
@@ -560,7 +607,7 @@ class AchievementsPage extends Page {
                         <strong>${escapeHtml(name)}</strong>
                         <small>${escapeHtml(kind)}</small>
                         <p>${escapeHtml(description)}</p>
-                        <div class="achievement-game-card-foot"><span class="achievement-shop-price">${price.toLocaleString()} ⭐</span>${button}</div>
+                        <div class="achievement-game-card-foot"><span class="achievement-shop-price">${achievementNumber(price)} ⭐</span>${button}</div>
                     </div>
                 </article>`;
         };
@@ -659,7 +706,7 @@ class AchievementsPage extends Page {
         if (!itemId || !this._userPath) return;
         const name = button.getAttribute('data-achievement-name') || itemId;
         const price = Number(button.getAttribute('data-achievement-price') || 0);
-        if (!window.confirm(gameText('confirmBuy', { name, price: price.toLocaleString() }))) return;
+        if (!window.confirm(gameText('confirmBuy', { name, price: achievementNumber(price) }))) return;
         button.disabled = true;
         this._setGameStatus(gameText('loadingGame'));
         try {
@@ -678,7 +725,10 @@ class AchievementsPage extends Page {
     async _usePowerUp(type, button) {
         if (!type || !this._userPath) return;
         const item = arrayOf(this._loadout && this._loadout.powerups, 'Inventory', 'inventory').find((entry) => String(valueOf(entry, 'Type', 'type')) === type);
-        const name = item ? valueOf(item, 'DisplayName', 'displayName') : type;
+        const localizedItem = item
+            ? localizeAchievementPowerUp(item, document.documentElement.lang || i18n.currentLang || 'en')
+            : null;
+        const name = localizedItem ? valueOf(localizedItem, 'DisplayName', 'displayName') : type;
         if (!window.confirm(gameText('confirmUse', { name }))) return;
         button.disabled = true;
         this._setGameStatus(gameText('loadingGame'));
@@ -727,7 +777,7 @@ class AchievementsPage extends Page {
             this._setGameStatus(gameText('actionFailed'), true);
             return;
         }
-        if (!window.confirm(gameText('confirmGift', { amount: amount.toLocaleString(), name: recipientName }))) return;
+        if (!window.confirm(gameText('confirmGift', { amount: achievementNumber(amount), name: recipientName }))) return;
         if (button) button.disabled = true;
         this._setGameStatus(gameText('loadingGame'));
         try {
@@ -802,7 +852,7 @@ class AchievementsPage extends Page {
             <div class="achievement-stat achievement-stat-score">
                 <span class="achievement-stat-icon">⭐</span>
                 <span class="achievement-stat-label">${escapeHtml(i18n.t('AchievementScore'))}</span>
-                <strong>${score.toLocaleString()}</strong>
+                <strong>${achievementNumber(score)}</strong>
             </div>
             <div class="achievement-stat achievement-stat-rank">
                 <span class="achievement-stat-icon">👑</span>
@@ -895,7 +945,7 @@ class AchievementsPage extends Page {
                 <div class="achievement-leader-row">
                     <span class="achievement-leader-place">${index + 1}</span>
                     <strong>${escapeHtml(name)}</strong>
-                    <span>${score.toLocaleString()} ⭐</span>
+                    <span>${achievementNumber(score)} ⭐</span>
                     <small>${unlocked} 🏆</small>
                 </div>
             `;
@@ -942,7 +992,7 @@ class AchievementsPage extends Page {
             const unlocked = !!valueOf(badge, 'Unlocked', 'unlocked');
             const percent = progressPercent(current, goal);
             const unlockedAt = valueOf(badge, 'UnlockedAt', 'unlockedAt');
-            const dateText = unlockedAt ? new Date(unlockedAt).toLocaleDateString() : '';
+            const dateText = achievementDate(unlockedAt, true);
             return `
                 <article class="achievement-badge ${unlocked ? 'is-unlocked' : 'is-locked'} rarity-${rarity}">
                     <div class="achievement-badge-icon">${badgeIcon(badge)}</div>
