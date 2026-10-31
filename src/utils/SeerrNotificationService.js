@@ -121,7 +121,7 @@ class SeerrNotificationService {
         }
         this._polling = true;
         try {
-            const snapshot = await seerr.notificationSnapshot(this._currentUser || {});
+            const snapshot = await seerr.notificationSnapshot();
             const next = this._buildSnapshot(snapshot);
             if (snapshot.issues == null && this._snapshot) next.issues = this._snapshot.issues || {};
             if (!this._snapshot) {
