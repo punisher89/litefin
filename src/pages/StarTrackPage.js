@@ -11,6 +11,7 @@ const log = logger.create('StarTrackPage');
 const ROOT = '/Plugins/StarTrack';
 const TABS = [
     ['ratings', 'Мои оценки', 'My Ratings', '/MyRatings?limit=100'],
+    ['reviews', 'Отзывы', 'Reviews', '/Recent?limit=100'],
     ['watchlist', 'Посмотреть позже', 'Watchlist', '/MyWatchlist'],
     ['diary', 'Дневник', 'Diary', '/MyDiary?limit=100'],
     ['favorites', 'Избранное', 'Favourites', '/MyFavorites'],
@@ -100,6 +101,10 @@ export default class StarTrackPage extends Page {
                 this._renderContent();
                 return;
             }
+            if (target.closest('[data-startrack-create-list]')) {
+                void this._createList();
+                return;
+            }
             const list = target.closest('[data-startrack-list-id]');
             if (list) { this._openList(list.getAttribute('data-startrack-list-id')); return; }
             const action = target.closest('[data-startrack-action]');
@@ -125,7 +130,7 @@ export default class StarTrackPage extends Page {
             leaveDown: 'my-ratings-content', leaveLeft: 'sidebar'
         });
         if (content) this.registerFocusSection('my-ratings-content', content, {
-            orientation: 'grid', selector: '.media-card, .startrack-action, .startrack-list-card, .startrack-back',
+            orientation: 'grid', selector: '.media-card, .startrack-action, .startrack-list-card, .startrack-back, .startrack-list-control, .startrack-list-delete, .startrack-list-remove',
             leaveUp: 'my-ratings-tabs', leaveLeft: 'sidebar'
         });
         this.setActiveSection('my-ratings-tabs');
@@ -155,7 +160,10 @@ export default class StarTrackPage extends Page {
             const data = await serverPluginClient.call(ROOT + tab[3]);
             this._records = Array.isArray(data) ? data : [];
             this._lists = tabId === 'lists' ? this._records : [];
-            this._entries = tabId === 'lists' ? [] : await this._hydrate(this._records);
+            const visibleRecords = tabId === 'reviews'
+                ? this._records.filter((record) => String(field(record, 'review', '') || '').trim())
+                : this._records;
+            this._entries = tabId === 'lists' ? [] : await this._hydrate(visibleRecords);
             this._cache[tabId] = { records: this._records, entries: this._entries, lists: this._lists };
         } catch (error) {
             log.warn('StarTrack API request failed:', error);
@@ -224,6 +232,7 @@ export default class StarTrackPage extends Page {
     _renderEmpty() {
         const titles = {
             ratings: ['Оценок пока нет', 'No ratings yet'],
+            reviews: ['Отзывов пока нет', 'No reviews yet'],
             watchlist: ['Список пока пуст', 'Your watchlist is empty'],
             diary: ['Дневник пока пуст', 'Your diary is empty'],
             favorites: ['Избранного пока нет', 'No favourites yet'],
@@ -270,6 +279,12 @@ export default class StarTrackPage extends Page {
         } else if (this._tab === 'favorites') {
             meta = '<span class="startrack-entry-label">★ ' + this._t('Избранное', 'Top pick') + '</span>';
             action = this._button('remove-favorite', id, this._t('Убрать', 'Remove'));
+        } else if (this._tab === 'reviews') {
+            const stars = field(record, 'stars', null);
+            if (stars) meta += '<span class="startrack-score">★ ' + esc(rating(stars)) + '</span>';
+            meta += '<span class="startrack-review-author">' + esc(field(record, 'userName', this._t('Пользователь', 'Member'))) + '</span>';
+            meta += '<span class="startrack-date">' + esc(this._date(field(record, 'ratedAt', ''))) + '</span>';
+            meta += '<span class="startrack-review">' + esc(field(record, 'review', '')) + '</span>';
         } else if (this._tab === 'recommendations') {
             meta = '<span class="startrack-entry-label">' + esc(field(record, 'reason', this._t('Подобрано для тебя', 'Picked for you'))) + '</span>';
             action = this._button('add-watchlist', id, this._t('Посмотреть позже', 'Add to watchlist'));
@@ -278,27 +293,53 @@ export default class StarTrackPage extends Page {
             '<div class="startrack-entry-meta">' + meta + action + '</div></article>';
     }
 
+    _currentUserId() {
+        const value = typeof api.userId === 'function' ? api.userId() : api.userId || api._userId;
+        return String(value || '').replace(/-/g, '').toLowerCase();
+    }
+
     _renderLists() {
-        if (!this._lists.length) {
-            return '<div class="startrack-empty"><div class="startrack-empty-icon">☷</div><h2>' +
-                this._t('Списков пока нет', 'No lists yet') + '</h2><p>' +
-                this._t('Созданные в StarTrack списки появятся здесь.', 'Your StarTrack lists will appear here.') +
-                '</p></div>';
-        }
-        return '<div class="startrack-list-grid">' + this._lists.map((list) => {
+        const currentUserId = this._currentUserId();
+        const cards = this._lists.map((list) => {
             const id = field(list, 'id', '');
             const name = field(list, 'name', this._t('Без названия', 'Untitled list'));
             const description = field(list, 'description', '');
             const rows = field(list, 'items', []);
-            return '<button class="startrack-list-card" type="button" tabindex="0" data-startrack-list-id="' +
+            const isOwner = !!currentUserId && String(field(list, 'ownerId', '')).replace(/-/g, '').toLowerCase() === currentUserId;
+            const meta = [
+                field(list, 'ownerName', ''),
+                field(list, 'collaborative', true) ? this._t('Совместный', 'Collaborative') : this._t('Личный', 'Private')
+            ].filter(Boolean).join(' · ');
+            return '<article class="startrack-list-card-wrap">' +
+                '<button class="startrack-list-card" type="button" tabindex="0" data-startrack-list-id="' +
                 esc(id) + '"><span class="startrack-list-icon">☷</span><strong>' + esc(name) + '</strong>' +
                 (description ? '<span>' + esc(description) + '</span>' : '') +
-                '<small>' + (Array.isArray(rows) ? rows.length : 0) + ' ' + this._t('фильмов', 'titles') + '</small></button>';
-        }).join('') + '</div>';
+                (meta ? '<small>' + esc(meta) + '</small>' : '') +
+                '<small>' + (Array.isArray(rows) ? rows.length : 0) + ' ' + this._t('элементов', 'items') + '</small></button>' +
+                (isOwner ? '<button class="startrack-list-delete" type="button" tabindex="0" data-startrack-action="delete-list" data-list-id="' + esc(id) + '">' +
+                    this._t('Удалить список', 'Delete list') + '</button>' : '') +
+                '</article>';
+        }).join('');
+
+        return '<div class="startrack-list-create">' +
+            '<input class="startrack-list-control" id="startrack-list-name" type="text" maxlength="120" autocomplete="off" placeholder="' +
+                this._t('Название нового списка', 'New list name') + '" aria-label="' + this._t('Название списка', 'List name') + '">' +
+            '<input class="startrack-list-control" id="startrack-list-description" type="text" maxlength="2000" autocomplete="off" placeholder="' +
+                this._t('Описание (необязательно)', 'Description (optional)') + '" aria-label="' + this._t('Описание списка', 'List description') + '">' +
+            '<button class="startrack-list-control startrack-action" type="button" tabindex="0" data-startrack-create-list="true">' +
+                this._t('Создать список', 'Create list') + '</button>' +
+            '<span class="startrack-list-create-message" id="startrack-list-create-message" aria-live="polite"></span>' +
+            '</div>' +
+            (cards ? '<div class="startrack-list-grid">' + cards + '</div>' :
+                '<div class="startrack-empty"><div class="startrack-empty-icon">☷</div><h2>' +
+                this._t('Списков пока нет', 'No lists yet') + '</h2><p>' +
+                this._t('Создай первый список, чтобы собирать фильмы и сериалы.', 'Create your first list to collect movies and series.') +
+                '</p></div>');
     }
 
     async _openList(id) {
         if (!id) return;
+        this._error = '';
         this._loading = true;
         this._renderContent();
         try {
@@ -315,9 +356,29 @@ export default class StarTrackPage extends Page {
 
     _renderList() {
         const title = field(this._list, 'name', this._t('Список', 'List'));
-        const cards = this._listEntries.map((entry) => this._renderMediaCard(entry.item, false, 'poster', 'home')).join('');
+        const currentUserId = this._currentUserId();
+        const ownerId = String(field(this._list, 'ownerId', '')).replace(/-/g, '').toLowerCase();
+        const isOwner = !!currentUserId && ownerId === currentUserId;
+        const cards = this._listEntries.map((entry) => {
+            const record = entry.record || {};
+            const id = mediaId(record) || entry.item.Id;
+            const addedBy = String(field(record, 'addedBy', '')).replace(/-/g, '').toLowerCase();
+            const canRemove = isOwner || (!!currentUserId && addedBy === currentUserId);
+            const by = field(record, 'addedByName', '');
+            const date = this._date(field(record, 'addedAt', ''));
+            const meta = [by, date].filter(Boolean).join(' · ');
+            return '<article class="startrack-entry">' + this._renderMediaCard(entry.item, false, 'poster', 'home') +
+                '<div class="startrack-entry-meta">' + (meta ? '<span class="startrack-date">' + esc(meta) + '</span>' : '') +
+                (canRemove ? '<button class="startrack-action startrack-list-remove" type="button" tabindex="0" data-startrack-action="remove-list-item" data-item-id="' + esc(id) + '">' +
+                    this._t('Убрать из списка', 'Remove from list') + '</button>' : '') +
+                '</div></article>';
+        }).join('');
+        const deleteButton = isOwner
+            ? '<button class="startrack-list-delete" type="button" tabindex="0" data-startrack-action="delete-list" data-list-id="' +
+                esc(field(this._list, 'id', '')) + '">' + this._t('Удалить список', 'Delete list') + '</button>'
+            : '';
         return '<div class="startrack-list-toolbar"><button class="startrack-back" type="button" tabindex="0" data-startrack-back="true">‹ ' +
-            this._t('Все списки', 'All lists') + '</button><h2>' + esc(title) + '</h2></div>' +
+            this._t('Все списки', 'All lists') + '</button><h2>' + esc(title) + '</h2>' + deleteButton + '</div>' +
             (cards ? '<div class="startrack-grid">' + cards + '</div>' :
                 '<div class="startrack-empty">' + this._t('Список пуст.', 'This list is empty.') + '</div>');
     }
@@ -333,10 +394,28 @@ export default class StarTrackPage extends Page {
             else if (action === 'remove-like' && id) await serverPluginClient.call(ROOT + '/Likes/' + encodeURIComponent(id), 'DELETE');
             else if (action === 'remove-diary' && entryId) await serverPluginClient.call(ROOT + '/Diary/' + encodeURIComponent(entryId), 'DELETE');
             else if (action === 'remove-favorite' && id) {
-                const remaining = this._records.filter((value) => String(value) !== String(id));
+                const remaining = this._records.filter((value) => String(value).toLowerCase() !== String(id).toLowerCase());
                 await serverPluginClient.call(ROOT + '/MyFavorites', 'POST', { itemIds: remaining });
             } else if (action === 'add-watchlist' && id) {
                 await serverPluginClient.call(ROOT + '/Watchlist/' + encodeURIComponent(id), 'POST', {});
+            } else if (action === 'remove-list-item' && id && this._list) {
+                const listId = field(this._list, 'id', '');
+                await serverPluginClient.call(ROOT + '/Lists/' + encodeURIComponent(listId) +
+                    '/Items/' + encodeURIComponent(id), 'DELETE');
+                this._cache = Object.create(null);
+                await this._openList(listId);
+                return;
+            } else if (action === 'delete-list') {
+                const listId = button.getAttribute('data-list-id') || field(this._list, 'id', '');
+                if (!listId) return;
+                if (this._pendingDeleteListId !== listId) {
+                    this._pendingDeleteListId = listId;
+                    button.textContent = this._t('Нажми ещё раз для удаления', 'Press again to delete');
+                    button.disabled = false;
+                    return;
+                }
+                await serverPluginClient.call(ROOT + '/Lists/' + encodeURIComponent(listId), 'DELETE');
+                this._pendingDeleteListId = null;
             } else { button.disabled = false; return; }
             this._cache = Object.create(null);
             await this._load(this._tab, true);
@@ -344,6 +423,35 @@ export default class StarTrackPage extends Page {
             log.warn('StarTrack action failed:', error);
             button.disabled = false;
             button.textContent = this._t('Не удалось выполнить', 'Action failed');
+        }
+    }
+
+    async _createList() {
+        const nameField = this.$('#startrack-list-name');
+        const descriptionField = this.$('#startrack-list-description');
+        const message = this.$('#startrack-list-create-message');
+        const button = this.$('[data-startrack-create-list]');
+        const name = nameField ? String(nameField.value || '').trim() : '';
+        const description = descriptionField ? String(descriptionField.value || '').trim() : '';
+        if (!name) {
+            if (message) message.textContent = this._t('Введи название списка.', 'Enter a list name.');
+            return;
+        }
+        if (button) button.disabled = true;
+        try {
+            await serverPluginClient.call(ROOT + '/Lists', 'POST', {
+                name: name,
+                description: description || null,
+                collaborative: true,
+                isPrivate: false
+            });
+            this._pendingDeleteListId = null;
+            this._cache = Object.create(null);
+            await this._load('lists', true);
+        } catch (error) {
+            log.warn('StarTrack list creation failed:', error);
+            if (message) message.textContent = this._t('Не удалось создать список.', 'Could not create the list.');
+            if (button) button.disabled = false;
         }
     }
 
