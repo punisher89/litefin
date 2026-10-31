@@ -77,6 +77,24 @@ test('JE native poster tokens are recognized with and without the Spoiler Guard 
     assert.equal(hasNativePosterTagStamp({}), false);
 });
 
+test('Seerr movie and series cards preserve TMDB IDs for Discover markers', () => {
+    const movie = normalizeSeerrItem({
+        id: 12345,
+        mediaType: 'movie',
+        title: 'Example Movie'
+    });
+    const series = normalizeSeerrItem({
+        id: 67890,
+        mediaType: 'tv',
+        name: 'Example Series'
+    });
+
+    assert.equal(movie.Type, 'Movie');
+    assert.equal(movie._tmdbId, 12345);
+    assert.equal(series.Type, 'Series');
+    assert.equal(series._tmdbId, 67890);
+});
+
 test('Seerr normalization never mistakes Radarr or Sonarr IDs for Jellyfin item IDs', () => {
     const withoutJellyfinId = normalizeSeerrItem({
         id: 12345,
