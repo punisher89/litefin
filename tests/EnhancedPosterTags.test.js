@@ -39,6 +39,8 @@ const {
     renderEnhancedPosterTags
 } = await import('../src/utils/EnhancedPosterTags.js');
 
+const { normalizeSeerrItem } = await import('../src/api/seerrNormalize.js');
+
 const settings = {
     UseNativePosterTags: true,
     QualityTagsEnabled: true,
@@ -73,6 +75,24 @@ test('JE native poster tokens are recognized with and without the Spoiler Guard 
     assert.equal(hasNativePosterTagStamp({ ImageTags: { Primary: 'sb-1234abcd-base-jet' + variant + '-jeu' + marker } }), true);
     assert.equal(hasNativePosterTagStamp({ ImageTags: { Primary: 'ordinary-image-tag' } }), false);
     assert.equal(hasNativePosterTagStamp({}), false);
+});
+
+test('Seerr normalization never mistakes Radarr or Sonarr IDs for Jellyfin item IDs', () => {
+    const withoutJellyfinId = normalizeSeerrItem({
+        id: 12345,
+        mediaType: 'movie',
+        title: 'Example',
+        mediaInfo: { serviceId: 7, externalServiceId: 98765 }
+    });
+    assert.equal(withoutJellyfinId._jellyfinMediaId, null);
+
+    const withJellyfinId = normalizeSeerrItem({
+        id: 12345,
+        mediaType: 'movie',
+        title: 'Example',
+        mediaInfo: { jellyfinMediaId: 'jellyfin-guid', serviceId: 7, externalServiceId: 98765 }
+    });
+    assert.equal(withJellyfinId._jellyfinMediaId, 'jellyfin-guid');
 });
 
 test('Jellyfin library TMDB index maps Seerr movie and series cards to real item IDs', () => {
