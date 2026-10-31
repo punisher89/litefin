@@ -701,12 +701,12 @@ export class SeerrClient {
         return this._request(`/request/${encodeURIComponent(requestId)}/${action}`, { method: 'POST', body: {} });
     }
 
-    /** Lists issues through the Jellyfin companion proxy, which scopes the upstream Seerr user. */
-    async issues(take = 30, skip = 0, filter = 'open') {
+    /** Lists issues through the Jellyfin companion proxy, scoped to the authenticated Seerr user. */
+    async issues(take = 20, skip = 0, filter = 'open', sort = 'added') {
         const params = new URLSearchParams({
             take: String(take),
             skip: String(skip),
-            sort: 'modified',
+            sort: String(sort || 'added'),
             filter: String(filter || 'open')
         });
         return this._request(`/Issues?${params.toString()}`);
