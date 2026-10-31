@@ -1624,7 +1624,7 @@ class CardRenderer {
                         `
                                 : `<div class="card-title"><span>${titleText}</span></div>`
                         }
-                        ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
+                        ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle${tmdbRatingInlineHtml ? ' seerr-discover-subtitle' : ''}">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
                         ${metaHtml}
                     </div>
                     `
@@ -1645,7 +1645,7 @@ class CardRenderer {
                     `
                             : `<div class="card-title"><span>${titleText}</span></div>`
                     }
-                    ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
+                    ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle${tmdbRatingInlineHtml ? ' seerr-discover-subtitle' : ''}">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
                     ${metaHtml}
                 </div>
                 `
