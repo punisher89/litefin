@@ -53,11 +53,16 @@ class Sidebar extends Component {
          */
         this._seerrAvailable = false;
         this._starTrackAvailable = pluginManager.isEnabled('startrack');
-        this._onStarTrackAvailabilityChanged = (available) => {
-            this._starTrackAvailable = !!available;
+        this._onStarTrackEnabled = () => {
+            this._starTrackAvailable = true;
             if (this.el) this._applySidebarLayout();
         };
-        eventBus.on('startrack:availability', this._onStarTrackAvailabilityChanged);
+        this._onStarTrackDisabled = () => {
+            this._starTrackAvailable = false;
+            if (this.el) this._applySidebarLayout();
+        };
+        eventBus.on('startrack:enabled', this._onStarTrackEnabled);
+        eventBus.on('startrack:disabled', this._onStarTrackDisabled);
     }
 
     render() {
@@ -481,9 +486,13 @@ class Sidebar extends Component {
         }
         focusManager.unregister('sidebar');
         eventBus.off('router:navigate', this._onNavigate.bind(this));
-        if (this._onStarTrackAvailabilityChanged) {
-            eventBus.off('startrack:availability', this._onStarTrackAvailabilityChanged);
-            this._onStarTrackAvailabilityChanged = null;
+        if (this._onStarTrackEnabled) {
+            eventBus.off('startrack:enabled', this._onStarTrackEnabled);
+            this._onStarTrackEnabled = null;
+        }
+        if (this._onStarTrackDisabled) {
+            eventBus.off('startrack:disabled', this._onStarTrackDisabled);
+            this._onStarTrackDisabled = null;
         }
 
         // Remove auth listeners
