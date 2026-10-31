@@ -234,6 +234,10 @@ export default class SeerrCenterPage extends Page {
                 void this._removeWatchlist(target.getAttribute('data-watchlist-id'));
                 return;
             }
+            if (action === 'watchlist-request') {
+                void this._requestFromWatchlist(target.getAttribute('data-watchlist-id'));
+                return;
+            }
             if (action === 'watchlist-open') {
                 router.navigate(`/seerr/${target.dataset.mediaType || 'movie'}/${target.dataset.tmdbId}`);
             }
@@ -534,7 +538,7 @@ export default class SeerrCenterPage extends Page {
                     <span class="seerr-center-meta">${releaseDate ? escapeHtml(dateLabel(releaseDate)) : escapeHtml(tr('SeerrCenterReleaseDateUnknown', 'Дата выхода неизвестна'))}</span>
                     <div class="seerr-center-actions">
                         <button class="seerr-center-action" type="button" data-center-action="watchlist-open" data-media-type="${escapeHtml(item._mediaType)}" data-tmdb-id="${escapeHtml(item._tmdbId)}" tabindex="0">${escapeHtml(tr('ViewDetails', 'Подробнее'))}</button>
-                        ${[0, 1, 6].includes(statusOf(item)) ? `<button class="seerr-center-action primary" type="button" data-center-action="watchlist-open" data-media-type="${escapeHtml(item._mediaType)}" data-tmdb-id="${escapeHtml(item._tmdbId)}" tabindex="0">${escapeHtml(tr('SeerrRequest', 'Запросить'))}</button>` : ''}
+                        ${[0, 1, 6].includes(statusOf(item)) ? `<button class="seerr-center-action primary" type="button" data-center-action="watchlist-request" data-watchlist-id="${escapeHtml(item._tmdbId)}" tabindex="0">${escapeHtml(tr('SeerrRequest', 'Запросить'))}</button>` : ''}
                         <button class="seerr-center-action danger" type="button" data-center-action="watchlist-remove" data-watchlist-id="${escapeHtml(item._tmdbId)}" tabindex="0">${escapeHtml(tr('Remove', 'Убрать'))}</button>
                     </div>
                 </div>
@@ -548,6 +552,23 @@ export default class SeerrCenterPage extends Page {
             ${cards || `<div class="seerr-center-empty"><span>◷</span><strong>${escapeHtml(tr('SeerrCenterEmptyWatchlist', 'В этом разделе пока пусто'))}</strong></div>`}
         `;
         this._registerFocus();
+    }
+
+    async _requestFromWatchlist(tmdbId) {
+        const item = this._watchlist.find((entry) => String(entry._tmdbId) === String(tmdbId));
+        if (!item) return;
+        try {
+            const module = await import('../components/SeerrRequestModal.js');
+            module.default.show(item, (newStatus, requestId) => {
+                item._seerrStatus = newStatus;
+                if (requestId) item._requestId = requestId;
+                seerr.clearCache();
+                this._renderWatchlist();
+            });
+        } catch (error) {
+            log.warn('Unable to open Seerr request form from watchlist', error);
+            toast.show(error?.message || tr('SeerrRequestFailed', 'Не удалось открыть запрос'));
+        }
     }
 
     async _removeWatchlist(tmdbId) {
