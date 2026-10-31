@@ -1837,5 +1837,18 @@
     "SeerrCenterIssueFilterResolved": "Решённые",
     "SeerrCenterIssueOpen": "Открыто",
     "SeerrCenterIssueResolved": "Решено",
-    "SeerrCenterReopenIssue": "Открыть снова"
+    "SeerrCenterReopenIssue": "Открыть снова",
+    "SeerrCenterRequestsSubtitle": "Управление запросами фильмов и сериалов.",
+    "SeerrCenterIssuesSubtitle": "Сообщения о проблемах, комментарии и их решение.",
+    "SeerrCenterNotificationsSubtitle": "Изменения статусов и новые ответы по обращениям.",
+    "SeerrCenterWatchlistSubtitle": "Отслеживаемые фильмы и сериалы, ожидающие выхода или запроса.",
+    "SeerrCenterIssueSortAdded": "Сначала новые",
+    "SeerrCenterIssueSortModified": "Последнее изменение",
+    "SeerrCenterResultsPerPage": "На странице",
+    "SeerrCenterShowingResults": "Показано",
+    "SeerrCenterIssueStatus": "Статус",
+    "SeerrCenterIssueType": "Тип проблемы",
+    "SeerrCenterIssueOpenedBy": "Открыл",
+    "SeerrCenterViewIssue": "Открыть обращение",
+    "SeerrCenterNoIssueDescription": "Описание не добавлено"
 }
