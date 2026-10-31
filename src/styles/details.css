@@ -2767,5 +2767,5 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     font: inherit;
 }
 .startrack-review-editor textarea:focus { outline: 2px solid var(--jf-accent); outline-offset: 2px; }
-.startrack-list-choices { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+.startrack-list-choices { display: flex; flex-wrap: wrap; margin-top: 8px; }
 .startrack-detail-button.startrack-list-choice { margin: 0; }
