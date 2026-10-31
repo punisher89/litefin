@@ -652,14 +652,8 @@ const seerrPersonChunk = createPageChunkLoader(
 const discoverChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "discover" */ '../pages/DiscoverPage.js')
 );
-const seerrCenterChunk = createPageChunkLoader(
-    () => import(/* webpackChunkName: "seerr-center" */ '../pages/SeerrCenterPage.js')
-);
 const favoritesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "favorites" */ '../pages/FavoritesPage.js')
-);
-const starTrackChunk = createPageChunkLoader(
-    () => import(/* webpackChunkName: "startrack" */ '../pages/StarTrackPage.js')
 );
 const profilesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "profiles" */ '../pages/ProfilesPage.js')
@@ -873,26 +867,12 @@ class DiscoverPage extends AsyncPageProxy {
     }
 }
 
-/** Route proxy for Seerr request, issue, notification and watchlist management. */
-class SeerrCenterPage extends AsyncPageProxy {
-    constructor(options) {
-        super(options, seerrCenterChunk);
-    }
-}
-
 /**
  * Route proxy for the user favorites view.
  */
 class FavoritesPage extends AsyncPageProxy {
     constructor(options) {
         super(options, favoritesChunk);
-    }
-}
-
-/** Route proxy for the native StarTrack ratings and watchlist page. */
-class StarTrackPage extends AsyncPageProxy {
-    constructor(options) {
-        super(options, starTrackChunk);
     }
 }
 
@@ -2221,10 +2201,8 @@ class App {
         router.register('/person/:id', PersonPage);
         router.register('/search', SearchPage);
         router.register('/discover', DiscoverPage);
-        router.register('/seerr-center', SeerrCenterPage);
         router.register('/favorites', FavoritesPage);
         router.register('/achievements', AchievementsPage);
-        router.register('/my-ratings', StarTrackPage);
         router.register('/settings', SettingsPage);
         router.register('/livetv', LiveTvPage);
         router.register('/offline', OfflinePage);
