@@ -68,7 +68,7 @@ const GAME_TEXT = {
 };
 
 function gameText(key, replacements = {}) {
-    const language = String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en').toLowerCase();
+    const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     const dictionary = language.startsWith('ru') ? GAME_TEXT.ru : GAME_TEXT.en;
     let text = dictionary[key] || GAME_TEXT.en[key] || key;
     Object.keys(replacements).forEach((name) => {
@@ -83,7 +83,7 @@ function arrayOf(object, ...keys) {
 }
 
 function cosmeticKindLabel(kind) {
-    const ru = String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en').toLowerCase().startsWith('ru');
+    const ru = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase().startsWith('ru');
     const normalized = String(kind || '')
         .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
         .replace(/[_-]+/g, ' ')
@@ -172,7 +172,7 @@ function badgeIcon(badge) {
 function localizedBadgeValue(value, kind) {
     const raw = String(value || '').trim();
     if (!raw) return '';
-    const language = String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en').toLowerCase();
+    const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     if (!language.startsWith('ru')) return raw;
 
     const key = raw.toLowerCase().replace(/[_-]+/g, ' ').trim();
@@ -232,7 +232,7 @@ function localizedBadgeValue(value, kind) {
 }
 
 function achievementLocale() {
-    return String((typeof document !== 'undefined' && document.documentElement.lang) || i18n.currentLang || 'en-US').replace(/_/g, '-');
+    return String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en-US').replace(/_/g, '-');
 }
 
 function achievementNumber(value) {
@@ -494,7 +494,7 @@ class AchievementsPage extends Page {
             // The public test route confirms the server plugin before user-scoped calls.
             await api.get('/Plugins/AchievementBadges/test');
 
-            const language = String(document.documentElement.lang || i18n.currentLang || 'en').toLowerCase().split('-')[0];
+            const language = String(i18n.currentLang || document.documentElement.lang || 'en').toLowerCase().split('-')[0];
             const userPath = `/Plugins/AchievementBadges/users/${encodeURIComponent(userId)}`;
             this._userId = userId;
             this._userPath = userPath;
@@ -551,7 +551,6 @@ class AchievementsPage extends Page {
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
             button.setAttribute('tabindex', active ? '0' : '-1');
-            button.setAttribute('tabindex', active ? '0' : '-1');
         });
         this.el.querySelectorAll('[data-game-section-panel]').forEach((panel) => {
             panel.hidden = panel.getAttribute('data-game-section-panel') !== selected;
@@ -576,7 +575,7 @@ class AchievementsPage extends Page {
     _setGameStatus(message, isError = false) {
         const status = this.$('#achievement-game-status');
         if (!status) return;
-        status.textContent = localizeAchievementMessage(message || '', document.documentElement.lang || i18n.currentLang || 'en');
+        status.textContent = localizeAchievementMessage(message || '', i18n.currentLang || document.documentElement.lang || 'en');
         status.classList.toggle('is-error', !!isError);
         status.hidden = !message;
     }
@@ -598,7 +597,7 @@ class AchievementsPage extends Page {
         const grid = this.$('#achievement-arsenal-grid');
         const countNode = this.$('#achievement-powerup-count');
         if (!grid) return;
-        const language = document.documentElement.lang || i18n.currentLang || 'en';
+        const language = i18n.currentLang || document.documentElement.lang || 'en';
         const inventory = arrayOf(this._loadout.powerups, 'Inventory', 'inventory');
         const total = inventory.reduce((sum, item) => sum + Number(valueOf(item, 'Count', 'count') || 0), 0);
         if (countNode) countNode.textContent = `${gameText('quantity')}: ${total}`;
@@ -640,7 +639,7 @@ class AchievementsPage extends Page {
         const cosmetics = arrayOf(this._loadout.catalog, 'Cosmetics', 'cosmetics');
         const owned = new Set(arrayOf(this._loadout.cosmetics, 'Owned', 'owned').map(String));
         const score = Number(valueOf(this._loadout.bank, 'ScoreBank', 'scoreBank') ?? valueOf(this._loadout.powerups, 'ScoreBank', 'scoreBank') ?? 0);
-        const language = document.documentElement.lang || i18n.currentLang || 'en';
+        const language = i18n.currentLang || document.documentElement.lang || 'en';
         const renderItem = (item, isCosmetic) => {
             const id = String(valueOf(item, 'Id', 'id') || '');
             const localizedItem = localizeAchievementCatalogItem(item, language);
@@ -651,6 +650,7 @@ class AchievementsPage extends Page {
             const isOwned = isCosmetic && owned.has(id);
             const isMilestone = isCosmetic && price === 0 && milestone > 0 && !isOwned;
             const affordable = score >= price;
+            const missingScore = Math.max(0, price - score);
             const preview = valueOf(item, 'PreviewColor', 'previewColor');
             const previewColor = typeof preview === 'string' && /^#[0-9a-f]{3,8}$/i.test(preview) ? preview : '';
             const previewGlyph = previewColor ? '✦' : (preview || (isCosmetic ? '🎨' : '⚡'));
@@ -660,7 +660,7 @@ class AchievementsPage extends Page {
                 ? `<span class="achievement-owned-label">✓ ${escapeHtml(gameText('owned'))}</span>`
                 : isMilestone
                     ? `<span class="achievement-owned-label">${escapeHtml(gameText('milestone'))}: ${achievementNumber(milestone)} ⭐</span>`
-                    : `<button class="achievement-action-button focusable" type="button" data-achievement-buy="${escapeHtml(id)}" data-achievement-name="${escapeHtml(name)}" data-achievement-price="${price}" tabindex="0" ${!affordable ? 'disabled' : ''}>${escapeHtml(gameText('buy'))}</button>`;
+                    : `<button class="achievement-action-button focusable${!affordable ? ' is-unaffordable-button' : ''}" type="button" data-achievement-buy="${escapeHtml(id)}" data-achievement-name="${escapeHtml(name)}" data-achievement-price="${price}" data-achievement-missing="${missingScore}" aria-label="${escapeHtml(affordable ? gameText('buy') : gameText('needMoreScore', { amount: achievementNumber(missingScore) }))}" tabindex="0">${escapeHtml(affordable ? gameText('buy') : gameText('needMoreScoreShort', { amount: achievementNumber(missingScore) }))}</button>`;
             return `
                 <article class="achievement-game-card achievement-shop-card ${!affordable && !isOwned && !isMilestone ? 'is-unaffordable' : ''}">
                     <div class="achievement-game-card-icon" ${previewColor ? `style="color:${previewColor}"` : ''}>${escapeHtml(previewGlyph)}</div>
@@ -682,7 +682,7 @@ class AchievementsPage extends Page {
         const catalog = arrayOf(this._loadout.catalog, 'Cosmetics', 'cosmetics');
         const owned = new Set(arrayOf(this._loadout.cosmetics, 'Owned', 'owned').map(String));
         const equipped = this._loadout.cosmetics || {};
-        const language = document.documentElement.lang || i18n.currentLang || 'en';
+        const language = i18n.currentLang || document.documentElement.lang || 'en';
         const items = catalog.filter((item) => owned.has(String(valueOf(item, 'Id', 'id') || '')));
         if (!items.length) {
             target.innerHTML = `<p class="achievements-muted">${escapeHtml(gameText('noCosmetics'))}</p>`;
@@ -765,6 +765,11 @@ class AchievementsPage extends Page {
 
     async _buyShopItem(itemId, button) {
         if (!itemId || !this._userPath) return;
+        const missingScore = Number(button.getAttribute('data-achievement-missing') || 0);
+        if (missingScore > 0) {
+            this._setGameStatus(gameText('needMoreScore', { amount: achievementNumber(missingScore) }), true);
+            return;
+        }
         const name = button.getAttribute('data-achievement-name') || itemId;
         const price = Number(button.getAttribute('data-achievement-price') || 0);
         if (!window.confirm(gameText('confirmBuy', { name, price: achievementNumber(price) }))) return;
@@ -787,7 +792,7 @@ class AchievementsPage extends Page {
         if (!type || !this._userPath) return;
         const item = arrayOf(this._loadout && this._loadout.powerups, 'Inventory', 'inventory').find((entry) => String(valueOf(entry, 'Type', 'type')) === type);
         const localizedItem = item
-            ? localizeAchievementPowerUp(item, document.documentElement.lang || i18n.currentLang || 'en')
+            ? localizeAchievementPowerUp(item, i18n.currentLang || document.documentElement.lang || 'en')
             : null;
         const name = localizedItem ? valueOf(localizedItem, 'DisplayName', 'displayName') : type;
         if (!window.confirm(gameText('confirmUse', { name }))) return;
@@ -893,7 +898,7 @@ class AchievementsPage extends Page {
         const unlocked = Number(valueOf(summary, 'Unlocked', 'unlocked') || 0);
         const total = Number(valueOf(summary, 'Total', 'total') || this._data.badges.length);
         const percent = Number(valueOf(summary, 'Percentage', 'percentage') || 0);
-        const language = document.documentElement.lang || i18n.currentLang || 'en';
+        const language = i18n.currentLang || document.documentElement.lang || 'en';
         const rankName = localizeAchievementRank(valueOf(tier, 'Name', 'name') || '—', language);
         const nextName = localizeAchievementRank(valueOf(nextTier, 'Name', 'name'), language);
         const rankProgress = Math.max(0, Math.min(100, Number(valueOf(rank, 'ProgressToNext', 'progressToNext') || 0)));
@@ -954,7 +959,7 @@ class AchievementsPage extends Page {
         if (!target) return;
         const daily = valueOf(this._data.quests, 'Daily', 'daily') || [];
         const weekly = valueOf(this._data.quests, 'Weekly', 'weekly') || [];
-        const language = document.documentElement.lang || i18n.currentLang || 'en';
+        const language = i18n.currentLang || document.documentElement.lang || 'en';
         const renderList = (items) => {
             if (!Array.isArray(items) || !items.length) return `<p class="achievements-muted">${escapeHtml(i18n.t('AchievementNoQuests'))}</p>`;
             return items.map((quest) => {
