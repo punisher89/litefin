@@ -107,6 +107,11 @@ class Sidebar extends Component {
                         <span class="item-text" data-i18n="SeerrDiscover">Discover</span>
                     </button>
 
+                    <button class="sidebar-item" id="sidebar-seerr-center" tabindex="0" data-path="/seerr-center" style="display: none;">
+                        <div class="item-icon" aria-hidden="true"><span>▤</span></div>
+                        <span class="item-text" data-i18n="SeerrCenterTitle">Seerr Center</span>
+                    </button>
+
                     <button class="sidebar-item" id="sidebar-favorites" tabindex="0" data-path="/favorites">
                         <div class="item-icon">
                             ${sidebarIcons.favorites}
@@ -453,7 +458,8 @@ class Sidebar extends Component {
 
     async _updateSeerrVisibility() {
         const button = this.$('#sidebar-discover');
-        if (!button) return;
+        const centerButton = this.$('#sidebar-seerr-center');
+        if (!button && !centerButton) return;
 
         // Don't probe while unauthenticated — the API call will fail and may
         // cause other pages to read a stale 'false' result from the in-memory cache.
@@ -474,7 +480,8 @@ class Sidebar extends Component {
         // Cache locally so _applySidebarLayout() can preserve this state
         // across any layout rebuild without an additional network call
         this._seerrAvailable = isAvailable;
-        button.style.display = isAvailable ? '' : 'none';
+        if (button) button.style.display = isAvailable ? '' : 'none';
+        if (centerButton) centerButton.style.display = isAvailable ? '' : 'none';
         focusManager.invalidateCache('sidebar');
         this._updateFloatingIslandGeometry();
     }
@@ -1906,7 +1913,8 @@ class Sidebar extends Component {
                 // Discover requires Seerr to be available — hide it if the probe hasn't
                 // confirmed availability yet, regardless of the saved layout preference
                 const isDiscover = id === 'discover';
-                const seerrHidden = isDiscover && !this._seerrAvailable;
+                const isSeerrCenter = id === 'seerrcenter';
+                const seerrHidden = (isDiscover || isSeerrCenter) && !this._seerrAvailable;
                 const starTrackHidden = id === 'startrack' && !this._starTrackAvailable;
                 const shouldHide = hidden || pluginHidden || seerrHidden || starTrackHidden;
 
@@ -1958,7 +1966,8 @@ class Sidebar extends Component {
                 const pluginHidden = isSyncPlay && !pluginManager.isEnabled('syncplay');
                 // Same seerr-awareness as Modern mode — discover stays hidden until probed
                 const isDiscover = id === 'discover';
-                const seerrHidden = isDiscover && !this._seerrAvailable;
+                const isSeerrCenter = id === 'seerrcenter';
+                const seerrHidden = (isDiscover || isSeerrCenter) && !this._seerrAvailable;
                 const starTrackHidden = id === 'startrack' && !this._starTrackAvailable;
                 const shouldHide = hidden || pluginHidden || seerrHidden || starTrackHidden;
 
