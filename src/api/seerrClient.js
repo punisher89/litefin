@@ -670,13 +670,18 @@ export class SeerrClient {
             issueParams.set('requestedBy', String(currentUser.id));
         }
 
-        const [requestPayload, issuePayload] = await Promise.all([
-            this._request(`/request?${requestParams.toString()}`, { noCache: true }),
-            this._request(`/issue?${issueParams.toString()}`, { noCache: true })
-        ]);
+        const requestPayload = await this._request(`/request?${requestParams.toString()}`, { noCache: true });
+        let issuePayload = null;
+        try {
+            issuePayload = await this._request(`/issue?${issueParams.toString()}`, { noCache: true });
+        } catch (error) {
+            // Some Seerr roles cannot browse issues. Request status notifications
+            // should continue even when the issue endpoint is not permitted.
+            log.debug('Issue polling is not available for this Seerr account', error);
+        }
         return {
             requests: this._resultsOf(requestPayload),
-            issues: this._resultsOf(issuePayload)
+            issues: issuePayload ? this._resultsOf(issuePayload) : null
         };
     }
 
