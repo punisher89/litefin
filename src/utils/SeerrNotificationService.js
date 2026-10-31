@@ -123,6 +123,7 @@ class SeerrNotificationService {
         try {
             const snapshot = await seerr.notificationSnapshot(this._currentUser || {});
             const next = this._buildSnapshot(snapshot);
+            if (snapshot.issues == null && this._snapshot) next.issues = this._snapshot.issues || {};
             if (!this._snapshot) {
                 // The first successful read is a baseline, not a flood of old events.
                 this._snapshot = next;
@@ -137,8 +138,11 @@ class SeerrNotificationService {
                 const current = next.requests[id];
                 const previous = previousRequests[id];
                 if (!previous) {
-                    // New requests only notify when there is already a baseline.
-                    generated.push(this._requestNotification(current, 'new'));
+                    // Admins see requests created by other household users. A user's
+                    // own newly submitted request is already confirmed by the request modal.
+                    if (String(current.requesterId || '') !== String(this._currentUser?.id || '')) {
+                        generated.push(this._requestNotification(current, 'new'));
+                    }
                     return;
                 }
                 if (current.requestStatus !== previous.requestStatus || current.mediaStatus !== previous.mediaStatus) {
@@ -151,7 +155,9 @@ class SeerrNotificationService {
                 const current = next.issues[id];
                 const previous = previousIssues[id];
                 if (!previous) {
-                    generated.push(this._issueNotification(current, 'new'));
+                    if (String(current.creatorId || '') !== String(this._currentUser?.id || '')) {
+                        generated.push(this._issueNotification(current, 'new'));
+                    }
                     return;
                 }
                 if (current.commentSignature && current.commentSignature !== previous.commentSignature &&
@@ -198,6 +204,7 @@ class SeerrNotificationService {
                 title: mediaTitle(media, `TMDB #${tmdbId || id}`),
                 tmdbId: tmdbId ? String(tmdbId) : '',
                 mediaType,
+                requesterId: request.requestedBy?.id || request.requestedBy?.userId || '',
                 updatedAt: request.updatedAt || media.updatedAt || request.createdAt || ''
             };
         });
@@ -215,6 +222,7 @@ class SeerrNotificationService {
                 mediaType: mediaTypeOf(media, {}),
                 commentSignature: lastComment ? `${lastComment.id || ''}:${lastComment.message || ''}:${lastComment.createdAt || ''}` : '',
                 commentUserId: lastComment?.user?.id || lastComment?.userId || '',
+                creatorId: issue.createdBy?.id || issue.createdBy?.userId || '',
                 updatedAt: issue.updatedAt || issue.createdAt || ''
             };
         });
