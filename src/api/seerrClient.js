@@ -657,7 +657,6 @@ export class SeerrClient {
             sortDirection: 'desc',
             mediaType: 'all'
         });
-        const permissionBits = Number(currentUser.permissions || 0);
         const issueParams = new URLSearchParams({
             take: '30',
             skip: '0',
