@@ -65,6 +65,8 @@ export default class SeerrCenterPage extends Page {
         this._items = [];
         this._issues = [];
         this._watchlist = [];
+        this._watchlistFilter = 'all';
+        this._watchlistSort = 'release';
         this._counts = {};
         this._currentUser = null;
         this._isAdmin = false;
@@ -219,7 +221,12 @@ export default class SeerrCenterPage extends Page {
                 return;
             }
             if (action === 'watchlist-filter') {
-                this._filter = target.getAttribute('data-filter') || 'all';
+                this._watchlistFilter = target.getAttribute('data-filter') || 'all';
+                this._renderWatchlist();
+                return;
+            }
+            if (action === 'watchlist-sort') {
+                this._watchlistSort = this._watchlistSort === 'release' ? 'title' : 'release';
                 this._renderWatchlist();
                 return;
             }
@@ -276,6 +283,7 @@ export default class SeerrCenterPage extends Page {
     _renderStats() {
         const el = this.$('#seerr-center-stats');
         if (!el) return;
+        el.style.display = this._tab === 'requests' ? '' : 'none';
         const counts = this._counts || {};
         const stats = [
             ['total', tr('SeerrCenterTotal', 'Всего'), counts.total],
@@ -348,7 +356,7 @@ export default class SeerrCenterPage extends Page {
                 </article>
             `;
         }).join('');
-        const canLoadMore = this._items.length >= 40 && (result.pages > 1 ? this._skip / 40 + 1 < result.pages : true);
+        const canLoadMore = this._items.length >= 20 && (result.pages > 1 ? this._skip / 20 + 1 < result.pages : true);
         el.innerHTML = `
             <div class="seerr-center-filters">
                 <div class="seerr-center-filter-group">${filters.map(([key, label]) => `<button type="button" class="seerr-center-filter${key === this._filter ? ' active' : ''}" data-center-action="filter" data-filter="${key}" tabindex="0">${escapeHtml(label)}</button>`).join('')}</div>
@@ -389,6 +397,11 @@ export default class SeerrCenterPage extends Page {
     async _loadIssues() {
         const userId = this._currentUser?.id;
         const requestedBy = this._canViewIssues ? null : userId;
+        if (!this._canViewIssues && requestedBy == null) {
+            this._issues = [];
+            this._renderIssues();
+            return;
+        }
         const payload = await seerr.issues(40, 0, 'open', requestedBy);
         this._issues = Array.isArray(payload) ? payload : (payload?.results || []);
         this._renderIssues();
