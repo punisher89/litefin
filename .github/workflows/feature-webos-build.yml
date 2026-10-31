@@ -1,0 +1,71 @@
+name: Feature WebOS Build
+
+on:
+  push:
+    branches:
+      - feature/game-center-notifications
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'gulpfile.mjs'
+      - 'webpack.config.cjs'
+      - 'appinfo.json'
+      - 'config.xml'
+      - '.github/workflows/feature-webos-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Run test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+
+  webos:
+    name: Build WebOS IPK packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Prepare artifact directory
+        run: mkdir -p artifacts
+      - name: Build Normal package
+        run: |
+          npm run package:webos-normal
+          mv Litefin-*-webOS-Normal.ipk artifacts/
+      - name: Build Modern package for webOS 6+
+        run: |
+          npm run package:webos-modern
+          mv Litefin-*-webOS-Modern.ipk artifacts/
+      - name: Upload IPK packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: litefin-webos-${{ github.sha }}
+          path: artifacts/*.ipk
+          if-no-files-found: error
+          retention-days: 14
