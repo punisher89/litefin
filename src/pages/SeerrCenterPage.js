@@ -6,6 +6,8 @@ import { logger } from '../utils/Logger.js';
 import { i18n } from '../utils/i18n.js';
 import { escapeHtml } from '../utils/Utils.js';
 import { toast } from '../ui/Toast.js';
+import { eventBus } from '../core/EventBus.js';
+import { seerrNotificationService } from '../utils/SeerrNotificationService.js';
 import '../styles/seerr-center.css';
 
 const log = logger.create('SeerrCenterPage');
@@ -71,6 +73,10 @@ export default class SeerrCenterPage extends Page {
         this._loading = false;
         this._issueDetails = null;
         this._destroyed = false;
+        this._onNotificationsChanged = () => {
+            this._updateNotificationBadge();
+            if (this._tab === 'notifications') this._renderNotifications();
+        };
     }
 
     render() {
@@ -112,6 +118,8 @@ export default class SeerrCenterPage extends Page {
     async onInit() {
         this.title = tr('SeerrCenterTitle', 'Центр Seerr');
         this._bindEvents();
+        eventBus.on('seerr:notificationsChanged', this._onNotificationsChanged);
+        this._updateNotificationBadge();
         this.setLoading(true);
         try {
             const available = await seerr.isAvailable();
@@ -154,7 +162,7 @@ export default class SeerrCenterPage extends Page {
                 return;
             }
             if (action === 'load-more') {
-                this._skip += 40;
+                this._skip += 20;
                 void this._loadRequests(true);
                 return;
             }
@@ -197,6 +205,15 @@ export default class SeerrCenterPage extends Page {
             }
             if (action === 'issue-resolve' || action === 'issue-decline') {
                 void this._updateIssue(target.getAttribute('data-issue-action'));
+                return;
+            }
+            if (action === 'notification-mark-all-read') {
+                seerrNotificationService.markAllRead();
+                this._renderNotifications();
+                return;
+            }
+            if (action === 'notification-open') {
+                void this._openNotification(target.getAttribute('data-notification-id'));
                 return;
             }
             if (action === 'watchlist-filter') {
@@ -273,7 +290,7 @@ export default class SeerrCenterPage extends Page {
     }
 
     async _loadRequests(append = false) {
-        const result = await seerr.requestQueue(40, append ? this._skip : 0, this._filter, this._mediaFilter);
+        const result = await seerr.requestQueue(20, append ? this._skip : 0, this._filter, this._mediaFilter);
         const incoming = result.items || [];
         this._items = append ? this._items.concat(incoming) : incoming;
         this._renderRequests(result);
@@ -505,10 +522,65 @@ export default class SeerrCenterPage extends Page {
         }
     }
 
+    _updateNotificationBadge() {
+        const count = seerrNotificationService.getUnreadCount();
+        const badge = this.$('[data-center-unread]');
+        if (badge) {
+            badge.textContent = count > 99 ? '99+' : String(count);
+            badge.classList.toggle('hidden', count === 0);
+        }
+    }
+
+    async _openNotification(notificationId) {
+        const notification = seerrNotificationService.getNotifications().find((entry) => entry.id === notificationId);
+        if (!notification) return;
+        seerrNotificationService.markRead(notificationId);
+        this._updateNotificationBadge();
+        if (notification.kind === 'issue' && notification.issueId) {
+            this._tab = 'issues';
+            this._issueDetails = null;
+            this._updateTabs();
+            await this._loadIssues();
+            await this._openIssue(notification.issueId);
+            return;
+        }
+        if (notification.tmdbId) {
+            router.navigate(`/seerr/${notification.mediaType === 'tv' ? 'tv' : 'movie'}/${encodeURIComponent(notification.tmdbId)}`);
+            return;
+        }
+        this._renderNotifications();
+    }
+
     _renderNotifications() {
         const el = this.$('#seerr-center-panel');
         if (!el) return;
-        el.innerHTML = `<div class="seerr-center-empty"><span>♢</span><strong>${escapeHtml(tr('SeerrCenterNotificationsComing', 'Центр уведомлений будет подключён следующим этапом.'))}</strong><p>${escapeHtml(tr('SeerrCenterNotificationsDesc', 'Litefin будет отслеживать изменения статусов ваших запросов и ответы по проблемам.'))}</p></div>`;
+        const notifications = seerrNotificationService.getNotifications();
+        const unread = seerrNotificationService.getUnreadCount();
+        const cards = notifications.map((entry) => {
+            const message = entry.messageKey
+                ? `${tr(entry.messageKey, entry.message || '')}: ${entry.title || ''}`
+                : (entry.message || entry.title || '');
+            return `
+                <button type="button" class="seerr-center-notification${entry.read ? ' read' : ' unread'}"
+                    data-center-action="notification-open" data-notification-id="${escapeHtml(entry.id)}" tabindex="0">
+                    <span class="seerr-center-notification-icon" aria-hidden="true">${entry.kind === 'issue' ? '⚑' : '▤'}</span>
+                    <span class="seerr-center-notification-copy">
+                        <strong>${escapeHtml(entry.title || tr('SeerrCenterTitle', 'Центр Seerr'))}</strong>
+                        <span>${escapeHtml(message)}</span>
+                        <small>${escapeHtml(dateLabel(entry.createdAt))}</small>
+                    </span>
+                    ${entry.read ? '' : '<span class="seerr-center-notification-dot" aria-hidden="true"></span>'}
+                </button>
+            `;
+        }).join('');
+        el.innerHTML = `
+            <div class="seerr-center-notification-toolbar">
+                <span>${escapeHtml(tr('SeerrCenterUnreadCount', 'Непрочитано'))}: <strong>${unread}</strong></span>
+                ${unread ? `<button type="button" class="seerr-center-action" data-center-action="notification-mark-all-read" tabindex="0">${escapeHtml(tr('SeerrCenterMarkAllRead', 'Прочитать всё'))}</button>` : ''}
+            </div>
+            ${cards || `<div class="seerr-center-empty"><span>♢</span><strong>${escapeHtml(tr('SeerrCenterNoNotifications', 'Новых уведомлений нет'))}</strong><p>${escapeHtml(tr('SeerrCenterNotificationsDesc', 'Здесь появятся изменения статусов запросов и ответы по проблемам.'))}</p></div>`}
+        `;
+        this._updateNotificationBadge();
         this._registerFocus();
     }
 
@@ -529,6 +601,7 @@ export default class SeerrCenterPage extends Page {
 
     destroy() {
         this._destroyed = true;
+        eventBus.off('seerr:notificationsChanged', this._onNotificationsChanged);
         super.destroy();
     }
 }
