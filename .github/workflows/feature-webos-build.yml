@@ -39,7 +39,7 @@ jobs:
         run: npm test
 
   webos:
-    name: Build WebOS IPK packages
+    name: Build WebOS Normal IPK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -58,14 +58,10 @@ jobs:
         run: |
           npm run package:webos-normal
           mv Litefin-*-webOS-Normal.ipk artifacts/
-      - name: Build Modern package for webOS 6+
-        run: |
-          npm run package:webos-modern
-          mv Litefin-*-webOS-Modern.ipk artifacts/
       - name: Upload IPK packages
         uses: actions/upload-artifact@v4
         with:
-          name: litefin-webos-${{ github.sha }}
+          name: litefin-webos-normal-${{ github.sha }}
           path: artifacts/*.ipk
           if-no-files-found: error
           retention-days: 14
