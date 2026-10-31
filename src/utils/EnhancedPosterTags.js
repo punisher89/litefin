@@ -14,6 +14,8 @@ const SETTINGS_TTL = 5 * 60 * 1000;
 const ITEM_TTL = 10 * 60 * 1000;
 const NEGATIVE_TTL = 2 * 60 * 1000;
 const MAX_BATCH = 200;
+const TMDB_INDEX_TTL = 10 * 60 * 1000;
+const TMDB_INDEX_PAGE_SIZE = 500;
 const SUPPORTED_TYPES = new Set(['Movie', 'Series', 'Season', 'Episode', 'BoxSet', 'Video']);
 const VALID_CORNERS = new Set(['top-left', 'top-right', 'bottom-left', 'bottom-right']);
 
@@ -24,6 +26,10 @@ let settingsLoaded = false;
 let settingsPromise = null;
 let endpointUnavailableUntil = 0;
 const itemCache = new Map();
+let tmdbIndex = null;
+let tmdbIndexUserId = null;
+let tmdbIndexFetchedAt = 0;
+let tmdbIndexPromise = null;
 
 function cleanPosition(value, fallback) {
     return VALID_CORNERS.has(value) ? value : fallback;
@@ -385,6 +391,112 @@ async function loadMissingItems(ids, userId) {
 }
 
 /**
+ * Build a local Jellyfin lookup from provider IDs returned by /Items?HasTmdbId=true.
+ * Jellyfin does not expose an exact TMDB-ID filter, so this is intentionally
+ * fetched once, with only ProviderIds and no image payload, then cached.
+ * @param {Array<Object>} items
+ * @returns {Map<string, string>} Map keys are "movie:<tmdbId>" / "series:<tmdbId>".
+ */
+export function indexJellyfinItemsByTmdbId(items) {
+    const index = new Map();
+    if (!Array.isArray(items)) return index;
+
+    for (const item of items) {
+        if (!item || !item.Id || !['Movie', 'Series'].includes(item.Type)) continue;
+        const providers = item.ProviderIds || item.providerIds || {};
+        const providerKey = Object.keys(providers).find((key) => lower(key) === 'tmdb');
+        const tmdbId = providerKey ? String(providers[providerKey] || '').trim() : '';
+        if (!tmdbId) continue;
+        index.set(item.Type.toLowerCase() + ':' + tmdbId, String(item.Id));
+    }
+    return index;
+}
+
+/**
+ * Attach backing Jellyfin IDs to Seerr cards whose synthetic IDs contain TMDB IDs.
+ * @param {Array<Object>} items
+ * @param {Map<string, string>} index
+ * @returns {Array<Object>}
+ */
+export function attachJellyfinIdsToSeerrItems(items, index) {
+    if (!Array.isArray(items) || !(index instanceof Map) || !index.size) return items;
+    for (const item of items) {
+        if (!item || item._jellyfinMediaId || !item._tmdbId) continue;
+        if (item.Type !== 'Movie' && item.Type !== 'Series') continue;
+        const lookupKey = item.Type.toLowerCase() + ':' + String(item._tmdbId);
+        const jellyfinId = index.get(lookupKey);
+        if (jellyfinId) item._jellyfinMediaId = jellyfinId;
+    }
+    return items;
+}
+
+async function getTmdbLibraryIndex(force = false) {
+    const userId = api._userId || api.userId;
+    if (!userId) return null;
+    const now = Date.now();
+
+    if (!force && tmdbIndexUserId === userId && tmdbIndex && now - tmdbIndexFetchedAt < TMDB_INDEX_TTL) {
+        return tmdbIndex;
+    }
+    if (!force && tmdbIndexPromise && tmdbIndexUserId === userId) return tmdbIndexPromise;
+
+    if (tmdbIndexUserId !== userId) {
+        tmdbIndex = null;
+        tmdbIndexFetchedAt = 0;
+    }
+    tmdbIndexUserId = userId;
+
+    const requestPromise = (async () => {
+        const allItems = [];
+        let startIndex = 0;
+        try {
+            while (true) {
+                const response = await api.getItems({
+                    HasTmdbId: true,
+                    IncludeItemTypes: 'Movie,Series',
+                    Recursive: true,
+                    Fields: 'ProviderIds',
+                    EnableImages: false,
+                    EnableImageTypes: '',
+                    ImageTypeLimit: 0,
+                    EnableTotalRecordCount: true,
+                    StartIndex: startIndex,
+                    Limit: TMDB_INDEX_PAGE_SIZE
+                }, { silent: true, warnOnError: false });
+
+                if ((api._userId || api.userId) !== userId) return null;
+                const page = Array.isArray(response && response.Items) ? response.Items : [];
+                allItems.push(...page);
+                if (page.length < TMDB_INDEX_PAGE_SIZE) break;
+
+                const total = Number(response && response.TotalRecordCount);
+                startIndex += page.length;
+                if (Number.isFinite(total) && total > 0 && startIndex >= total) break;
+            }
+
+            const built = indexJellyfinItemsByTmdbId(allItems);
+            if ((api._userId || api.userId) !== userId) return null;
+            tmdbIndex = built;
+            tmdbIndexFetchedAt = Date.now();
+            log.debug('Built Jellyfin TMDB item index:', built.size);
+            return built;
+        } catch (error) {
+            if ((api._userId || api.userId) === userId) {
+                tmdbIndex = new Map();
+                tmdbIndexFetchedAt = Date.now();
+                log.debug('Jellyfin TMDB item index could not be loaded:', error && error.message);
+            }
+            return tmdbIndex;
+        } finally {
+            if (tmdbIndexPromise === requestPromise) tmdbIndexPromise = null;
+        }
+    })();
+
+    tmdbIndexPromise = requestPromise;
+    return requestPromise;
+}
+
+/**
  * Resolves the real Jellyfin item ID used by Jellyfin Enhanced's tag-data API.
  * Seerr/TMDB cards use synthetic IDs (tmdb-movie-123), which are not valid
  * Jellyfin item IDs. Only query JE for those cards when Seerr supplies the
@@ -403,16 +515,30 @@ export function getEnhancedPosterTagLookupId(item) {
 
 export async function prepareEnhancedPosterTags(items, contextType = '') {
     if (!Array.isArray(items) || !items.length) return items;
-    const candidates = items.filter((item) =>
-        item && getEnhancedPosterTagLookupId(item) && SUPPORTED_TYPES.has(item.Type) &&
+    const eligible = items.filter((item) =>
+        item && SUPPORTED_TYPES.has(item.Type) &&
         !item._isGenreCard && !item._isStudioCard && !item._isNetworkCard &&
         !hasNativePosterTagStamp(item)
     );
-    if (!candidates.length) return items;
+    if (!eligible.length) return items;
 
     const snapshot = await getSettingsSnapshot();
     if (!snapshot) return items;
     const userId = snapshot.userId;
+
+    // Seerr cards use synthetic tmdb-* IDs. If their payload omitted the backing
+    // Jellyfin ID, resolve it from a lightweight, cached ProviderIds index.
+    const unresolvedSeerrItems = eligible.filter((item) =>
+        !getEnhancedPosterTagLookupId(item) && item._tmdbId &&
+        (item.Type === 'Movie' || item.Type === 'Series')
+    );
+    if (unresolvedSeerrItems.length) {
+        const libraryIndex = await getTmdbLibraryIndex();
+        if (libraryIndex) attachJellyfinIdsToSeerrItems(unresolvedSeerrItems, libraryIndex);
+    }
+
+    const candidates = eligible.filter((item) => getEnhancedPosterTagLookupId(item));
+    if (!candidates.length) return items;
 
     const now = Date.now();
     const missing = candidates
@@ -517,5 +643,9 @@ export function clearEnhancedPosterTagCache() {
     settingsLoaded = false;
     settingsPromise = null;
     endpointUnavailableUntil = 0;
+    tmdbIndex = null;
+    tmdbIndexUserId = null;
+    tmdbIndexFetchedAt = 0;
+    tmdbIndexPromise = null;
     itemCache.clear();
 }
