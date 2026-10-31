@@ -2222,6 +2222,7 @@ class HomePage extends Page {
 
         const virtualRow = new VirtualCardRow(trackEl, items, {
             isLandscape,
+            contextType: descriptor.contextType || descriptor.id,
             cardType,
             hideLabels: shouldHideLabels,
             visibleCount,
