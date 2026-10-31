@@ -35,12 +35,14 @@ function dateLabel(value) {
 function requestStatus(request) {
     const requestState = Number(request._requestStatus || 0);
     const mediaState = Number(request._mediaStatus || request._seerrStatus || 0);
+    if (requestState === 3) return { key: 'SeerrCenterDeclined', fallback: 'Отклонено', tone: 'declined' };
+    if (requestState === 1) return { key: 'SeerrCenterAwaitingApproval', fallback: 'Ожидает одобрения', tone: 'pending' };
+    if (mediaState === 6) return { key: 'SeerrCenterFailed', fallback: 'Ошибка', tone: 'declined' };
     if (mediaState === 5) return { key: 'SeerrStatusAvailable', fallback: 'Доступно', tone: 'available' };
     if (mediaState === 3 || mediaState === 4) return { key: 'SeerrStatusProcessing', fallback: 'Загружается', tone: 'processing' };
-    if (mediaState === 2 || requestState === 2) return { key: 'SeerrStatusPending', fallback: 'В очереди', tone: 'pending' };
-    if (requestState === 1) return { key: 'SeerrCenterAwaitingApproval', fallback: 'Ожидает одобрения', tone: 'pending' };
-    if (requestState === 3) return { key: 'SeerrCenterDeclined', fallback: 'Отклонено', tone: 'declined' };
-    return { key: 'SeerrStatusNotRequested', fallback: 'Статус неизвестен', tone: 'neutral' };
+    if (mediaState === 2) return { key: 'SeerrStatusPending', fallback: 'В очереди', tone: 'pending' };
+    if (requestState === 2) return { key: 'SeerrCenterApproved', fallback: 'Одобрено', tone: 'processing' };
+    return { key: 'SeerrStatusNotRequested', fallback: 'Не запрошено', tone: 'neutral' };
 }
 
 function issueTypeLabel(type) {
