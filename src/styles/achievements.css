@@ -1591,3 +1591,55 @@
         transition: none !important;
     }
 }
+
+
+/* Litefin Game Center — persistent player identity and progress */
+.achievements-player-panel {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: minmax(220px, 1.15fr) minmax(150px, .65fr) minmax(220px, 1fr);
+    align-items: center;
+    gap: 22px;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 20px;
+    padding: 17px 22px;
+    border: 1px solid rgba(165, 145, 255, .30);
+    border-radius: 18px;
+    background: linear-gradient(105deg, rgba(43, 35, 76, .97), rgba(27, 31, 51, .97) 58%, rgba(25, 48, 60, .97));
+    box-shadow: 0 10px 28px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.07);
+    backdrop-filter: blur(12px);
+}
+.achievements-player-main { display:flex; align-items:center; gap:13px; min-width:0; }
+.achievements-player-emblem {
+    display:grid; place-items:center; flex:0 0 52px; width:52px; height:52px;
+    border:1px solid rgba(239,201,112,.38); border-radius:16px;
+    background:linear-gradient(145deg,rgba(235,190,89,.22),rgba(139,110,220,.16));
+    font-size:27px;
+}
+.achievements-player-identity { display:flex; flex-direction:column; min-width:0; gap:3px; }
+.achievements-player-identity small,
+.achievements-player-score small { color:#bdb7d4; font-size:10px; font-weight:800; letter-spacing:.12em; }
+.achievements-player-identity strong { overflow:hidden; color:#fff; font-size:19px; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
+.achievements-player-identity span { color:#b8b3ca; font-size:11px; }
+.achievements-player-score { display:flex; flex-direction:column; gap:5px; padding-left:20px; border-left:1px solid rgba(255,255,255,.12); }
+.achievements-player-score strong { color:#f1cc77; font-size:24px; font-weight:850; font-variant-numeric:tabular-nums; }
+.achievements-player-progress { min-width:0; }
+.achievements-player-progress-label { display:flex; justify-content:space-between; gap:8px; margin-bottom:8px; color:#c6c0da; font-size:11px; }
+.achievements-player-progress-label strong { color:#e4d9ff; font-variant-numeric:tabular-nums; }
+.achievements-player-progress .achievement-progress { height:9px; margin:0; background:rgba(0,0,0,.28); }
+.achievements-player-progress .achievement-progress span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#8068e8,#b49bff 58%,#7bcfe0); box-shadow:0 0 13px rgba(160,137,255,.38); }
+@media (max-width: 760px) {
+    .achievements-player-panel { grid-template-columns:minmax(0,1fr) auto; gap:13px; padding:14px; }
+    .achievements-player-progress { grid-column:1 / -1; }
+}
+@media (max-width: 440px) {
+    .achievements-player-panel { top:0; grid-template-columns:minmax(0,1fr); }
+    .achievements-player-score { padding:9px 0 0; border-left:0; border-top:1px solid rgba(255,255,255,.12); }
+    .achievements-player-score strong { font-size:20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .achievements-player-panel { scroll-behavior:auto; }
+}
