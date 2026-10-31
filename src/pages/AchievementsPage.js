@@ -566,6 +566,7 @@ class AchievementsPage extends Page {
         this.el.querySelectorAll('[data-achievement-panel]').forEach((panel) => {
             panel.hidden = panel.getAttribute('data-achievement-panel') !== selected;
         });
+        focusManager.invalidateCache('achievements-game-center');
         if (selected === 'gifts' && !this._giftUsers && !this._giftUsersLoading) this._loadGiftUsers();
     }
 
@@ -894,6 +895,7 @@ class AchievementsPage extends Page {
         this._renderQuests();
         this._renderBadges();
         this._renderLoadout();
+        focusManager.invalidateCache('achievements-game-center');
     }
 
     _renderOverview() {
