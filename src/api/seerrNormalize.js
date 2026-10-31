@@ -173,7 +173,9 @@ export function normalizeSeerrItem(result, fallbackMediaType = null) {
         _seerrStatus: (result.mediaInfo && result.mediaInfo.status) || SEERR_STATUS.NOT_REQUESTED,
         _jellyfinMediaId: (() => {
             const info = result.mediaInfo || {};
-            return info.jellyfinMediaId || info.jellyfinMediaId4k || info.serviceId || info.externalServiceId || null;
+            // serviceId / externalServiceId belong to Radarr or Sonarr, not Jellyfin.
+            // Only Jellyfin's own media item GUID is valid for JE tag-data lookups.
+            return info.jellyfinMediaId || info.jellyfinMediaId4k || null;
         })(),
         _requestId: (() => {
             const requests = (result.mediaInfo && result.mediaInfo.requests) || result.requests || [];
