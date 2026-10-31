@@ -1801,5 +1801,14 @@
     "SeerrIssueVideo": "Видео",
     "SeerrIssueAudio": "Звук",
     "SeerrIssueSubtitles": "Субтитры",
-    "SeerrIssueOther": "Другое"
+    "SeerrIssueOther": "Другое",
+    "SeerrIssueReportTitle": "Сообщить о проблеме",
+    "SeerrIssueDescription": "Опишите проблему",
+    "SeerrIssueDescriptionPlaceholder": "Например: нет звука в русской аудиодорожке…",
+    "SeerrIssueHint": "Обращение появится в центре Seerr.",
+    "SeerrIssueNoTmdb": "Для этого элемента не найден TMDB ID.",
+    "SeerrIssueMessageRequired": "Добавьте описание проблемы.",
+    "SeerrIssuePermissionDenied": "У вашей учётной записи Seerr нет права создавать обращения.",
+    "SeerrIssueSent": "Сообщение отправлено в Seerr.",
+    "SeerrIssueSendFailed": "Не удалось отправить обращение."
 }
