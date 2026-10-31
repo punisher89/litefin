@@ -3,6 +3,7 @@ import { storage } from './StorageService.js';
 import { eventBus } from '../core/EventBus.js';
 import { toast } from '../ui/Toast.js';
 import { logger } from './Logger.js';
+import { i18n } from './i18n.js';
 
 const log = logger.create('SeerrNotifications');
 const POLL_INTERVAL_MS = 120000;
@@ -165,7 +166,9 @@ class SeerrNotificationService {
                 if (fresh.length) {
                     this._notifications = fresh.concat(this._notifications).slice(0, MAX_NOTIFICATIONS);
                     if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
-                        toast.show(fresh.length === 1 ? fresh[0].message : `${fresh.length} new Seerr updates`);
+                        const key = fresh.length === 1 ? 'SeerrNotificationNewActivity' : 'SeerrNotificationNewCount';
+                        const fallback = fresh.length === 1 ? 'New Seerr activity' : `${fresh.length} new Seerr updates`;
+                        toast.show(i18n.t(key) && i18n.t(key) !== key ? i18n.t(key) : fallback);
                     }
                 }
             }
@@ -226,15 +229,23 @@ class SeerrNotificationService {
             : Number(request.mediaStatus) === 3 || Number(request.mediaStatus) === 4 ? 'processing'
             : Number(request.mediaStatus) === 2 ? 'queued'
             : kind === 'new' ? 'received' : 'updated';
-        const message = kind === 'new'
-            ? `New request: ${request.title}`
-            : `${request.title}: ${requestLabel}`;
+        const messageKeys = {
+            'awaiting approval': 'SeerrNotificationStatusAwaiting',
+            approved: 'SeerrNotificationStatusApproved',
+            declined: 'SeerrNotificationStatusDeclined',
+            available: 'SeerrNotificationStatusAvailable',
+            processing: 'SeerrNotificationStatusProcessing',
+            queued: 'SeerrNotificationStatusQueued',
+            received: 'SeerrNotificationRequestNew',
+            updated: 'SeerrNotificationStatusUpdated'
+        };
         const signature = `${request.requestStatus}-${request.mediaStatus}-${request.updatedAt}`;
         return {
             id: `request:${request.id}:${signature}`,
             kind: 'request',
             title: request.title,
-            message,
+            messageKey: messageKeys[requestLabel] || 'SeerrNotificationStatusUpdated',
+            message: `${requestLabel}: ${request.title}`,
             createdAt: safeDate(request.updatedAt),
             mediaType: request.mediaType,
             tmdbId: request.tmdbId,
@@ -248,6 +259,7 @@ class SeerrNotificationService {
             id: `issue:${issue.id}:${issue.commentSignature || issue.updatedAt}`,
             kind: 'issue',
             title: issue.title,
+            messageKey: kind === 'comment' ? 'SeerrNotificationIssueReply' : 'SeerrNotificationIssueNew',
             message: kind === 'comment' ? `New reply: ${issue.title}` : `New issue: ${issue.title}`,
             createdAt: safeDate(issue.updatedAt),
             issueId: issue.id,
