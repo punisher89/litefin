@@ -1245,11 +1245,12 @@ class CardRenderer {
         // Show the actual TMDB score under the title; no extra request is needed.
         const rawTmdbId = item._tmdbId;
         const tmdbId = rawTmdbId === null || rawTmdbId === undefined ? '' : String(rawTmdbId).trim();
+        const hasTmdbId = tmdbId !== '' && Number.isFinite(Number(tmdbId)) && Number(tmdbId) > 0;
         const tmdbRating = Number(item.CommunityRating);
         const tmdbRatingHtml =
             contextType === 'discover' &&
             (item.Type === 'Movie' || item.Type === 'Series') &&
-            /^\\d+$/.test(tmdbId) &&
+            hasTmdbId &&
             Number.isFinite(tmdbRating) &&
             tmdbRating > 0
                 ? `<div class="seerr-tmdb-rating" title="TMDB rating"><span class="seerr-tmdb-rating__brand">TMDB</span><span class="seerr-tmdb-rating__score"><span class="seerr-tmdb-rating__star">★</span>${tmdbRating.toFixed(1)}</span></div>`
