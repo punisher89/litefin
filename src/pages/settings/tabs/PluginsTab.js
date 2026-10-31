@@ -104,6 +104,41 @@ export class PluginsTab {
 
                 <h3 class="setting-section-title">${i18n.t('InstalledPlugins', ['Installed Plugins'])}</h3>
                 ${content}
+
+                <h3 class="setting-section-title">${i18n.t('PluginCatalog', ['Community Add-on Catalog'])}</h3>
+                <p class="content-subtitle plugin-catalog-intro">${i18n.t('PluginCatalogDescription', ['Curated Jellyfin server plugins and native Litefin integrations. External code is never loaded automatically.'])}</p>
+                <div class="community-plugin-grid">
+                    <article class="community-plugin-card community-plugin-card--supported">
+                        <div class="community-plugin-card-heading"><span class="community-plugin-icon">★</span><span class="community-plugin-kind">${i18n.t('NativeLitefinIntegration', ['Native Litefin integration'])}</span></div>
+                        <h4>StarTrack</h4>
+                        <p>${i18n.t('StarTrackCatalogDescription', ['Personal ratings, watchlist, diary, favourites, recommendations and lists. Requires the StarTrack plugin on your Jellyfin server.'])}</p>
+                        <span class="community-plugin-status">${i18n.t('Integrated', ['Integrated'])}</span>
+                        <button class="btn btn-option focusable" type="button" tabindex="0" data-catalog-url="https://github.com/ZL154/jellyfin-plugin-startrack">${i18n.t('OpenProject', ['Open project'])}</button>
+                    </article>
+                    <article class="community-plugin-card">
+                        <div class="community-plugin-card-heading"><span class="community-plugin-icon">🏆</span><span class="community-plugin-kind">${i18n.t('JellyfinServerPlugin', ['Jellyfin server plugin'])}</span></div>
+                        <h4>Jellyfin Oscars</h4>
+                        <p>${i18n.t('OscarsCatalogDescription', ['Adds Academy Awards metadata to Jellyfin. Litefin does not yet provide a dedicated awards panel for this plugin.'])}</p>
+                        <button class="btn btn-option focusable" type="button" tabindex="0" data-catalog-url="https://github.com/FizzyMUC/jellyfin-oscars-plugin">${i18n.t('OpenProject', ['Open project'])}</button>
+                    </article>
+                    <article class="community-plugin-card">
+                        <div class="community-plugin-card-heading"><span class="community-plugin-icon">👥</span><span class="community-plugin-kind">${i18n.t('JellyfinWebExtension', ['Jellyfin Web extension'])}</span></div>
+                        <h4>ActorPlus</h4>
+                        <p>${i18n.t('ActorPlusCatalogDescription', ['Adds cast details and filmography to the standard Jellyfin Web interface. Litefin does not load its injected Web UI.'])}</p>
+                        <button class="btn btn-option focusable" type="button" tabindex="0" data-catalog-url="https://github.com/Druidblack/Jellyfin.Plugin.ActorPlus">${i18n.t('OpenProject', ['Open project'])}</button>
+                    </article>
+                    <article class="community-plugin-card">
+                        <div class="community-plugin-card-heading"><span class="community-plugin-icon">⌘</span><span class="community-plugin-kind">${i18n.t('CommunityDirectory', ['Community directory'])}</span></div>
+                        <h4>Awesome Jellyfin</h4>
+                        <p>${i18n.t('AwesomeJellyfinCatalogDescription', ['Browse server plugins, clients, themes and companion tools. Check compatibility for every project.'])}</p>
+                        <button class="btn btn-option focusable" type="button" tabindex="0" data-catalog-url="https://github.com/awesome-jellyfin/awesome-jellyfin">${i18n.t('BrowseCatalog', ['Browse catalogue'])}</button>
+                    </article>
+                </div>
+                <div class="plugin-catalog-note">
+                    <strong>${i18n.t('ServerPluginInstallTitle', ['Installing a Jellyfin server plugin'])}</strong>
+                    <p>${i18n.t('ServerPluginInstallDescription', ['Open Jellyfin Dashboard → Plugins → Repositories, add the author repository if available, install the plugin, then restart Jellyfin when required. Litefin only displays integrations implemented natively in the client.'])}</p>
+                    <button class="btn btn-option focusable" id="btn-open-dashboard-catalog" type="button" tabindex="0">${i18n.t('OpenJellyfinDashboard', ['Open Jellyfin Dashboard'])}</button>
+                </div>
             </div>
         `;
     }
@@ -136,6 +171,27 @@ export class PluginsTab {
                 const serverUrl = rawUrl.replace(/\/+$/, '');
                 const dashboardUrl = `${serverUrl}/web/index.html#!/dashboard.html`;
                 openExternalUrl(dashboardUrl);
+            });
+        }
+
+        // Community catalogue links are informational; Litefin never executes remote code.
+        const catalogueLinks = (container || document).querySelectorAll('[data-catalog-url]');
+        for (let i = 0; i < catalogueLinks.length; i++) {
+            const link = catalogueLinks[i];
+            addManagedListener(link, 'click', (e) => {
+                e.preventDefault();
+                const url = link.getAttribute('data-catalog-url');
+                if (url) openExternalUrl(url);
+            });
+        }
+
+        const dashboardCatalogButton = find('#btn-open-dashboard-catalog');
+        if (dashboardCatalogButton) {
+            addManagedListener(dashboardCatalogButton, 'click', (e) => {
+                e.preventDefault();
+                const rawUrl = api.serverUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+                const serverUrl = rawUrl.charAt(rawUrl.length - 1) === '/' ? rawUrl.slice(0, -1) : rawUrl;
+                openExternalUrl(serverUrl + '/web/index.html#!/dashboard.html');
             });
         }
 
