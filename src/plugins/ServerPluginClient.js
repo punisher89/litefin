@@ -79,6 +79,8 @@ const KNOWN_PROBES = {
         dataEndpoint: (itemId) => `/Plugins/MdbListRatings/CachedByItemId?itemId=${itemId}`
     },
     startrack: {
+        // The status endpoint is user-scoped but does not require a media item.
+        probeWithoutItem: true,
         probeEndpoint: () => '/Plugins/StarTrack/Stats',
         dataEndpoint: () => '/Plugins/StarTrack/Stats'
     },
@@ -350,10 +352,14 @@ class ServerPluginClient {
             return { available: false, data: null };
         }
 
-        // Let each probe decide whether it needs a media item. Some plugins
-        // expose a server-wide endpoint (for example StarTrack /Stats) and can
-        // be detected immediately, while item-scoped probes return null until
-        // a suitable item is available.
+        // Only explicitly server-wide probes may run before playback.
+        // This avoids changing the behaviour of other registered probes that
+        // happen to return a static URL but still require a media context.
+        if (!item && probe.probeWithoutItem !== true) {
+            log.debug(`Plugin '${pluginId}' probe requires a media item — deferring until playback`);
+            return { available: false, deferred: true, data: null };
+        }
+
         const endpoint = probe.probeEndpoint(item);
         if (!endpoint) {
             log.debug(`Plugin '${pluginId}' probe has no endpoint for the current context — deferring`);
