@@ -1275,7 +1275,7 @@
 
 .achievement-rarity {
     flex: 0 0 auto;
-    border-color: color-mix(in srgb, var(--badge-rarity, #9ba5b3) 36%, transparent);
+    border-color: rgba(255,255,255,.12);
     background: rgba(255,255,255,.045);
     color: var(--badge-rarity, #aeb7c2) !important;
     font-size: 9px;
