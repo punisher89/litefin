@@ -17,7 +17,7 @@ import { RichMetadataTable } from '../components/RichMetadataTable.js';
 import { api } from '../api/ApiClient.js';
 import { seerr } from '../api/seerrClient.js';
 import { renderWatchProviders, watchProviderRegion } from '../utils/WatchProviders.js';
-import { SEERR_STATUS, seerrStatusKey } from '../api/seerrNormalize.js';
+import { SEERR_STATUS, seerrStatusKey, formatSeerrReleaseDate } from '../api/seerrNormalize.js';
 import BackdropManager from '../utils/BackdropManager.js';
 import { focusManager } from '../ui/FocusManager.js';
 import { toast } from '../ui/Toast.js';
@@ -317,8 +317,12 @@ class SeerrDetailsPage extends Page {
             return `$${val}`;
         };
 
+        const releaseDate = formatSeerrReleaseDate(item.ReleaseDate, i18n.currentLang || '');
+        const releaseDateMeta = releaseDate
+            ? '<span class="meta-item seerr-release-date"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2.75v3.5M17 2.75v3.5M3.75 9h16.5M5.5 4.75h13A1.75 1.75 0 0 1 20.25 6.5v12A1.75 1.75 0 0 1 18.5 20.25h-13A1.75 1.75 0 0 1 3.75 18.5v-12A1.75 1.75 0 0 1 5.5 4.75Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 12.5h2m5 0h2m-9 3h2m5 0h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>' + escapeHtml(releaseDate) + '</span></span>'
+            : '';
         const primaryMeta = [
-            item.ProductionYear ? `<span class="meta-item">${item.ProductionYear}</span>` : '',
+            releaseDateMeta || (item.ProductionYear ? '<span class="meta-item">' + item.ProductionYear + '</span>' : ''),
             runtime ? `<span class="meta-item">${runtime}</span>` : '',
             item.OfficialRating
                 ? `<span class="meta-item meta-badge seerr-content-rating">${escapeHtml(item.OfficialRating)}</span>`
@@ -347,7 +351,6 @@ class SeerrDetailsPage extends Page {
                 ? `<span class="meta-item seerr-meta-card seerr-seasons-badge">${escapeHtml(seasonsLabel)}</span>`
                 : '',
             item.MediaStatus ? `<span class="meta-item seerr-meta-card">${escapeHtml(item.MediaStatus)}</span>` : '',
-            item.ReleaseDate ? `<span class="meta-item seerr-meta-card">${escapeHtml(item.ReleaseDate)}</span>` : '',
             item.Budget
                 ? `<span class="meta-item seerr-meta-card">Budget: ${formatCompactCurrency(item.Budget)}</span>`
                 : '',
