@@ -1,7 +1,10 @@
 /* Seerr issue form embedded in the player OSD. Keep it self-contained and TV-remote friendly. */
 .seerr-issue-menu-overlay {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 60;
     display: flex;
     align-items: center;
