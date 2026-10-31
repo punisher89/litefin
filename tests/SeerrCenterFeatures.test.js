@@ -66,7 +66,7 @@ test('Player OSD opens an authenticated Seerr issue report against the current m
     assert.ok(osd.includes("data-action=\"reportIssue\""));
     assert.ok(osd.includes("case 'reportIssue':"));
     assert.ok(osd.includes('this.seerrIssueMenu = new SeerrIssueMenu(this)'));
-    assert.ok(osd.includes("overlay.querySelectorAll('button, input[type=\"range\"], textarea')"));
+    assert.ok(osd.includes("overlay.querySelectorAll('button, input[type=\"range\"], textarea, select')"));
     assert.ok(issueMenu.includes("seerr.createIssue({"));
     assert.ok(issueMenu.includes('(2 | 1048576 | 4194304)'));
     assert.ok(issueMenu.includes('SeerrIssueMessageRequired'));
