@@ -52,7 +52,7 @@ class Sidebar extends Component {
          * @type {boolean}
          */
         this._seerrAvailable = false;
-        this._starTrackAvailable = false;
+        this._starTrackAvailable = pluginManager.isEnabled('startrack');
         this._onStarTrackAvailabilityChanged = (available) => {
             this._starTrackAvailable = !!available;
             if (this.el) this._applySidebarLayout();
