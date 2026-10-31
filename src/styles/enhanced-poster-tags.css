@@ -1,0 +1,106 @@
+/*
+ * Lightweight Jellyfin Enhanced poster overlays for Litefin.
+ * The layout is intentionally simple for webOS 6 / Chromium 79.
+ */
+.lf-je-poster-tags {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
+}
+
+.lf-je-tag-group {
+    position: absolute;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 3px;
+    max-width: calc(100% - 12px);
+    line-height: 1;
+}
+
+.lf-je-tag-group--top-left {
+    top: 8px;
+    left: 8px;
+}
+
+.lf-je-tag-group--top-right {
+    top: 8px;
+    right: 8px;
+}
+
+.lf-je-tag-group--bottom-left {
+    bottom: 8px;
+    left: 8px;
+}
+
+.lf-je-tag-group--bottom-right {
+    bottom: 8px;
+    right: 8px;
+}
+
+.lf-je-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 23px;
+    box-sizing: border-box;
+    padding: 4px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    background: rgba(12, 18, 27, 0.88);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.015em;
+    line-height: 1.1;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+    white-space: nowrap;
+}
+
+.lf-je-tag--quality {
+    background: rgba(24, 47, 73, 0.92);
+}
+
+.lf-je-tag--genre {
+    background: rgba(47, 56, 77, 0.92);
+}
+
+.lf-je-tag--language {
+    min-width: 25px;
+    padding: 4px 6px;
+    background: rgba(25, 52, 60, 0.94);
+}
+
+.lf-je-tag--rating {
+    background: rgba(87, 62, 27, 0.94);
+}
+
+.lf-je-tag--age {
+    background: rgba(78, 36, 42, 0.94);
+}
+
+/* Reserve space for the native Jellyfin/Litefin indicators in the same corner. */
+.media-card.has-unplayed-count .lf-je-tag-group--top-right {
+    top: 44px;
+}
+
+.media-card.has-episode-badge .lf-je-tag-group--top-left {
+    top: 38px;
+}
+
+.media-card.has-bottom-left-badges .lf-je-tag-group--bottom-left {
+    bottom: 42px;
+}
+
+.media-card.has-played-badge .lf-je-tag-group--bottom-right {
+    bottom: 42px;
+}
+
+@media (max-width: 900px) {
+    .lf-je-tag {
+        min-height: 19px;
+        padding: 3px 5px;
+        font-size: 10px;
+    }
+}

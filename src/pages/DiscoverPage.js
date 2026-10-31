@@ -629,6 +629,7 @@ class DiscoverPage extends Page {
         const trackEl = sectionEl.querySelector('.row-items-track');
         const virtualRow = new VirtualCardRow(trackEl, items, {
             isLandscape,
+            contextType: 'discover',
             cardType: def.cardType || 'poster',
             visibleCount: 10,
             initialWindow: Math.min(items.length, 12),

@@ -446,9 +446,9 @@ class LayoutManager {
         const savedCardLabelStyle = storage.getItem('pref:cardLabelStyle') || 'default';
         document.documentElement.setAttribute('data-card-label-style', savedCardLabelStyle);
 
-        // Load saved card label alignment and stamp it on the root HTML element
-        // Alignment defaults to 'start' now for cleaner card typography alignment.
-        const savedCardLabelAlign = storage.getItem('pref:cardLabelAlign') || 'start';
+        // Load saved card label alignment and stamp it on the root HTML element.
+        // Default to centered titles for a balanced poster-card layout.
+        const savedCardLabelAlign = storage.getItem('pref:cardLabelAlign') || 'center';
         document.documentElement.setAttribute('data-card-label-align', savedCardLabelAlign);
 
         // Stamp the tier and platform for CSS targeting

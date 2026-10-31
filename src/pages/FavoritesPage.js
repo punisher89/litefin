@@ -359,6 +359,7 @@ class FavoritesPage extends Page {
         // Initialize VirtualCardRow
         virtualRow = new VirtualCardRow(trackContainer, items, {
             isLandscape: targetIsLandscape,
+            contextType: 'favorites',
             cardType: targetCardType, // Pass through for height calculation
             visibleCount: targetIsLandscape ? 8 : 12,
             focusSectionId: sectionId,

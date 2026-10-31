@@ -5,6 +5,7 @@ import { platformInfo } from '../utils/PlatformInfo.js';
 import { storage } from '../utils/StorageService.js';
 import { scrollController } from '../ui/ScrollController.js';
 import { mouseRowScroller } from '../ui/MouseRowScroller.js';
+import { prepareEnhancedPosterTags, attachEnhancedPosterTagsToCard } from '../utils/EnhancedPosterTags.js';
 
 export class VirtualCardRow {
     /**
@@ -35,6 +36,7 @@ export class VirtualCardRow {
         this.hideLabels = options.hideLabels || false;
         this.focusSectionId = options.focusSectionId;
         this.renderCard = options.renderCard;
+        this.contextType = options.contextType || '';
 
         // Static CSS measurements from home.css
         // Landscape width: 400px, Portrait width: 240px, Margin-right: 24px
@@ -448,7 +450,10 @@ export class VirtualCardRow {
                 const isIntegratedExpanding =
                     isExpanding && (this.isLandscape || this.cardType === 'square' || this.cardType === 'artist');
                 const isPortraitExpanding =
-                    isExpanding && !this.isLandscape && this.cardType !== 'square' && this.cardType !== 'artist';
+                    isExpanding &&
+                    !this.isLandscape &&
+                    this.cardType !== 'square' &&
+                    this.cardType !== 'artist';
 
                 if (!this.hideLabels && !isIntegratedExpanding && !isPortraitExpanding) {
                     const infoDiv = document.createElement('div');
@@ -558,6 +563,20 @@ export class VirtualCardRow {
         if (this.totalItems > 4) {
             this._injectScrollArrows();
         }
+
+        // Resolve Enhanced tags in one bounded batch for this row, then attach
+        // overlays to the cards already in the virtual window. Future cards
+        // are rendered with the metadata now cached on their item objects.
+        prepareEnhancedPosterTags(this.items, this.contextType)
+            .then(() => {
+                if (!this.track || !this.track.isConnected) return;
+                for (const [index, card] of this.domNodes.entries()) {
+                    attachEnhancedPosterTagsToCard(card, this.items[index]);
+                }
+            })
+            .catch(() => {
+                // Poster metadata is optional; never let a plugin outage affect row navigation.
+            });
     }
 
     /**

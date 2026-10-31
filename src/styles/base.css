@@ -2659,18 +2659,29 @@ html[data-card-label-style="hidden"] .genre-grid-items {
    Card Labels Alignment Adjustments
    ============================================================================ */
 
-/* Card Labels Alignment Adjustments (excluding list-views) */
-html[data-card-label-align="start"] .media-card:not(.list-skeleton):not(.view-list .media-card) .card-title,
-html[data-card-label-align="start"] .media-card:not(.list-skeleton):not(.view-list .media-card) .card-subtitle {
+/* Card Labels Alignment Adjustments.
+   Keep selectors compatible with LG webOS 6 / Chromium 79: complex selectors
+   inside :not() are unsupported there and cause the entire rule to be dropped.
+   The list-view exception is restored explicitly below. */
+html[data-card-label-align="start"] .media-card:not(.list-skeleton) .card-title,
+html[data-card-label-align="start"] .media-card:not(.list-skeleton) .card-subtitle {
     text-align: start !important;
 }
-html[data-card-label-align="end"] .media-card:not(.list-skeleton):not(.view-list .media-card) .card-title,
-html[data-card-label-align="end"] .media-card:not(.list-skeleton):not(.view-list .media-card) .card-subtitle {
+html[data-card-label-align="end"] .media-card:not(.list-skeleton) .card-title,
+html[data-card-label-align="end"] .media-card:not(.list-skeleton) .card-subtitle {
     text-align: end !important;
 }
-html[data-card-label-align="center"] .media-card:not(.list-skeleton):not(.view-list .media-card) .card-title,
-html[data-card-label-align="center"] .media-card:not(.list-skeleton):not(.view-list .media-card) .card-subtitle {
+html[data-card-label-align="center"] .media-card:not(.list-skeleton) .card-title,
+html[data-card-label-align="center"] .media-card:not(.list-skeleton) .card-subtitle {
     text-align: center !important;
+}
+
+/* Library list rows keep their horizontal, left-aligned metadata layout.
+   This higher-specificity override replaces the former unsupported :not()
+   exclusion without relying on Selectors Level 4 features. */
+html[data-card-label-align] .library-grid.view-list .media-card .card-title,
+html[data-card-label-align] .library-grid.view-list .media-card .card-subtitle {
+    text-align: left !important;
 }
 
 /* Skeleton loader lines alignment (excluding list-views) */

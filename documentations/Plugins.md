@@ -161,3 +161,29 @@ Plugins are **sandboxed** via the `PluginAPI`.
 - **DO** use `api.on()` (auto-unsubscribed), `api.showToast()`, `api.getStorage()`, `api.addOSDWidget()`, and `api.serverPlugins` for all operations.
 - This ensures your plugin doesn't break if Litefin's internal directory structure changes.
 
+## Client Feature Bridges
+
+Some Jellyfin server plugins expose data that Litefin renders natively instead of injecting their web-client scripts.
+
+### Achievement Badges
+
+The Game Center page and unlock notifications are implemented in Litefin:
+- Page: `src/pages/AchievementsPage.js`
+- Localization: `src/utils/AchievementBadgeLocalization.js`
+- Notifications: `src/utils/AchievementNotifications.js`
+
+The server-side Achievement Badges plugin remains the source of truth for progress, scores, quests, rewards, purchases, cosmetics, and user permissions. Litefin calls its user-scoped `/Plugins/AchievementBadges/*` routes. The client page already covers the summary, rank, badge catalog, quests, leaderboard, score bank, power-ups, shop, cosmetics, gifts, and unlock notifications.
+
+### Jellyfin Enhanced Poster Tags
+
+Litefin includes a lightweight adapter for poster tags:
+- Metadata adapter and renderer: `src/utils/EnhancedPosterTags.js`
+- Card overlay styles: `src/styles/enhanced-poster-tags.css`
+- Homepage integration: `src/pages/HomePage.js`
+- Card integration: `src/utils/CardRenderer.js`
+
+The adapter reads the public plugin configuration and the active user's settings, then requests tag metadata through `POST /JellyfinEnhanced/tag-data/{userId}` in batches of up to 200 item IDs. It respects the server's Native Poster Tags master switch, per-user opt-out, supported tag groups and configured positions. Settings are cached for 5 minutes, item metadata for 10 minutes, and negative results for 2 minutes. The item cache is cleared when a new homepage render pipeline starts so Spoiler Guard and library-access filtering are re-evaluated.
+
+If an item's Primary image tag already contains Jellyfin Enhanced's native `-jet` token, Litefin leaves that image to the server compositor and does not draw a second HTML overlay. This avoids duplicate tags. The client adapter does not load Jellyfin Enhanced's injected web scripts, which avoids relying on JavaScript syntax unsupported by older TV browser engines.
+
+The adapter renders quality, genre, language, rating, and age-rating groups on homepage rows, shared `MediaGrid` search/result cards, virtualized horizontal rows (including Discover and Favorites), and the Library page grid. Existing server-stamped native posters are left untouched. The adapter decorates already-rendered virtual cards in place, preserving TV focus and avoiding a full row rebuild. Seerr/TMDB results first use a backing Jellyfin media ID (`_jellyfinMediaId`) when Seerr provides one. Otherwise, Litefin builds a per-user, 10-minute cached lookup from Jellyfin `/Items?HasTmdbId=true` results, requesting only `ProviderIds` (no images), then matches TMDB ID and media type locally. Synthetic `tmdb-*` IDs are never sent to Jellyfin Enhanced. Unrequested or not-yet-imported catalogue entries have no local media streams, so technical quality/audio tags are not available for them.
