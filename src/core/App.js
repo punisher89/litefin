@@ -652,6 +652,9 @@ const seerrPersonChunk = createPageChunkLoader(
 const discoverChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "discover" */ '../pages/DiscoverPage.js')
 );
+const seerrCenterChunk = createPageChunkLoader(
+    () => import(/* webpackChunkName: "seerr-center" */ '../pages/SeerrCenterPage.js')
+);
 const favoritesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "favorites" */ '../pages/FavoritesPage.js')
 );
@@ -867,6 +870,13 @@ class SeerrPersonPage extends AsyncPageProxy {
 class DiscoverPage extends AsyncPageProxy {
     constructor(options) {
         super(options, discoverChunk);
+    }
+}
+
+/** Route proxy for Seerr request, issue, notification and watchlist management. */
+class SeerrCenterPage extends AsyncPageProxy {
+    constructor(options) {
+        super(options, seerrCenterChunk);
     }
 }
 
@@ -2211,6 +2221,7 @@ class App {
         router.register('/person/:id', PersonPage);
         router.register('/search', SearchPage);
         router.register('/discover', DiscoverPage);
+        router.register('/seerr-center', SeerrCenterPage);
         router.register('/favorites', FavoritesPage);
         router.register('/achievements', AchievementsPage);
         router.register('/my-ratings', StarTrackPage);
