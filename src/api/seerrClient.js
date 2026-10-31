@@ -648,7 +648,7 @@ export class SeerrClient {
      * Minimal, uncached request/issue snapshot for the background notification
      * poller. This deliberately avoids full TMDB enrichment.
      */
-    async notificationSnapshot(currentUser = {}) {
+    async notificationSnapshot() {
         const requestParams = new URLSearchParams({
             take: '50',
             skip: '0',
