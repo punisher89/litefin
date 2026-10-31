@@ -921,7 +921,7 @@ class AchievementsPage extends Page {
             .sort((a, b) => new Date(valueOf(b, 'UnlockedAt', 'unlockedAt')) - new Date(valueOf(a, 'UnlockedAt', 'unlockedAt')))
             .slice(0, 4);
         const recentHtml = recent.length
-            ? `<div class="achievements-recent">${recent.map((badge) => `<span title="${escapeHtml(valueOf(localizeAchievementBadge(badge, document.documentElement.lang || i18n.currentLang), 'Title', 'title'))}">${badgeIcon(badge)}</span>`).join('')}</div>`
+            ? `<div class="achievements-recent">${recent.map((badge) => `<span title="${escapeHtml(valueOf(localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang), 'Title', 'title'))}">${badgeIcon(badge)}</span>`).join('')}</div>`
             : '';
 
         target.innerHTML = `
@@ -1055,7 +1055,7 @@ class AchievementsPage extends Page {
 
         const visible = badges.slice(0, this._visibleBadgeCount);
         grid.innerHTML = visible.map((badge) => {
-            const localizedBadge = localizeAchievementBadge(badge, document.documentElement.lang || i18n.currentLang);
+            const localizedBadge = localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang);
             const title = valueOf(localizedBadge, 'Title', 'title') || '';
             const description = valueOf(localizedBadge, 'Description', 'description') || '';
             const category = valueOf(badge, 'Category', 'category') || '';
