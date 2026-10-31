@@ -18,7 +18,7 @@ const log = logger.create('AchievementsPage');
 
 const GAME_TEXT = {
     ru: {
-        eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        overviewTab: 'Обзор', badgesTab: 'Достижения', questsTab: 'Задания', shopTab: 'Магазин', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -42,7 +42,7 @@ const GAME_TEXT = {
         inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Тест уведомления'
     },
     en: {
-        eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -315,15 +315,21 @@ class AchievementsPage extends Page {
                             <div class="achievement-progress"><span id="achievement-player-progress" style="width:0%"></span></div>
                         </div>
                     </section>
+                    <nav class="achievements-main-tabs" role="tablist" aria-label="${escapeHtml(gameText('game'))}">
+                        <button class="achievements-main-tab focusable active" data-game-section="overview" type="button" role="tab" aria-selected="true" tabindex="0">⌂ ${escapeHtml(gameText('overviewTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="badges" type="button" role="tab" aria-selected="false" tabindex="0">🏅 ${escapeHtml(gameText('badgesTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="quests" type="button" role="tab" aria-selected="false" tabindex="0">⚡ ${escapeHtml(gameText('questsTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="shop" type="button" role="tab" aria-selected="false" tabindex="0">🛍 ${escapeHtml(gameText('shopTab'))}</button>
+                    </nav>
                     <div class="achievements-error" id="achievements-error" role="status" hidden></div>
                     <div class="achievements-loading" id="achievements-loading">${escapeHtml(i18n.t('Loading'))}</div>
 
-                    <section class="achievements-overview" id="achievements-overview" aria-live="polite"></section>
-                    <section class="achievements-section" id="achievements-quests-section">
+                    <section class="achievements-overview achievements-main-panel" id="achievements-overview" data-game-section-panel="overview" aria-live="polite"></section>
+                    <section class="achievements-section achievements-main-panel" id="achievements-quests-section" data-game-section-panel="quests" hidden>
                         <h2>${escapeHtml(i18n.t('AchievementQuests'))}</h2>
                         <div class="achievements-quests" id="achievements-quests"></div>
                     </section>
-                    <section class="achievements-section achievements-game-section" id="achievements-game-section">
+                    <section class="achievements-section achievements-game-section achievements-main-panel" id="achievements-game-section" data-game-section-panel="shop" hidden>
                         <div class="achievements-game-heading">
                             <div>
                                 <h2>${escapeHtml(gameText('game'))}</h2>
@@ -373,7 +379,7 @@ class AchievementsPage extends Page {
                         </section>
                     </section>
 
-                    <section class="achievements-section">
+                    <section class="achievements-section achievements-main-panel" id="achievements-badges-section" data-game-section-panel="badges" hidden>
                         <div class="achievements-section-heading">
                             <h2>${escapeHtml(gameText('badgeCollection'))}</h2>
                             <span class="achievements-count" id="achievements-count"></span>
@@ -399,6 +405,10 @@ class AchievementsPage extends Page {
     }
 
     _bindEvents() {
+        this.el.querySelectorAll('[data-game-section]').forEach((button) => {
+            button.addEventListener('click', () => this._selectMainSection(button.getAttribute('data-game-section')));
+        });
+
         const refresh = this.$('#achievements-refresh');
         if (refresh) refresh.addEventListener('click', () => this._load(true));
 
@@ -509,6 +519,20 @@ class AchievementsPage extends Page {
             catalog: results[2] || {},
             cosmetics: results[3] || {}
         };
+    }
+
+    _selectMainSection(section) {
+        const allowed = ['overview', 'badges', 'quests', 'shop'];
+        const selected = allowed.includes(section) ? section : 'overview';
+        this.el.querySelectorAll('[data-game-section]').forEach((button) => {
+            const active = button.getAttribute('data-game-section') === selected;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        this.el.querySelectorAll('[data-game-section-panel]').forEach((panel) => {
+            panel.hidden = panel.getAttribute('data-game-section-panel') !== selected;
+        });
+        if (selected === 'shop') this._selectGameTab('shop');
     }
 
     _selectGameTab(tab) {
