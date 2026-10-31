@@ -18,7 +18,7 @@ const log = logger.create('AchievementsPage');
 
 const GAME_TEXT = {
     ru: {
-        eyebrow: 'JELLYFIN · ЦЕНТР ДОСТИЖЕНИЙ', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -42,7 +42,7 @@ const GAME_TEXT = {
         inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Тест уведомления'
     },
     en: {
-        eyebrow: 'JELLYFIN · ACHIEVEMENT CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -297,6 +297,24 @@ class AchievementsPage extends Page {
                         </div>
                     </header>
 
+                    <section class="achievements-player-panel" aria-label="${escapeHtml(gameText('game'))}">
+                        <div class="achievements-player-main">
+                            <span class="achievements-player-emblem" aria-hidden="true">👑</span>
+                            <div class="achievements-player-identity">
+                                <small>${escapeHtml(gameText('playerLevel'))}</small>
+                                <strong id="achievement-player-rank">—</strong>
+                                <span id="achievement-player-next">${escapeHtml(gameText('loadingGame'))}</span>
+                            </div>
+                        </div>
+                        <div class="achievements-player-score">
+                            <small>${escapeHtml(gameText('scoreBank'))}</small>
+                            <strong><span id="achievement-player-score">—</span> ⭐</strong>
+                        </div>
+                        <div class="achievements-player-progress">
+                            <div class="achievements-player-progress-label"><span>${escapeHtml(gameText('progressToNext'))}</span><strong id="achievement-player-percent">0%</strong></div>
+                            <div class="achievement-progress"><span id="achievement-player-progress" style="width:0%"></span></div>
+                        </div>
+                    </section>
                     <div class="achievements-error" id="achievements-error" role="status" hidden></div>
                     <div class="achievements-loading" id="achievements-loading">${escapeHtml(i18n.t('Loading'))}</div>
 
@@ -355,10 +373,6 @@ class AchievementsPage extends Page {
                         </section>
                     </section>
 
-                    <section class="achievements-section" id="achievements-leaderboard-section">
-                        <h2>${escapeHtml(i18n.t('AchievementLeaderboard'))}</h2>
-                        <div class="achievements-leaderboard" id="achievements-leaderboard"></div>
-                    </section>
                     <section class="achievements-section">
                         <div class="achievements-section-heading">
                             <h2>${escapeHtml(gameText('badgeCollection'))}</h2>
@@ -452,20 +466,18 @@ class AchievementsPage extends Page {
             const userPath = `/Plugins/AchievementBadges/users/${encodeURIComponent(userId)}`;
             this._userId = userId;
             this._userPath = userPath;
-            const [summary, rank, badges, quests, leaderboard] = await Promise.all([
+            const [summary, rank, badges, quests] = await Promise.all([
                 api.get(`${userPath}/summary`),
                 api.get(`${userPath}/rank`),
                 api.get(`${userPath}?lang=${encodeURIComponent(language)}`),
-                api.get(`${userPath}/quests`),
-                api.get('/Plugins/AchievementBadges/leaderboard?limit=5').catch(() => [])
+                api.get(`${userPath}/quests`)
             ]);
 
             this._data = {
                 summary: summary || {},
                 rank: rank || {},
                 badges: Array.isArray(badges) ? badges : [],
-                quests: quests || {},
-                leaderboard: Array.isArray(leaderboard) ? leaderboard : []
+                quests: quests || {}
             };
 
             await this._loadLoadout();
@@ -817,7 +829,6 @@ class AchievementsPage extends Page {
         if (!this._data) return;
         this._renderOverview();
         this._renderQuests();
-        this._renderLeaderboard();
         this._renderBadges();
         this._renderLoadout();
     }
@@ -840,6 +851,17 @@ class AchievementsPage extends Page {
         const rankProgress = Math.max(0, Math.min(100, Number(valueOf(rank, 'ProgressToNext', 'progressToNext') || 0)));
         const streak = Number(valueOf(summary, 'CurrentWatchStreak', 'currentWatchStreak') || 0);
         const bestStreak = Number(valueOf(summary, 'BestWatchStreak', 'bestWatchStreak') || 0);
+
+        const playerRank = this.$('#achievement-player-rank');
+        const playerScore = this.$('#achievement-player-score');
+        const playerNext = this.$('#achievement-player-next');
+        const playerProgress = this.$('#achievement-player-progress');
+        const playerPercent = this.$('#achievement-player-percent');
+        if (playerRank) playerRank.textContent = rankName || '—';
+        if (playerScore) playerScore.textContent = achievementNumber(score);
+        if (playerNext) playerNext.textContent = nextName ? gameText('nextRank', { name: nextName }) : gameText('maxRank');
+        if (playerProgress) playerProgress.style.width = `${rankProgress}%`;
+        if (playerPercent) playerPercent.textContent = `${rankProgress}%`;
 
         const recent = this._data.badges
             .filter((badge) => valueOf(badge, 'Unlocked', 'unlocked') && valueOf(badge, 'UnlockedAt', 'unlockedAt'))
