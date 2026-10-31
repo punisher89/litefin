@@ -42,3 +42,6 @@
 .startrack-list-card-wrap .startrack-list-card { width: 100%; }
 .startrack-list-delete { align-self: flex-start; padding: 7px 10px; margin: 7px 0 0; border: 1px solid var(--jf-divider, rgba(255,255,255,.12)); border-radius: 8px; color: var(--jf-text-secondary); background: transparent; cursor: pointer; }
 .startrack-list-remove { margin-left: auto; }
+
+.startrack-favorites-group { margin-bottom: 30px; }
+.startrack-favorites-group h2 { margin: 0 0 15px; color: var(--jf-text-primary); font-size: 1.3rem; }
