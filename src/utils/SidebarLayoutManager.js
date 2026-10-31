@@ -28,7 +28,7 @@ const CLASSIC_STATIC_ITEMS = [
     /* Core navigation items */
     { id: 'home', label: 'Home' },
     { id: 'discover', label: 'SeerrDiscover' },
-    { id: 'seerrcenter', label: 'SeerrCenterTitle' },
+    { id: 'seerr-center', label: 'SeerrCenterTitle' },
     { id: 'favorites', label: 'Favorites' },
     { id: 'achievements', label: 'Achievements' },
     { id: 'startrack', label: 'MyRatings' },
@@ -48,7 +48,7 @@ const CLASSIC_STATIC_ITEMS = [
 const MODERN_STATIC_ITEMS = [
     { id: 'home', label: 'Home' },
     { id: 'discover', label: 'SeerrDiscover' },
-    { id: 'seerrcenter', label: 'SeerrCenterTitle' },
+    { id: 'seerr-center', label: 'SeerrCenterTitle' },
     { id: 'favorites', label: 'Favorites' },
     { id: 'achievements', label: 'Achievements' },
     { id: 'startrack', label: 'MyRatings' },
