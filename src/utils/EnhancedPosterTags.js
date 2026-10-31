@@ -499,8 +499,8 @@ async function getTmdbLibraryIndex(force = false) {
 /**
  * Resolves the real Jellyfin item ID used by Jellyfin Enhanced's tag-data API.
  * Seerr/TMDB cards use synthetic IDs (tmdb-movie-123), which are not valid
- * Jellyfin item IDs. Only query JE for those cards when Seerr supplies the
- * backing Jellyfin media ID.
+ * Jellyfin item IDs. Query JE only after the card has been linked to a local
+ * library item, either by Seerr's backing ID or the cached TMDB provider index.
  * @param {Object} item
  * @returns {string}
  */
