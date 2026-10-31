@@ -504,10 +504,10 @@ html[data-layout-media-rows="expanding"] .media-card:not(.landscape):not(.square
     opacity: 0;
 }
 
-/* Cast & Crew cards are static person posters rather than expandable media
-   posters. Keep their name and role visible below the portrait in Expanding
-   mode instead of letting the generic poster rule fade their labels out. */
-html[data-layout-media-rows="expanding"] .people-row .media-card .card-info:not(.inside) {
+/* Person cards are static portraits rather than expandable media posters.
+   Keep their name and role visible below the image in Expanding mode. */
+html[data-layout-media-rows="expanding"] .media-card.person-card .card-info:not(.inside) {
+    display: block !important;
     opacity: 1 !important;
     visibility: visible !important;
 }
