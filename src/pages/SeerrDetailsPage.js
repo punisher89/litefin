@@ -195,7 +195,7 @@ class SeerrDetailsPage extends Page {
         //   - PROCESSING / beyond → only Seerr admins can cancel (approved)
         //
         // We match the current Jellyfin user ID against the Seerr users list
-        // and check their permissions bitmask: ADMIN=2, MANAGE_REQUESTS=8192.
+        // and check their permissions bitmask: ADMIN=2, MANAGE_REQUESTS=16.
         // Defaults to false so non-admins are safe if the fetch fails.
         // --------------------------------------------------------------------
         this._isSeerrAdmin = false;
@@ -208,8 +208,8 @@ class SeerrDetailsPage extends Page {
                     const uJfId = (u.jellyfinUserId || '').replace(/-/g, '').toLowerCase();
                     return currentJfId && uJfId && uJfId === currentJfId;
                 });
-                // Bits: 2 = ADMIN, 8192 = MANAGE_REQUESTS
-                this._isSeerrAdmin = !!((me?.permissions || 0) & (2 | 8192));
+                // Bits: 2 = ADMIN, 16 = MANAGE_REQUESTS
+                this._isSeerrAdmin = !!((me?.permissions || 0) & (2 | 16));
                 // Re-evaluate cancel button visibility now that admin status is known
                 this._updateRequestButton();
             })
