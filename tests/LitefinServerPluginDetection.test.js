@@ -133,3 +133,31 @@ test('ServerPluginClient & ApiClient: disabled plugin in server registry is trea
     const isIntroSkipperActive = serverPluginClient._checkInAdminList('intro-skipper', mockAdminList);
     assert.equal(isIntroSkipperActive.available, true, 'Active Intro Skipper plugin should be considered active');
 });
+
+
+test('ServerPluginClient: server-wide probes run without an item while item-scoped probes defer', async () => {
+    const { serverPluginClient } = await import('../src/plugins/ServerPluginClient.js');
+    const originalApi = serverPluginClient._api;
+    const requested = [];
+    serverPluginClient._api = {
+        get: async (endpoint) => {
+            requested.push(endpoint);
+            return { totalRatings: 12 };
+        }
+    };
+
+    try {
+        const starTrack = await serverPluginClient._probeEndpoint('startrack', null);
+        assert.equal(starTrack.available, true);
+        assert.equal(starTrack.deferred, undefined);
+        assert.deepEqual(requested, ['/Plugins/StarTrack/Stats']);
+
+        const introSkipper = await serverPluginClient._probeEndpoint('intro-skipper', null);
+        assert.equal(introSkipper.available, false);
+        assert.equal(introSkipper.deferred, true);
+        assert.deepEqual(requested, ['/Plugins/StarTrack/Stats']);
+    } finally {
+        serverPluginClient._api = originalApi;
+        serverPluginClient.reset();
+    }
+});
