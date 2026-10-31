@@ -108,13 +108,6 @@ export class PluginsTab {
                 <h3 class="setting-section-title">${i18n.t('PluginCatalog', ['Community Add-on Catalog'])}</h3>
                 <p class="content-subtitle plugin-catalog-intro">${i18n.t('PluginCatalogDescription', ['Curated Jellyfin server plugins and native Litefin integrations. External code is never loaded automatically.'])}</p>
                 <div class="community-plugin-grid">
-                    <article class="community-plugin-card community-plugin-card--supported">
-                        <div class="community-plugin-card-heading"><span class="community-plugin-icon">★</span><span class="community-plugin-kind">${i18n.t('NativeLitefinIntegration', ['Native Litefin integration'])}</span></div>
-                        <h4>StarTrack</h4>
-                        <p>${i18n.t('StarTrackCatalogDescription', ['Personal ratings, watchlist, diary, favourites, recommendations and lists. Requires the StarTrack plugin on your Jellyfin server.'])}</p>
-                        <span class="community-plugin-status">${i18n.t('Integrated', ['Integrated'])}</span>
-                        <button class="btn btn-option focusable" type="button" tabindex="0" data-catalog-url="https://github.com/ZL154/jellyfin-plugin-startrack">${i18n.t('OpenProject', ['Open project'])}</button>
-                    </article>
                     <article class="community-plugin-card">
                         <div class="community-plugin-card-heading"><span class="community-plugin-icon">🏆</span><span class="community-plugin-kind">${i18n.t('JellyfinServerPlugin', ['Jellyfin server plugin'])}</span></div>
                         <h4>Jellyfin Oscars</h4>
