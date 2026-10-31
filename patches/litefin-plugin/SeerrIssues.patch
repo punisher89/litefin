@@ -1,6 +1,14 @@
 diff --git a/Controllers/SeerrController.cs b/Controllers/SeerrController.cs
 --- a/Controllers/SeerrController.cs
 +++ b/Controllers/SeerrController.cs
+@@ -1257,5 +1257,5 @@ public class SeerrController : ControllerBase
+         using var response = await this.SendAsync(HttpMethod.Get, "/auth/me", null, cancellationToken, userId).ConfigureAwait(false);
+         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+         var permissions = document.RootElement.TryGetProperty("permissions", out var value) && value.TryGetInt32(out var mask) ? mask : 0;
+-        return this.StatusCode((int)response.StatusCode, new { permissions });
++        return this.StatusCode((int)response.StatusCode, new { permissions, id = userId.Value });
+
 @@ -1357,6 +1357,150 @@ public class SeerrController : ControllerBase
          var path = $"/watchlist/{tmdbId.ToString(CultureInfo.InvariantCulture)}?mediaType={normalizedMediaType}";
          return await this.ProxyAsync(HttpMethod.Delete, path, null, cancellationToken, userId).ConfigureAwait(false);
@@ -174,8 +182,5 @@ diff --git a/Controllers/SeerrController.cs b/Controllers/SeerrController.cs
 +            userId.Value).ConfigureAwait(false);
 +    }
 +
-@@ -1261,7 +1261,7 @@ public class SeerrController : ControllerBase
--        return this.StatusCode((int)response.StatusCode, new { permissions });
-+        return this.StatusCode((int)response.StatusCode, new { permissions, id = userId.Value });
 
      private static string? GetServiceName(string mediaType)
