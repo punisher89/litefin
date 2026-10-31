@@ -8,6 +8,22 @@
    padding-top: 20px;
  }
 
+.seerr-release-date {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.seerr-release-date svg {
+    display: inline-block;
+    width: 17px;
+    height: 17px;
+    margin-right: 6px;
+    flex: 0 0 auto;
+    color: var(--jf-text-secondary);
+    vertical-align: middle;
+}
+
 /* ========================================================================
    Seerr Card Top-Left Media Type Badges (MOVIE / SERIES)
    ======================================================================== */
