@@ -52,6 +52,12 @@ class Sidebar extends Component {
          * @type {boolean}
          */
         this._seerrAvailable = false;
+        this._starTrackAvailable = false;
+        this._onStarTrackAvailabilityChanged = (available) => {
+            this._starTrackAvailable = !!available;
+            if (this.el) this._applySidebarLayout();
+        };
+        eventBus.on('startrack:availability', this._onStarTrackAvailabilityChanged);
     }
 
     render() {
@@ -108,6 +114,11 @@ class Sidebar extends Component {
                             <span>🏆</span>
                         </div>
                         <span class="item-text" data-i18n="Achievements">Achievements</span>
+                    </button>
+
+                    <button class="sidebar-item" id="sidebar-startrack" tabindex="0" data-path="/my-ratings" style="display: none;">
+                        <div class="item-icon" aria-hidden="true"><span>★</span></div>
+                        <span class="item-text" data-i18n="MyRatings">${i18n.t('MyRatings') || 'My Ratings'}</span>
                     </button>
 
                     <button class="sidebar-item" id="sidebar-search" tabindex="0" data-path="/search">
@@ -470,6 +481,10 @@ class Sidebar extends Component {
         }
         focusManager.unregister('sidebar');
         eventBus.off('router:navigate', this._onNavigate.bind(this));
+        if (this._onStarTrackAvailabilityChanged) {
+            eventBus.off('startrack:availability', this._onStarTrackAvailabilityChanged);
+            this._onStarTrackAvailabilityChanged = null;
+        }
 
         // Remove auth listeners
         eventBus.off('auth:login', this._onAuthChange.bind(this));
@@ -1883,7 +1898,8 @@ class Sidebar extends Component {
                 // confirmed availability yet, regardless of the saved layout preference
                 const isDiscover = id === 'discover';
                 const seerrHidden = isDiscover && !this._seerrAvailable;
-                const shouldHide = hidden || pluginHidden || seerrHidden;
+                const starTrackHidden = id === 'startrack' && !this._starTrackAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden || starTrackHidden;
 
                 el.style.display = shouldHide ? 'none' : '';
                 sidebarContent.appendChild(el);
@@ -1934,7 +1950,8 @@ class Sidebar extends Component {
                 // Same seerr-awareness as Modern mode — discover stays hidden until probed
                 const isDiscover = id === 'discover';
                 const seerrHidden = isDiscover && !this._seerrAvailable;
-                const shouldHide = hidden || pluginHidden || seerrHidden;
+                const starTrackHidden = id === 'startrack' && !this._starTrackAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden || starTrackHidden;
 
                 el.style.display = shouldHide ? 'none' : '';
                 sidebarContent.appendChild(el);
