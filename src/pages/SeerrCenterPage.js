@@ -163,6 +163,8 @@ export default class SeerrCenterPage extends Page {
             else if (type === 'issue-page-size') this._issuePageSize = Math.max(5, Math.min(100, Number(select.value) || 20));
             else if (type === 'request-filter') this._filter = select.value || 'all';
             else if (type === 'request-media') this._mediaFilter = select.value || 'all';
+            else if (type === 'watchlist-filter') this._watchlistFilter = select.value || 'all';
+            else if (type === 'watchlist-sort') this._watchlistSort = select.value || 'release';
             else return;
             if (type.startsWith('issue-')) {
                 this._issueSkip = 0;
@@ -672,9 +674,17 @@ export default class SeerrCenterPage extends Page {
         `;
         }).join('');
         el.innerHTML = `
-            <div class="seerr-center-filters"><div class="seerr-center-filter-group">
-                ${filters.map(([key,label,count]) => `<button type="button" class="seerr-center-filter${key === this._watchlistFilter ? ' active' : ''}" data-center-action="watchlist-filter" data-filter="${key}" tabindex="0">${escapeHtml(label)} <span class="seerr-center-filter-count">${count}</span></button>`).join('')}
-            </div><button type="button" class="seerr-center-filter seerr-center-sort" data-center-action="watchlist-sort" tabindex="0">${escapeHtml(tr('SeerrCenterSortBy', 'Сортировка'))}: ${escapeHtml(this._watchlistSort === 'title' ? tr('Name', 'Название') : tr('SeerrCenterSortByRelease', 'Дата выхода'))}</button></div>
+            <div class="seerr-center-toolbar">
+                <label class="seerr-center-select-wrap"><span class="seerr-center-select-icon">⌕</span>
+                    <select class="seerr-center-select" data-center-select="watchlist-filter" tabindex="0">${filters.map(([key,label,count]) => `<option value="${key}"${key === this._watchlistFilter ? ' selected' : ''}>${escapeHtml(label)} (${count})</option>`).join('')}</select>
+                </label>
+                <label class="seerr-center-select-wrap"><span class="seerr-center-select-icon">↕</span>
+                    <select class="seerr-center-select" data-center-select="watchlist-sort" tabindex="0">
+                        <option value="release"${this._watchlistSort === 'release' ? ' selected' : ''}>${escapeHtml(tr('SeerrCenterSortByRelease', 'Дата выхода'))}</option>
+                        <option value="title"${this._watchlistSort === 'title' ? ' selected' : ''}>${escapeHtml(tr('Name', 'Название'))}</option>
+                    </select>
+                </label>
+            </div>
             ${cards || `<div class="seerr-center-empty"><span>◷</span><strong>${escapeHtml(tr('SeerrCenterEmptyWatchlist', 'В этом разделе пока пусто'))}</strong></div>`}
         `;
         this._registerFocus();
