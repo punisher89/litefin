@@ -18,7 +18,7 @@ const log = logger.create('AchievementsPage');
 
 const GAME_TEXT = {
     ru: {
-        eyebrow: 'JELLYFIN · ЦЕНТР ДОСТИЖЕНИЙ', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        eyebrow: 'JELLYFIN · ЦЕНТР ДОСТИЖЕНИЙ', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -42,7 +42,7 @@ const GAME_TEXT = {
         inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Тест уведомления'
     },
     en: {
-        eyebrow: 'JELLYFIN · ACHIEVEMENT CENTER', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        eyebrow: 'JELLYFIN · ACHIEVEMENT CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -285,6 +285,7 @@ class AchievementsPage extends Page {
                         <div>
                             <div class="achievements-eyebrow">${escapeHtml(gameText('eyebrow'))}</div>
                             <h1>${escapeHtml(i18n.t('Achievements'))}</h1>
+                            <p class="achievements-intro">${escapeHtml(gameText('intro'))}</p>
                         </div>
                         <div class="achievements-header-actions">
                             <button class="achievements-refresh focusable achievements-test-notification" id="achievements-test-notification" type="button" tabindex="0">
@@ -360,7 +361,7 @@ class AchievementsPage extends Page {
                     </section>
                     <section class="achievements-section">
                         <div class="achievements-section-heading">
-                            <h2>${escapeHtml(i18n.t('Achievements'))}</h2>
+                            <h2>${escapeHtml(gameText('badgeCollection'))}</h2>
                             <span class="achievements-count" id="achievements-count"></span>
                         </div>
                         <div class="achievements-filters" role="group" aria-label="${escapeHtml(i18n.t('AchievementProgress'))}">
