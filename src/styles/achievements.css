@@ -1814,3 +1814,58 @@
     .achievement-game-tab,.achievement-action-button,.achievement-reroll-button { transition:none; }
     .achievement-badge:hover { transform:none; }
 }
+
+
+/* Game Center interaction refinement: readable states and smooth TV focus */
+.achievement-game-card {
+    transition: transform .22s ease, border-color .22s ease, background-color .22s ease, box-shadow .22s ease, opacity .22s ease;
+}
+.achievement-game-card:focus-within {
+    border-color: rgba(177,151,255,.62);
+    box-shadow: 0 0 0 2px rgba(177,151,255,.16), 0 10px 25px rgba(0,0,0,.18);
+}
+.achievement-action-button {
+    min-width: 116px;
+    cursor: pointer;
+    transition: transform .18s ease, filter .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.achievement-action-button:hover,
+.achievement-action-button:focus-visible {
+    transform: translateY(-1px);
+    filter: brightness(1.12);
+    box-shadow: 0 6px 17px rgba(116,91,202,.2);
+}
+.achievement-action-button.is-unaffordable-button {
+    color: #f2dba4;
+    border-color: rgba(229,190,75,.28);
+    background: rgba(229,190,75,.09);
+    font-size: 11px;
+    white-space: nowrap;
+}
+.achievement-game-tab,
+.achievements-main-tab,
+.achievement-filter {
+    cursor: pointer;
+    transition: transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.achievement-game-tab:active,
+.achievements-main-tab:active,
+.achievement-filter:active,
+.achievement-action-button:active {
+    transform: scale(.98);
+}
+.achievement-game-panel:not([hidden]) {
+    animation: gameCenterPanelIn .22s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+    .achievement-game-card,
+    .achievement-action-button,
+    .achievement-game-tab,
+    .achievements-main-tab,
+    .achievement-filter,
+    .achievement-game-panel:not([hidden]) {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+}
