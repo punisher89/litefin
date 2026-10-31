@@ -561,6 +561,128 @@ export class SeerrClient {
         }
     }
 
+    /**
+     * Returns Seerr request records with their moderation metadata intact.
+     * The standard requests() method is retained for poster rows; the center
+     * needs request-level status, owner, timestamps and season selection.
+     */
+    async requestQueue(take = 40, skip = 0, filter = 'all', mediaType = 'all') {
+        const params = new URLSearchParams({
+            take: String(take),
+            skip: String(skip),
+            filter: String(filter || 'all'),
+            sort: 'modified',
+            sortDirection: 'desc',
+            mediaType: String(mediaType || 'all')
+        });
+        const payload = await this._request(`/request?${params.toString()}`);
+        const rawList = this._resultsOf(payload);
+        const items = rawList.map((request) => {
+            if (!request) return null;
+            const media = request.media || {};
+            const tmdbId = media.tmdbId || media.id || request.tmdbId || request.mediaId;
+            if (!tmdbId) return null;
+            const declaredType = media.mediaType || request.mediaType || request.type;
+            const resolvedType = declaredType === 2 || declaredType === '2' ? 'tv'
+                : declaredType === 1 || declaredType === '1' ? 'movie'
+                : declaredType === 'tv' || declaredType === 'series' ? 'tv'
+                : declaredType === 'movie' ? 'movie'
+                : (media.firstAirDate || media.numberOfSeasons ? 'tv' : 'movie');
+            const normalized = normalizeSeerrItem({
+                ...media,
+                id: tmdbId,
+                mediaType: resolvedType,
+                mediaInfo: media,
+                requests: [request]
+            }, resolvedType);
+            if (!normalized) return null;
+            return {
+                ...decorateStatusBadge(normalized),
+                _requestId: request.id || request.requestId || normalized._requestId,
+                _requestStatus: Number(request.status || 0),
+                _mediaStatus: Number(media.status || normalized._seerrStatus || 0),
+                _requestedBy: request.requestedBy || {},
+                _modifiedBy: request.modifiedBy || null,
+                _requestCreatedAt: request.createdAt || '',
+                _requestUpdatedAt: request.updatedAt || '',
+                _requestIs4k: !!request.is4k,
+                _requestSeasons: Array.isArray(request.seasons) ? request.seasons : [],
+                _requestError: request.errorMessage || request.error || '',
+                _rawRequest: request
+            };
+        }).filter(Boolean);
+
+        const pageInfo = payload && payload.pageInfo ? payload.pageInfo : {};
+        return {
+            items,
+            pageInfo,
+            totalResults: Number(pageInfo.results || pageInfo.totalResults || items.length),
+            page: Number(pageInfo.page || 1),
+            pages: Number(pageInfo.pages || 1)
+        };
+    }
+
+    /** Returns aggregate request counts supplied by Seerr. */
+    async requestCounts() {
+        return this._request('/request/count');
+    }
+
+    /** Returns the authenticated Seerr account and permission bitmask. */
+    async currentUser() {
+        return this._request('/User');
+    }
+
+    /** Moderates a pending request or retries a failed request. */
+    async moderateRequest(requestId, action) {
+        const allowed = ['approve', 'decline', 'retry'];
+        if (!allowed.includes(action)) throw new Error('Unsupported Seerr request action');
+        if (action === 'retry') {
+            return this._request(`/request/${encodeURIComponent(requestId)}/retry`, { method: 'POST', body: {} });
+        }
+        return this._request(`/request/${encodeURIComponent(requestId)}/${action}`, { method: 'POST', body: {} });
+    }
+
+    /** Lists Seerr issues; requestedBy restricts regular users to their own reports. */
+    async issues(take = 30, skip = 0, filter = 'open', requestedBy = null) {
+        const params = new URLSearchParams({
+            take: String(take),
+            skip: String(skip),
+            sort: 'modified',
+            sortDirection: 'desc',
+            filter: String(filter || 'open')
+        });
+        if (requestedBy != null) params.set('requestedBy', String(requestedBy));
+        return this._request(`/issue?${params.toString()}`);
+    }
+
+    async issueDetails(issueId) {
+        return this._request(`/issue/${encodeURIComponent(issueId)}`);
+    }
+
+    async createIssue({ mediaId, issueType, message }) {
+        if (!mediaId || ![1, 2, 3, 4].includes(Number(issueType)) || !String(message || '').trim()) {
+            throw new Error('A media item, issue type and message are required');
+        }
+        return this._request('/issue', {
+            method: 'POST',
+            body: { mediaId: Number(mediaId), issueType: Number(issueType), message: String(message).trim() }
+        });
+    }
+
+    async commentIssue(issueId, message) {
+        const text = String(message || '').trim();
+        if (!text) throw new Error('Comment cannot be empty');
+        return this._request(`/issue/${encodeURIComponent(issueId)}/comment`, {
+            method: 'POST',
+            body: { message: text }
+        });
+    }
+
+    async updateIssueStatus(issueId, status) {
+        if (!['approve', 'decline'].includes(status)) throw new Error('Unsupported Seerr issue action');
+        return this._request(`/issue/${encodeURIComponent(issueId)}/${status}`, { method: 'POST', body: {} });
+    }
+
     async getRatingsCombined(mediaType, tmdbId) {
         try {
             return await this._request(`/Ratings/${mediaType}/${tmdbId}`);
