@@ -39,7 +39,7 @@ const GAME_TEXT = {
         actionFailed: 'Не удалось выполнить действие.', notEnough: 'Недостаточно очков.', milestone: 'Откроется за достижения прогресса',
         activeUntil: 'Действует до', loadingUsers: 'Список пользователей загружается…',
         shopPowerups: 'Усиления', shopCosmetics: 'Оформление профиля',
-        inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Тест уведомления'
+        inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Проверить уведомления', needMoreScore: 'Для покупки не хватает {amount} очков.', needMoreScoreShort: 'Не хватает {amount} ⭐'
     },
     en: {
         overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
@@ -63,7 +63,7 @@ const GAME_TEXT = {
         actionFailed: 'The action could not be completed.', notEnough: 'Not enough score.', milestone: 'Unlocked through progress milestones',
         activeUntil: 'Active until', loadingUsers: 'Loading user list…',
         shopPowerups: 'Power-ups', shopCosmetics: 'Profile cosmetics',
-        inventory: 'In inventory', balance: 'Balance', viewShop: 'Open shop', testNotifications: 'Test notification'
+        inventory: 'In inventory', balance: 'Balance', viewShop: 'Open shop', testNotifications: 'Test notification', needMoreScore: 'You need {amount} more score to buy this item.', needMoreScoreShort: 'Need {amount} ⭐'
     }
 };
 
