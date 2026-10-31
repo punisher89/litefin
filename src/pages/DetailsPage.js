@@ -16,8 +16,6 @@ import { api } from '../api/index.js';
 import { router } from '../core/Router.js';
 import { eventBus } from '../core/EventBus.js';
 import { state } from '../core/StateManager.js';
-import { pluginManager } from '../plugins/PluginManager.js';
-import { serverPluginClient } from '../plugins/ServerPluginClient.js';
 import { focusManager } from '../ui/FocusManager.js';
 import { imageService } from '../utils/ImageService.js';
 
@@ -296,27 +294,6 @@ class DetailsPage extends Page {
                                 <div class="action-btn-tooltip-bar style-${tooltipMode}" id="action-tooltip-bar">
                                     <span class="action-btn-tooltip-text" id="action-tooltip-text"></span>
                                 </div>
-                                <div class="startrack-detail-widget hidden" id="startrack-detail-widget" aria-label="StarTrack">
-                                    <div class="startrack-detail-heading"><strong>STARTRACK</strong><span id="startrack-community-rating"></span></div>
-                                    <div class="startrack-detail-controls">
-                                        <span class="startrack-detail-label">${this._starTrackText('Твоя оценка', 'Your rating')}</span>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="step-down" aria-label="Decrease rating">−</button>
-                                        <strong id="startrack-rating-draft">—</strong>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="step-up" aria-label="Increase rating">+</button>
-                                        <button class="startrack-detail-button primary" type="button" tabindex="0" data-startrack-action="save-rating">${this._starTrackText('Сохранить', 'Save')}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="clear-rating">${this._starTrackText('Удалить', 'Remove')}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="toggle-watchlist" id="startrack-watchlist-action">${this._starTrackText('Посмотреть позже', 'Watchlist')}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="toggle-like" id="startrack-like-action">♥ ${this._starTrackText('Нравится', 'Like')}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="toggle-favorite" id="startrack-favorite-action">${this._starTrackText('В Top 4', 'Top 4')}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="log-watch">${this._starTrackText('Записать просмотр', 'Log watch')}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="open-list-picker">${this._starTrackText('Добавить в список', 'Add to list')}</button>
-                                    </div>
-                                    <div class="startrack-review-editor">
-                                        <textarea id="startrack-review-draft" rows="2" maxlength="10000" aria-label="${this._starTrackText('Моя рецензия', 'My review')}" placeholder="${this._starTrackText('Написать отзыв…', 'Write a review…')}"></textarea>
-                                    </div>
-                                    <div class="startrack-list-choices hidden" id="startrack-list-choices"></div>
-                                    <div class="startrack-detail-message" id="startrack-detail-message"></div>
-                                </div>
                             </section>
 
                             <!-- Overview -->
@@ -485,7 +462,6 @@ class DetailsPage extends Page {
 
             // Bind actions
             this._bindActions();
-            this._bindStarTrackControls();
 
             // Setup action button tooltip listener
             this._setupTooltipListener();
@@ -1332,209 +1308,6 @@ class DetailsPage extends Page {
     }
 
 
-    // ---------------------------------------------------------------------
-    // Native StarTrack controls (authenticated JSON API; no injected Web UI)
-    // ---------------------------------------------------------------------
-    _starTrackText(ru, en) {
-        const lang = String((typeof document !== 'undefined' && document.documentElement.lang) ||
-            i18n.currentLang || 'en').toLowerCase();
-        return lang.indexOf('ru') === 0 ? ru : en;
-    }
-
-    _bindStarTrackControls() {
-        const actions = this.$('#actions');
-        if (!actions) return;
-        actions.addEventListener('click', (event) => {
-            const button = event.target && event.target.closest
-                ? event.target.closest('[data-startrack-action]')
-                : null;
-            if (!button) return;
-            event.preventDefault();
-            event.stopPropagation();
-            const action = button.getAttribute('data-startrack-action');
-            if (action === 'step-up' || action === 'step-down') {
-                const delta = action === 'step-up' ? 0.5 : -0.5;
-                const current = Number(this._starTrackRatingDraft || 0);
-                const next = Math.round((current + delta) * 2) / 2;
-                this._starTrackRatingDraft = Math.max(0, Math.min(5, next));
-                this._renderStarTrackControls();
-                return;
-            }
-            void this._runStarTrackAction(action, button);
-        });
-    }
-
-    async _loadStarTrackControls() {
-        const panel = this.$('#startrack-detail-widget');
-        if (!panel || !this._item || !this._item.Id || !pluginManager.isEnabled('startrack')) return;
-        try {
-            const results = await Promise.all([
-                serverPluginClient.call('/Plugins/StarTrack/Interactions/' + encodeURIComponent(this._item.Id)),
-                serverPluginClient.call('/Plugins/StarTrack/Ratings/' + encodeURIComponent(this._item.Id))
-            ]);
-            this._starTrackStatus = results[0] || {};
-            this._starTrackRatings = results[1] || {};
-            const userId = typeof api.userId === 'function' ? api.userId() : api.userId || api._userId;
-            const normalizedUserId = String(userId || '').replace(/-/g, '').toLowerCase();
-            const userRatings = Array.isArray(this._starTrackRatings.userRatings) ? this._starTrackRatings.userRatings : [];
-            const ownRating = userRatings.find((entry) =>
-                String(entry.userId || '').replace(/-/g, '').toLowerCase() === normalizedUserId
-            );
-            this._starTrackCurrentRating = ownRating ? Number(ownRating.stars) : 0;
-            this._starTrackRatingDraft = this._starTrackCurrentRating;
-            const reviewDraft = this.$('#startrack-review-draft');
-            if (reviewDraft) reviewDraft.value = ownRating && ownRating.review ? ownRating.review : '';
-            panel.classList.remove('hidden');
-            this._renderStarTrackControls();
-            focusManager.invalidateCache('details-actions');
-        } catch (error) {
-            log.debug('StarTrack details controls unavailable:', error);
-            panel.classList.add('hidden');
-        }
-    }
-
-    _renderStarTrackControls() {
-        const panel = this.$('#startrack-detail-widget');
-        if (!panel || panel.classList.contains('hidden')) return;
-        const draft = this.$('#startrack-rating-draft');
-        const save = this.$('[data-startrack-action="save-rating"]');
-        const clear = this.$('[data-startrack-action="clear-rating"]');
-        const community = this.$('#startrack-community-rating');
-        const watchlist = this.$('#startrack-watchlist-action');
-        const like = this.$('#startrack-like-action');
-        const favorite = this.$('#startrack-favorite-action');
-        const message = this.$('#startrack-detail-message');
-        if (draft) draft.textContent = this._starTrackRatingDraft > 0 ? String(this._starTrackRatingDraft) + ' ★' : '—';
-        if (save) save.disabled = !(this._starTrackRatingDraft >= 0.5 && this._starTrackRatingDraft <= 5);
-        if (clear) clear.disabled = !(this._starTrackCurrentRating > 0);
-        if (community) {
-            const average = Number(this._starTrackRatings && this._starTrackRatings.averageRating || 0);
-            const count = Number(this._starTrackRatings && this._starTrackRatings.totalRatings || 0);
-            community.textContent = count > 0
-                ? '★ ' + average.toFixed(1) + ' · ' + count
-                : this._starTrackText('Пока без оценок', 'No ratings yet');
-        }
-        if (watchlist) {
-            const active = !!(this._starTrackStatus && this._starTrackStatus.watchlisted);
-            watchlist.classList.toggle('active', active);
-            watchlist.textContent = active
-                ? this._starTrackText('✓ В списке', '✓ In watchlist')
-                : this._starTrackText('+ Посмотреть позже', '+ Watchlist');
-        }
-        if (like) {
-            const active = !!(this._starTrackStatus && this._starTrackStatus.liked);
-            like.classList.toggle('active', active);
-            like.textContent = active
-                ? '♥ ' + this._starTrackText('Нравится', 'Liked')
-                : '♡ ' + this._starTrackText('Нравится', 'Like');
-        }
-        if (favorite) {
-            const active = !!(this._starTrackStatus && this._starTrackStatus.favorite);
-            favorite.classList.toggle('active', active);
-            favorite.textContent = active
-                ? '✓ ' + this._starTrackText('В Top 4', 'In Top 4')
-                : '+ ' + this._starTrackText('В Top 4', 'Add to Top 4');
-        }
-        if (message) message.textContent = '';
-    }
-
-    async _runStarTrackAction(action, button) {
-        if (!this._item || !this._item.Id) return;
-        const id = encodeURIComponent(this._item.Id);
-        const status = this._starTrackStatus || {};
-        button.disabled = true;
-        try {
-            if (action === 'save-rating') {
-                const stars = Number(this._starTrackRatingDraft || 0);
-                if (!Number.isFinite(stars) || stars < 0.5 || stars > 5 || Math.round(stars * 2) !== stars * 2) {
-                    const message = this.$('#startrack-detail-message');
-                    if (message) message.textContent = this._starTrackText('Сначала выбери оценку от 0,5 до 5.', 'Choose a rating from 0.5 to 5 first.');
-                    return;
-                }
-                const reviewField = this.$('#startrack-review-draft');
-                const review = reviewField ? String(reviewField.value || '').trim() : '';
-                await serverPluginClient.call('/Plugins/StarTrack/Ratings/' + id, 'POST', {
-                    stars: stars,
-                    review: review || null
-                });
-            } else if (action === 'clear-rating') {
-                await serverPluginClient.call('/Plugins/StarTrack/Ratings/' + id, 'DELETE');
-            } else if (action === 'toggle-watchlist') {
-                await serverPluginClient.call('/Plugins/StarTrack/Watchlist/' + id, status.watchlisted ? 'DELETE' : 'POST');
-            } else if (action === 'toggle-like') {
-                await serverPluginClient.call('/Plugins/StarTrack/Likes/' + id, status.liked ? 'DELETE' : 'POST');
-            } else if (action === 'toggle-favorite') {
-                const current = await serverPluginClient.call('/Plugins/StarTrack/MyFavorites');
-                const favorites = Array.isArray(current) ? current.slice() : [];
-                const existingIndex = favorites.findIndex((value) => String(value).toLowerCase() === String(this._item.Id).toLowerCase());
-                if (existingIndex >= 0) {
-                    favorites.splice(existingIndex, 1);
-                } else {
-                    // The current StarTrack server API stores at most 12 favourites.
-                    if (favorites.length >= 12) {
-                        const message = this.$('#startrack-detail-message');
-                        if (message) message.textContent = this._starTrackText('Достигнут лимит избранного (12 элементов на сервере).', 'The server favourite limit (12 items) has been reached.');
-                        return;
-                    }
-                    favorites.push(this._item.Id);
-                }
-                await serverPluginClient.call('/Plugins/StarTrack/MyFavorites', 'POST', { itemIds: favorites });
-            } else if (action === 'open-list-picker') {
-                const picker = this.$('#startrack-list-choices');
-                const message = this.$('#startrack-detail-message');
-                const lists = await serverPluginClient.call('/Plugins/StarTrack/Lists');
-                if (!picker) return;
-                picker.innerHTML = '';
-                if (!Array.isArray(lists) || lists.length === 0) {
-                    if (message) message.textContent = this._starTrackText('Списков пока нет. Создай список на странице StarTrack.', 'No lists yet. Create one on the StarTrack page first.');
-                    return;
-                }
-                lists.forEach((list) => {
-                    if (!list || !list.id) return;
-                    const choice = document.createElement('button');
-                    choice.type = 'button';
-                    choice.tabIndex = 0;
-                    choice.className = 'startrack-detail-button startrack-list-choice';
-                    choice.setAttribute('data-startrack-action', 'add-to-list');
-                    choice.setAttribute('data-list-id', list.id);
-                    choice.textContent = String(list.name || this._starTrackText('Без названия', 'Untitled list'));
-                    picker.appendChild(choice);
-                });
-                picker.classList.remove('hidden');
-                focusManager.invalidateCache('details-actions');
-                return;
-            } else if (action === 'add-to-list') {
-                const listId = button.getAttribute('data-list-id');
-                if (!listId) return;
-                await serverPluginClient.call('/Plugins/StarTrack/Lists/' + encodeURIComponent(listId) + '/Items', 'POST', {
-                    itemId: this._item.Id
-                });
-                const picker = this.$('#startrack-list-choices');
-                if (picker) picker.classList.add('hidden');
-            } else if (action === 'log-watch') {
-                const reviewField = this.$('#startrack-review-draft');
-                const review = reviewField ? String(reviewField.value || '').trim() : '';
-                await serverPluginClient.call('/Plugins/StarTrack/Diary', 'POST', {
-                    itemId: this._item.Id,
-                    watchedAt: new Date().toISOString(),
-                    stars: this._starTrackCurrentRating > 0 ? this._starTrackCurrentRating : null,
-                    review: review || null
-                });
-            } else {
-                return;
-            }
-            await this._loadStarTrackControls();
-            const message = this.$('#startrack-detail-message');
-            if (message) message.textContent = this._starTrackText('Сохранено', 'Saved');
-        } catch (error) {
-            log.warn('StarTrack details action failed:', error);
-            const message = this.$('#startrack-detail-message');
-            if (message) message.textContent = this._starTrackText('Не удалось выполнить действие', 'Could not complete action');
-        } finally {
-            button.disabled = false;
-        }
-    }
-
     async _loadDetails() {
         // Invalidate optional metadata before starting a different item load.
         this._watchProvidersRequestId = (this._watchProvidersRequestId || 0) + 1;
@@ -1620,7 +1393,6 @@ class DetailsPage extends Page {
 
             // Render all text content immediately — only needs this._item
             this._renderHeroText();
-            void this._loadStarTrackControls();
             void this._loadEnhancedDetailsInfo();
             this._setupFavoriteButton();
             this._renderRichMetadata();
