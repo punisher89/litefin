@@ -483,3 +483,418 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+
+/* ============================================================================
+   Seerr application layout — wide desktop / TV canvas and native-style panels
+   ============================================================================ */
+.seerr-center-content {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 30px clamp(28px, 4vw, 76px) 64px;
+}
+.seerr-center-header {
+    align-items: flex-end;
+    margin-bottom: 25px;
+}
+.seerr-center-brand { min-width: 0; }
+.seerr-center-mark { display: none; }
+.seerr-center-eyebrow {
+    color: #9ca3af;
+    letter-spacing: 2.4px;
+    font-size: 11px;
+    margin-bottom: 7px;
+}
+.seerr-center-header h1 {
+    color: #f9fafb;
+    font-size: clamp(30px, 3vw, 42px);
+    font-weight: 800;
+    line-height: 1.08;
+}
+.seerr-center-header p {
+    margin-top: 7px;
+    color: #9ca3af;
+    font-size: 14px;
+}
+.seerr-center-refresh {
+    min-height: 42px;
+    border-color: #4b5563;
+    border-radius: 7px;
+    background: #1f2937;
+}
+.seerr-center-tabs {
+    align-items: stretch;
+    padding: 0;
+    margin: 0 0 23px;
+    border-bottom: 1px solid #374151;
+}
+.seerr-center-tab {
+    position: relative;
+    min-height: 49px;
+    padding: 0 22px;
+    border: 0;
+    border-radius: 0;
+    color: #9ca3af;
+    background: transparent;
+    font-weight: 650;
+}
+.seerr-center-tab.active {
+    color: #fff;
+    border: 0;
+    background: transparent;
+}
+.seerr-center-tab.active:after {
+    position: absolute;
+    right: 13px;
+    bottom: -1px;
+    left: 13px;
+    height: 3px;
+    content: "";
+    background: #6366f1;
+    border-radius: 3px 3px 0 0;
+}
+.seerr-center-tab-icon { color: #a5b4fc; }
+.seerr-center-unread-count { margin-left: 8px; background: #6366f1; }
+.seerr-center-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 18px;
+}
+.seerr-center-stat {
+    min-height: 65px;
+    border-color: #374151;
+    border-radius: 9px;
+    background: #1f2937;
+}
+.seerr-center-stat strong { font-size: 24px; }
+.seerr-center-panel {
+    min-height: 260px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+.seerr-center-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 0 18px;
+}
+.seerr-center-select-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-width: 185px;
+    margin: 0 10px 8px 0;
+}
+.seerr-center-select-icon {
+    position: absolute;
+    left: 12px;
+    z-index: 1;
+    color: #d1d5db;
+    font-size: 19px;
+    pointer-events: none;
+}
+.seerr-center-select {
+    width: 100%;
+    min-width: 0;
+    height: 42px;
+    padding: 0 34px 0 40px;
+    appearance: auto;
+    -webkit-appearance: menulist;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    outline: none;
+    color: #f3f4f6;
+    background: #1f2937;
+    font: inherit;
+    font-size: 14px;
+}
+.seerr-center-select.small {
+    width: 76px;
+    min-width: 76px;
+    padding-left: 12px;
+}
+.seerr-center-select:focus {
+    border-color: #818cf8;
+    outline: 2px solid rgba(99,102,241,.3);
+    outline-offset: 1px;
+}
+.seerr-center-page-size {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 16px 8px 3px;
+    color: #9ca3af;
+    font-size: 13px;
+}
+.seerr-center-page-size .seerr-center-select { margin-left: 9px; }
+.seerr-center-result-count {
+    margin: 0 0 8px auto;
+    color: #9ca3af;
+    font-size: 13px;
+}
+.seerr-center-result-count strong { color: #f3f4f6; }
+.seerr-center-issue-card {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    width: 100%;
+    min-height: 185px;
+    overflow: hidden;
+    padding: 0;
+    margin: 0 0 14px;
+    border: 1px solid #374151;
+    border-radius: 11px;
+    background: #1f2937;
+    box-shadow: 0 5px 16px rgba(0,0,0,.18);
+    cursor: default;
+}
+.seerr-center-issue-card.has-backdrop { background: #1f2937; }
+.seerr-center-issue-backdrop {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 70%;
+    background-position: center 35%;
+    background-size: cover;
+    opacity: .24;
+}
+.seerr-center-issue-backdrop:after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    content: "";
+    background: linear-gradient(90deg, rgba(31,41,55,.35) 0%, #1f2937 96%);
+}
+.seerr-center-issue-main {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    width: 62%;
+    min-width: 0;
+    padding: 19px 22px;
+    border: 0;
+    color: #e5e7eb;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+.seerr-center-issue-poster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 108px;
+    margin-right: 17px;
+    flex: 0 0 72px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #374151;
+    box-shadow: 0 3px 12px rgba(0,0,0,.25);
+}
+.seerr-center-issue-poster img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+.seerr-center-issue-poster.placeholder {
+    color: #9ca3af;
+    font-size: 28px;
+}
+.seerr-center-issue-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.seerr-center-issue-year {
+    margin-bottom: 3px;
+    color: #d1d5db;
+    font-size: 11px;
+}
+.seerr-center-issue-copy > strong {
+    display: block;
+    overflow: hidden;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.seerr-center-issue-preview {
+    display: -webkit-box;
+    max-width: 100%;
+    margin-top: 6px;
+    overflow: hidden;
+    color: #d1d5db;
+    font-size: 13px;
+    line-height: 1.4;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+.seerr-center-issue-tags {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.seerr-center-issue-tag {
+    display: inline-block;
+    margin: 0 6px 5px 0;
+    padding: 3px 8px;
+    border: 1px solid rgba(156,163,175,.24);
+    border-radius: 4px;
+    color: #d1d5db;
+    background: rgba(17,24,39,.36);
+    font-size: 10px;
+    font-weight: 700;
+}
+.seerr-center-issue-side {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 38%;
+    min-width: 250px;
+    padding: 16px 20px;
+    border-left: 1px solid rgba(107,114,128,.28);
+    background: rgba(17,24,39,.35);
+}
+.seerr-center-issue-fact {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 0 7px;
+}
+.seerr-center-issue-fact small {
+    width: 112px;
+    color: #9ca3af;
+    font-size: 11px;
+}
+.seerr-center-issue-fact strong {
+    min-width: 0;
+    color: #e5e7eb;
+    font-size: 12px;
+    font-weight: 650;
+}
+.seerr-center-issue-fact .seerr-center-status { min-height: 22px; }
+.seerr-center-issue-view {
+    align-self: flex-start;
+    margin-top: 7px;
+    border-color: #6366f1;
+    border-radius: 6px;
+    background: #6366f1;
+}
+.seerr-center-request, .seerr-center-watch-card {
+    padding: 18px 0;
+    border-bottom-color: #374151;
+}
+.seerr-center-poster {
+    width: 76px;
+    height: 114px;
+    flex-basis: 76px;
+    border-radius: 6px;
+}
+.seerr-center-request h3, .seerr-center-watch-main strong { font-size: 20px; }
+.seerr-center-status {
+    border-radius: 4px;
+    font-size: 11px;
+}
+.seerr-center-filter {
+    min-height: 40px;
+    border-radius: 6px;
+    border-color: #4b5563;
+    background: #1f2937;
+}
+.seerr-center-filter.active {
+    border-color: #6366f1;
+    background: #6366f1;
+}
+.seerr-center-notification {
+    border-color: #374151;
+    border-radius: 8px;
+    background: #1f2937;
+}
+.seerr-center-issue-detail {
+    max-width: 1280px;
+    padding: 8px 0;
+}
+.seerr-center-issue-description {
+    max-width: 100%;
+}
+.seerr-center-comments {
+    max-width: 100%;
+    padding: 8px 0;
+    border-top: 1px solid #374151;
+    border-bottom: 1px solid #374151;
+}
+.seerr-center-comment {
+    padding: 15px 0;
+    border-bottom-color: #374151;
+}
+.seerr-center-textarea {
+    max-width: 100%;
+    border-radius: 6px;
+    border-color: #4b5563;
+    background: #1f2937;
+}
+.seerr-center-action {
+    min-height: 39px;
+    border-radius: 6px;
+}
+.seerr-center-action.primary {
+    border-color: #6366f1;
+    background: #6366f1;
+}
+.seerr-center-empty {
+    min-height: 270px;
+}
+.seerr-center-loading {
+    min-height: 260px;
+}
+.seerr-center-content button:focus {
+    outline: 2px solid #a5b4fc;
+    outline-offset: 2px;
+}
+@media (max-width: 1100px) {
+    .seerr-center-content { padding: 25px 28px 48px; }
+    .seerr-center-issue-main { width: 58%; padding: 16px; }
+    .seerr-center-issue-side { width: 42%; min-width: 220px; padding: 13px; }
+    .seerr-center-issue-fact small { width: 92px; }
+}
+@media (max-width: 760px) {
+    .seerr-center-content { padding: 20px 16px 36px; }
+    .seerr-center-issue-card { flex-direction: column; }
+    .seerr-center-issue-main { width: 100%; min-height: 150px; }
+    .seerr-center-issue-side {
+        width: auto;
+        min-width: 0;
+        padding: 13px 16px;
+        border-top: 1px solid rgba(107,114,128,.28);
+        border-left: 0;
+    }
+    .seerr-center-issue-fact small { width: 115px; }
+}
+@media (max-width: 560px) {
+    .seerr-center-content { padding: 16px 12px 28px; }
+    .seerr-center-header { align-items: flex-start; flex-direction: row; }
+    .seerr-center-header h1 { font-size: 27px; }
+    .seerr-center-header p { max-width: 250px; }
+    .seerr-center-tabs { margin-bottom: 17px; }
+    .seerr-center-tab { padding: 0 12px; }
+    .seerr-center-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .seerr-center-panel { padding: 0; }
+    .seerr-center-issue-main { padding: 14px; }
+    .seerr-center-issue-poster { width: 60px; height: 90px; flex-basis: 60px; margin-right: 12px; }
+    .seerr-center-issue-copy > strong { font-size: 16px; }
+    .seerr-center-issue-side { padding: 12px 14px; }
+    .seerr-center-result-count { margin-left: 0; }
+}
