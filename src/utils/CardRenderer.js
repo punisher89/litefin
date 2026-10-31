@@ -1317,6 +1317,7 @@ class CardRenderer {
         // --- 4. HTML Assembly ---
 
         let cssClass = isLandscape ? 'media-card landscape' : 'media-card';
+        if (type === 'person') cssClass += ' person-card';
         // 'artist' is an alias for the square type — same 1:1 aspect ratio card.
         // In Expanded Posters layout, person cards (cast/crew/guest stars) render as square (1:1) cards.
         if (type === 'square' || type === 'artist' || (isExpanded && type === 'person')) cssClass = 'media-card square';
@@ -1633,7 +1634,7 @@ class CardRenderer {
                         `
                                 : `<div class="card-title"><span>${titleText}</span></div>`
                         }
-                        ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle${tmdbRatingInlineHtml ? ' seerr-discover-subtitle' : ''}">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
+                        ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle${isDiscoverRating ? ' seerr-discover-subtitle' : ''}">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
                         ${metaHtml}
                     </div>
                     `
@@ -1654,7 +1655,7 @@ class CardRenderer {
                     `
                             : `<div class="card-title"><span>${titleText}</span></div>`
                     }
-                    ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle${tmdbRatingInlineHtml ? ' seerr-discover-subtitle' : ''}">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
+                    ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle${isDiscoverRating ? ' seerr-discover-subtitle' : ''}">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
                     ${metaHtml}
                 </div>
                 `
