@@ -1241,6 +1241,17 @@ class CardRenderer {
         titleText = escapeHtml(titleText);
         subtitleText = escapeHtml(subtitleText);
 
+        // Discover cards already carry the TMDB ID from Seerr. Show it as a
+        // small source marker under the title without making any extra request.
+        const rawTmdbId = item._tmdbId;
+        const tmdbId = rawTmdbId === null || rawTmdbId === undefined ? '' : String(rawTmdbId).trim();
+        const tmdbTagHtml =
+            contextType === 'discover' &&
+            (item.Type === 'Movie' || item.Type === 'Series') &&
+            /^\\d+$/.test(tmdbId)
+                ? `<div class="seerr-tmdb-tag" title="The Movie Database ID ${escapeHtml(tmdbId)}"><span class="seerr-tmdb-tag__brand">TMDB</span><span class="seerr-tmdb-tag__id">#${escapeHtml(tmdbId)}</span></div>`
+                : '';
+
         // --- 3.5. List View Override ---
         // In list-view, we want the Title on the left and EVERY other piece of info
         // (Year, Role, Rating, Score) on the right. We move subtitle parts to metaHtml.
@@ -1610,6 +1621,7 @@ class CardRenderer {
                                 : `<div class="card-title"><span>${titleText}</span></div>`
                         }
                         ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
+                        ${tmdbTagHtml}
                         ${metaHtml}
                     </div>
                     `
@@ -1631,6 +1643,7 @@ class CardRenderer {
                             : `<div class="card-title"><span>${titleText}</span></div>`
                     }
                     ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
+                    ${tmdbTagHtml}
                     ${metaHtml}
                 </div>
                 `
