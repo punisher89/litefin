@@ -187,7 +187,10 @@ export class VirtualCardRow {
             // Add a buffer for the expanded card width (375px) so the track doesn't clip.
             // Symmetrical spacing keeps the row scroll boundaries aligned cleanly.
             const expansion =
-                this.isLandscape || this.cardType === 'square' || this.cardType === 'artist'
+                this.isLandscape ||
+                this.cardType === 'square' ||
+                this.cardType === 'artist' ||
+                this.cardType === 'person'
                     ? 0
                     : 375 * (this.modernMultiplier || 1.0);
             this.track.style.width = `${totalWidth + expansion}px`;
@@ -450,7 +453,11 @@ export class VirtualCardRow {
                 const isIntegratedExpanding =
                     isExpanding && (this.isLandscape || this.cardType === 'square' || this.cardType === 'artist');
                 const isPortraitExpanding =
-                    isExpanding && !this.isLandscape && this.cardType !== 'square' && this.cardType !== 'artist';
+                    isExpanding &&
+                    !this.isLandscape &&
+                    this.cardType !== 'square' &&
+                    this.cardType !== 'artist' &&
+                    this.cardType !== 'person';
 
                 if (!this.hideLabels && !isIntegratedExpanding && !isPortraitExpanding) {
                     const infoDiv = document.createElement('div');
@@ -485,7 +492,11 @@ export class VirtualCardRow {
             const isRtl = document.documentElement.dir === 'rtl';
             const elementPos = this.getItemPosition(this.currentIndex);
             const canExpand =
-                isExpanding && !this.isLandscape && this.cardType !== 'square' && this.cardType !== 'artist';
+                isExpanding &&
+                !this.isLandscape &&
+                this.cardType !== 'square' &&
+                this.cardType !== 'artist' &&
+                this.cardType !== 'person';
             const elementWidth = canExpand ? Math.round(600 * (this.modernMultiplier || 1.0)) : this.itemWidth;
 
             const containerWidth = this.track.parentElement ? this.track.parentElement.clientWidth : window.innerWidth;
@@ -658,7 +669,12 @@ export class VirtualCardRow {
         // Expanding layouts must center on the EXPANDED card width so the
         // target card's boundaries never clip at the viewport edge
         const isExpanding = document.documentElement.getAttribute('data-layout-media-rows') === 'expanding';
-        const canExpand = isExpanding && !this.isLandscape && this.cardType !== 'square' && this.cardType !== 'artist';
+        const canExpand =
+            isExpanding &&
+            !this.isLandscape &&
+            this.cardType !== 'square' &&
+            this.cardType !== 'artist' &&
+            this.cardType !== 'person';
         const elementWidth = canExpand ? Math.round(600 * (this.modernMultiplier || 1.0)) : this.itemWidth;
 
         const containerWidth = rowItems.clientWidth;
@@ -1092,7 +1108,11 @@ export class VirtualCardRow {
         // -------------------------------------------------------------
         const isExpanding = document.documentElement.getAttribute('data-layout-media-rows') === 'expanding';
         const expansion =
-            isExpanding && !this.isLandscape && this.cardType !== 'square' && this.cardType !== 'artist'
+            isExpanding &&
+            !this.isLandscape &&
+            this.cardType !== 'square' &&
+            this.cardType !== 'artist' &&
+            this.cardType !== 'person'
                 ? 375 * (this.modernMultiplier || 1.0)
                 : 0;
         return this.totalItems * this.totalItemWidth + this.sidePadding * 2 + expansion;
