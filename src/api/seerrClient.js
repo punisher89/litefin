@@ -582,7 +582,7 @@ export class SeerrClient {
         const items = rawList.map((request) => {
             if (!request) return null;
             const media = request.media || {};
-            const tmdbId = media.tmdbId || media.id || request.tmdbId || request.mediaId;
+            const tmdbId = media.tmdbId || request.tmdbId || request.mediaId;
             if (!tmdbId) return null;
             const declaredType = media.mediaType || request.mediaType || request.type;
             const resolvedType = declaredType === 2 || declaredType === '2' ? 'tv'
