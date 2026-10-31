@@ -196,6 +196,7 @@ Litefin includes a native StarTrack client bridge when the StarTrack Jellyfin se
 - The **My Ratings** navigation entry appears only after the server plugin is detected.
 - The page uses the authenticated `/Plugins/StarTrack/*` JSON API; it does not embed StarTrack's injected Jellyfin Web JavaScript or put the access token in a URL.
 - Ratings, watchlist, diary, favourites, liked titles, recommendations and lists are hydrated through a batched Jellyfin `/Items?Ids=...` request.
+- The media details page adds a TV-remote-friendly StarTrack panel: 0.5-step rating selection, save/remove rating, watchlist toggle, and like toggle. The panel stays hidden unless the server plugin is active.
 - Removing a rating, watchlist entry, like or diary entry uses the corresponding authenticated StarTrack API endpoint.
 - External Letterboxd, Trakt, Simkl and other sync settings remain controlled by the StarTrack server plugin and are not enabled by Litefin automatically.
 
