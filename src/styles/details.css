@@ -2729,3 +2729,26 @@ html[dir="rtl"][data-layout-quirks="c26"] .episode-row-rating svg {
     outline-offset: -2px;
 }
 
+
+
+/* Native StarTrack rating and collection controls on the media details page. */
+.startrack-detail-widget {
+    flex: 1 1 100%; width: 100%; box-sizing: border-box; margin-top: 12px; padding: 12px 14px;
+    border: 1px solid var(--jf-divider, rgba(255,255,255,.14)); border-radius: 10px;
+    background: var(--jf-background-alt, rgba(255,255,255,.035));
+}
+.startrack-detail-heading, .startrack-detail-controls {
+    display: flex; display: -webkit-flex; align-items: center; flex-wrap: wrap;
+}
+.startrack-detail-heading { justify-content: space-between; margin-bottom: 8px; color: var(--jf-text-primary); }
+.startrack-detail-heading strong { color: var(--jf-accent); letter-spacing: .1em; font-size: .78rem; }
+.startrack-detail-heading span, .startrack-detail-label, .startrack-detail-message { color: var(--jf-text-secondary); font-size: .82rem; }
+.startrack-detail-controls > * { margin: 3px 5px 3px 0; }
+.startrack-detail-controls strong { min-width: 42px; text-align: center; color: #f4c34f; }
+.startrack-detail-button {
+    border: 1px solid var(--jf-divider, rgba(255,255,255,.16)); border-radius: 7px;
+    padding: 7px 10px; color: var(--jf-text-primary); background: rgba(255,255,255,.05); font-size: .82rem;
+}
+.startrack-detail-button.primary, .startrack-detail-button.active { color: #fff; background: var(--jf-accent); border-color: var(--jf-accent); }
+.startrack-detail-button:focus { outline: 2px solid var(--jf-accent); outline-offset: 2px; }
+.startrack-detail-message { min-height: 1.1em; margin-top: 5px; }
