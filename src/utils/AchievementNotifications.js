@@ -262,6 +262,21 @@ class AchievementNotifications {
             '.lf-ab-detail{font-size:13px;line-height:1.25;color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
             '.lf-ab-points{font-size:13px;font-weight:800;color:#fff;margin-top:1px;}',
             '.lf-ab-toast.lf-ab-exit{opacity:0;transform:translateX(28px) scale(.98);}',
+            '@media (prefers-reduced-motion:reduce){.lf-ab-toast{transition:none;transform:none}.lf-ab-toast.lf-ab-visible{transform:none}}',
+            /* Litefin Game Center notification skin */
+            '#litefin-achievement-toast-container{top:clamp(18px,3vh,34px);right:clamp(18px,2.5vw,38px);width:min(460px,calc(100vw - 36px));gap:12px;font-family:inherit;}',
+            '.lf-ab-toast{position:relative;min-height:116px;gap:17px;padding:17px 20px 17px 17px;border-radius:19px;border:1px solid rgba(166,143,255,.38);background:radial-gradient(ellipse at 0% 0%,rgba(115,82,190,.24),transparent 58%),linear-gradient(125deg,rgba(24,23,42,.99),rgba(27,32,49,.99) 70%,rgba(27,43,53,.98));box-shadow:0 16px 42px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.07);backdrop-filter:blur(14px);}',
+            '.lf-ab-toast:before{content:"";position:absolute;left:0;top:13px;bottom:13px;width:4px;border-radius:0 5px 5px 0;background:var(--lf-ab-rarity,#9875ff);box-shadow:0 0 15px var(--lf-ab-glow,rgba(152,117,255,.4));}',
+            '.lf-ab-orb{width:66px;height:66px;min-width:66px;border-radius:17px;font-size:32px;background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.25),transparent 52%),linear-gradient(145deg,rgba(104,78,170,.72),rgba(47,42,76,.96));border:1px solid var(--lf-ab-glow,rgba(152,117,255,.35));box-shadow:0 8px 22px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.12);}',
+            '.lf-ab-copy{gap:5px;padding:1px 0;}',
+            '.lf-ab-eyebrow{color:#c8b7ff;font-size:10px;letter-spacing:1.35px;font-weight:800;}',
+            '.lf-ab-title{font-size:18px;line-height:1.25;font-weight:850;color:#fff;}',
+            '.lf-ab-detail{color:#b9b5cb;font-size:12px;line-height:1.4;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}',
+            '.lf-ab-points{display:inline-flex;align-self:flex-start;margin-top:4px;padding:5px 9px;border-radius:8px;background:rgba(237,194,102,.12);border:1px solid rgba(237,194,102,.22);color:#f2cd7d;font-size:12px;}',
+            '.lf-ab-toast.lf-ab-visible{transform:translateX(0) scale(1);}',
+            '.lf-ab-toast.lf-ab-exit{opacity:0;transform:translateY(-8px) scale(.985);}',
+            '@media (max-width:600px){#litefin-achievement-toast-container{top:12px;right:12px;width:calc(100vw - 24px)}.lf-ab-toast{min-height:96px;padding:13px 14px;gap:12px}.lf-ab-orb{width:54px;height:54px;min-width:54px;border-radius:14px;font-size:27px}.lf-ab-title{font-size:16px}}',
+            '@media (min-width:1000px){.lf-ab-toast{min-height:124px;padding:19px 22px}.lf-ab-orb{width:72px;height:72px;min-width:72px;font-size:35px}.lf-ab-title{font-size:20px}}',
             '@media (prefers-reduced-motion:reduce){.lf-ab-toast{transition:none;transform:none}.lf-ab-toast.lf-ab-visible{transform:none}}'
         ].join('');
         document.head.appendChild(style);
