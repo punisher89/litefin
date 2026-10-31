@@ -147,17 +147,6 @@ Extends your server with features that require elevated or backend network acces
 - **Where to Watch (Streaming Availability)**: Queries TMDB streaming provider catalogs (Netflix, Prime, Disney+, etc.) grouped by subscription and rental.
 - **MDBList Ratings Aggregation**: Enriches media items with multi-source ratings (Rotten Tomatoes, IMDb, Metacritic, Trakt, Letterboxd).
 
-### Seerr Center and in-player issue reporting
-
-When Seerr is configured on the Litefin companion server plugin, the TV sidebar exposes a lazy-loaded **Seerr Center**:
-- **Requests**: filter the user's requests by pending, approved, processing, available, failed and completed status. Accounts with Seerr's `MANAGE_REQUESTS` permission can approve, decline and retry eligible requests; users can cancel their own pending requests.
-- **Issues**: browse open, resolved or all issues, read the original report and comments, reply, and resolve or reopen issues when the account has `MANAGE_ISSUES`.
-- **Player reporting**: the video OSD includes a report action. It uses the playing item's TMDB ID, asks for an issue category and description, and submits through Seerr only when the account has `CREATE_ISSUES`.
-- **Notifications**: Litefin checks request status changes and issue activity every two minutes while the app is visible. Polling pauses while the app is hidden. The first poll establishes a baseline so existing requests do not create a flood of old notifications. This is periodic polling, not an instant webhook feed.
-- **Smart Watchlist**: filter items by availability, active processing, upcoming release or whether they can be requested; sort by release date or title, request eligible titles directly, or remove them from the list.
-
-All Seerr communication continues through the authenticated Litefin server plugin. The Seerr URL and API key stay on the server; client devices use the existing Jellyfin session.
-
 ### 2. Litefin Client Plugin (`Litefin.Client.Plugin`)
 Embeds Litefin directly inside your Jellyfin server web interface:
 - **Repository Manifest**: `https://github.com/MoazSalem/litefin/releases/latest/download/litefin-plugin-manifest.json`
@@ -199,22 +188,6 @@ If an item's Primary image tag already contains Jellyfin Enhanced's native `-jet
 
 The adapter renders quality, genre, language, rating, and age-rating groups on homepage rows, shared `MediaGrid` search/result cards, virtualized horizontal rows (including Discover and Favorites), and the Library page grid. Existing server-stamped native posters are left untouched. The adapter decorates already-rendered virtual cards in place, preserving TV focus and avoiding a full row rebuild. Seerr/TMDB results first use a backing Jellyfin media ID (`_jellyfinMediaId`) when Seerr provides one. Otherwise, Litefin builds a per-user, 10-minute cached lookup from Jellyfin `/Items?HasTmdbId=true` results, requesting only `ProviderIds` (no images), then matches TMDB ID and media type locally. Synthetic `tmdb-*` IDs are never sent to Jellyfin Enhanced. Unrequested or not-yet-imported catalogue entries have no local media streams, so technical quality/audio tags are not available for them.
 
-
-## StarTrack native integration
-
-Litefin includes a native StarTrack client bridge when the StarTrack Jellyfin server plugin is installed and active.
-
-- The **My Ratings** navigation entry appears only after the server plugin is detected.
-- The page uses the authenticated `/Plugins/StarTrack/*` JSON API; it does not embed StarTrack's injected Jellyfin Web JavaScript or put the access token in a URL.
-- Ratings, watchlist, diary, favourites, liked titles, recommendations and lists are hydrated through a batched Jellyfin `/Items?Ids=...` request.
-- The Reviews tab shows recent written ratings from `/Recent?limit=100`; the server applies its activity/member privacy filters before returning entries.
-- Favourites are grouped into Movie, Series, Season and Episode sections. The current StarTrack server API stores at most 12 favourite IDs in total, so Litefin does not claim a larger server-side capacity.
-- The Lists tab can create collaborative lists, open them, remove entries added by the current user, and delete lists owned by the current user. From a media details page, a user can add that item to an existing list.
-- The media details page adds a TV-remote-friendly StarTrack panel: 0.5-step rating selection, editable review text, save/remove rating, watchlist and like toggles, Top 4 toggle, manual diary logging, and add-to-list actions. The panel stays hidden unless the server plugin is active.
-- Removing ratings, watchlist entries, likes or diary entries uses the corresponding authenticated StarTrack API endpoint.
-- External Letterboxd, Trakt, Simkl and other sync settings remain controlled by the StarTrack server plugin and are not enabled by Litefin automatically.
-
-Server plugin repository: `https://raw.githubusercontent.com/ZL154/jellyfin-plugin-startrack/main/manifest.json`
 
 ## Community add-on catalogue
 
