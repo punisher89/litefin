@@ -216,13 +216,6 @@ export function normalizeSeerrItem(result, fallbackMediaType = null) {
         _backdropUrl: result.backdropPath ? `${TMDB_BACKDROP_BASE}${result.backdropPath}` : '',
         WatchProviders: Array.isArray(result.watchProviders) ? result.watchProviders : [],
         _seerrStatus: (result.mediaInfo && result.mediaInfo.status) || SEERR_STATUS.NOT_REQUESTED,
-        // Seerr issue creation requires the internal Media table primary key,
-        // not the TMDB ID. It exists only when this title is registered in Seerr.
-        _seerrMediaId: result.mediaInfo && Number.isInteger(Number(result.mediaInfo.id))
-            ? Number(result.mediaInfo.id)
-            : null,
-        _seerrMediaInfo: result.mediaInfo || null,
-        _seerrSeasons: Array.isArray(result.seasons) ? result.seasons : [],
         _jellyfinMediaId: (() => {
             const info = result.mediaInfo || {};
             // serviceId / externalServiceId belong to Radarr or Sonarr, not Jellyfin.
