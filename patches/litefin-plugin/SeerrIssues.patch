@@ -67,7 +67,8 @@ diff --git a/Controllers/SeerrController.cs b/Controllers/SeerrController.cs
 +            || !request.TryGetProperty("issueType", out var issueTypeValue)
 +            || !issueTypeValue.TryGetInt32(out var issueType)
 +            || issueType is < 1 or > 4
-+            || !request.TryGetProperty("message", out var messageValue)
++             || !request.TryGetProperty("message", out var messageValue)
++            || messageValue.ValueKind != JsonValueKind.String
 +            || string.IsNullOrWhiteSpace(messageValue.GetString()))
 +        {
 +            return this.BadRequest(new { message = "A valid Seerr media ID, issue type and description are required." });
@@ -113,7 +114,8 @@ diff --git a/Controllers/SeerrController.cs b/Controllers/SeerrController.cs
 +    {
 +        if (issueId <= 0
 +            || request.ValueKind != JsonValueKind.Object
-+            || !request.TryGetProperty("message", out var messageValue)
++             || !request.TryGetProperty("message", out var messageValue)
++            || messageValue.ValueKind != JsonValueKind.String
 +            || string.IsNullOrWhiteSpace(messageValue.GetString()))
 +        {
 +            return this.BadRequest(new { message = "A valid issue ID and comment are required." });
