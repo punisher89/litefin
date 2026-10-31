@@ -34,6 +34,7 @@ export default class SeerrIssueMenu extends BaseMenu {
         this._metadataLoading = false;
         this._metadataError = '';
         this._sending = false;
+        this._message = '';
     }
 
     open(item) {
@@ -54,6 +55,7 @@ export default class SeerrIssueMenu extends BaseMenu {
         this._metadataLoading = !!this._tmdbId;
         this._metadataError = this._tmdbId ? '' : t('SeerrIssueNoTmdb', 'Для этого элемента не найден TMDB ID.');
         this._sending = false;
+        this._message = '';
 
         this._render();
         this.osd.activeMenu = this;
@@ -271,6 +273,7 @@ export default class SeerrIssueMenu extends BaseMenu {
         }
 
         this._sending = true;
+        this._message = message;
         this._render();
         this.show();
         this._syncFocus();
