@@ -3,6 +3,7 @@ import { i18n } from '../../utils/i18n.js';
 import { logger } from '../../utils/Logger.js';
 import { toast } from '../../ui/Toast.js';
 import { escapeHtml } from '../../utils/Utils.js';
+import '../../styles/seerr-issue-menu.css';
 
 const log = logger.create('SeerrIssueMenu');
 
