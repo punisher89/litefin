@@ -12,6 +12,36 @@
    Seerr Card Top-Left Media Type Badges (MOVIE / SERIES)
    ======================================================================== */
 
+/* TMDB source marker below Seerr movie and series poster titles */
+.seerr-tmdb-tag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+    margin: 5px auto 0;
+    line-height: 1;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    pointer-events: none;
+}
+
+.seerr-tmdb-tag__brand {
+    padding: 3px 5px;
+    border-radius: 4px;
+    background: rgba(1, 180, 228, 0.16);
+    color: #01b4e4;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.seerr-tmdb-tag__id {
+    color: var(--jf-text-secondary);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
 .seerr-type-badge {
     position: absolute;
     top: 10px;
