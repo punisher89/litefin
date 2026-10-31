@@ -4628,6 +4628,7 @@ class LibraryPage extends Page {
                 const trackContainer = section.querySelector('.row-items-track');
                 virtualRow = new VirtualCardRow(trackContainer, displayItems, {
                     isLandscape: row.isLandscape || false,
+                    contextType: row.contextType || 'library',
                     cardType: row.cardType || 'poster',
                     visibleCount: row.isLandscape ? 8 : 12,
                     // Eagerly render the first several cards so the row is navigable
