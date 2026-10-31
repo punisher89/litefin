@@ -14,13 +14,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 24px;
+    gap: 0;
     margin: 0 0 28px;
 }
 .seerr-center-brand {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 0;
     min-width: 0;
 }
 .seerr-center-mark {
@@ -61,7 +61,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 9px;
+    gap: 0;
     min-height: 44px;
     padding: 0 18px;
     flex: 0 0 auto;
@@ -76,7 +76,7 @@
 .seerr-center-refresh span { font-size: 22px; }
 .seerr-center-tabs {
     display: flex;
-    gap: 8px;
+    gap: 0;
     align-items: center;
     overflow-x: auto;
     overflow-y: hidden;
@@ -123,7 +123,7 @@
 .seerr-center-stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: 0;
     margin-bottom: 22px;
 }
 .seerr-center-stat {
@@ -132,7 +132,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 0;
     box-sizing: border-box;
     border: 1px solid var(--jf-border, rgba(255,255,255,.12));
     border-radius: var(--jf-border-radius-lg, 16px);
@@ -168,7 +168,7 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: 0;
 }
 .seerr-center-filter {
     min-height: 36px;
@@ -189,7 +189,7 @@
 }
 .seerr-center-request, .seerr-center-watch-card {
     display: flex;
-    gap: 18px;
+    gap: 0;
     padding: 15px 0;
     border-bottom: 1px solid var(--jf-divider, rgba(255,255,255,.08));
 }
@@ -215,7 +215,7 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 9px 13px;
+    gap: 0;
 }
 .seerr-center-request h3, .seerr-center-watch-main strong {
     margin: 0;
@@ -285,7 +285,7 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 5px;
+    gap: 0;
     padding: 16px;
     margin-bottom: 10px;
     border: 1px solid var(--jf-border, rgba(255,255,255,.1));
@@ -333,7 +333,7 @@
     .seerr-center-content { padding: 16px 14px 32px; }
     .seerr-center-header { align-items: flex-start; flex-direction: column; }
     .seerr-center-mark { width: 52px; height: 52px; flex-basis: 52px; border-radius: 15px; }
-    .seerr-center-request, .seerr-center-watch-card { gap: 11px; }
+    .seerr-center-request, .seerr-center-watch-card { gap: 0; }
     .seerr-center-poster { width: 68px; height: 102px; flex-basis: 68px; }
     .seerr-center-request h3, .seerr-center-watch-main strong { font-size: 16px; }
     .seerr-center-panel { padding: 13px; }
@@ -442,5 +442,29 @@
 @media (max-width: 560px) {
     .seerr-center-request-main, .seerr-center-watch-main { margin-left: 11px; }
     .seerr-center-notification { padding: 11px; }
+    .seerr-center-notification-icon { margin-right: 10px; }
+}
+
+
+/* Flexbox spacing fallback for the Chromium 79-based webOS 6 runtime. */
+.seerr-center-header > * + * { margin-left: 24px; }
+.seerr-center-brand > * + * { margin-left: 20px; }
+.seerr-center-refresh > span { margin-right: 9px; }
+.seerr-center-tabs > * + * { margin-left: 8px; }
+.seerr-center-tab > * + * { margin-left: 9px; }
+.seerr-center-stat strong { margin-left: auto; }
+.seerr-center-filter-group > * + * { margin-left: 7px; }
+.seerr-center-request-main, .seerr-center-watch-main { margin-left: 18px; }
+.seerr-center-request-heading .seerr-center-status { margin-left: 13px; }
+.seerr-center-actions > * { margin-right: 8px; margin-bottom: 8px; }
+.seerr-center-issue-card > * + * { margin-top: 5px; }
+.seerr-center-loading .seerr-center-spinner { margin-right: 12px; }
+.seerr-center-notification-icon { margin-right: 14px; }
+.seerr-center-notification-dot { margin-left: 12px; }
+.seerr-center-watch-heading .seerr-center-status { margin-left: 10px; }
+@media (max-width: 560px) {
+    .seerr-center-header > * + * { margin-left: 0; margin-top: 12px; }
+    .seerr-center-brand > * + * { margin-left: 13px; }
+    .seerr-center-request-main, .seerr-center-watch-main { margin-left: 11px; }
     .seerr-center-notification-icon { margin-right: 10px; }
 }
