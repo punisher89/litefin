@@ -469,3 +469,17 @@
     .seerr-center-request-main, .seerr-center-watch-main { margin-left: 11px; }
     .seerr-center-notification-icon { margin-right: 10px; }
 }
+
+
+.seerr-center-issue-description {
+    margin: 13px 0 18px;
+    padding: 14px 16px;
+    border-left: 3px solid var(--jf-accent, #00a4dc);
+    border-radius: 0 var(--jf-border-radius, 9px) var(--jf-border-radius, 9px) 0;
+    color: var(--jf-text-primary, #fff);
+    background: var(--jf-card-bg, rgba(255,255,255,.05));
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
