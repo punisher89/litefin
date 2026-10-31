@@ -1248,7 +1248,7 @@ class CardRenderer {
         const tmdbTagHtml =
             contextType === 'discover' &&
             (item.Type === 'Movie' || item.Type === 'Series') &&
-            /^\\d+$/.test(tmdbId)
+            /^\d+$/.test(tmdbId)
                 ? `<div class="seerr-tmdb-tag" title="The Movie Database ID ${escapeHtml(tmdbId)}"><span class="seerr-tmdb-tag__brand">TMDB</span><span class="seerr-tmdb-tag__id">#${escapeHtml(tmdbId)}</span></div>`
                 : '';
 
