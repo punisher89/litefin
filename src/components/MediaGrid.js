@@ -15,6 +15,7 @@ import { i18n } from '../utils/i18n.js';
 import CardRenderer from '../utils/CardRenderer.js';
 import { lazyLoader } from '../utils/LazyLoader.js';
 import { logger } from '../utils/Logger.js';
+import { prepareEnhancedPosterTags, attachEnhancedPosterTagsToCard } from '../utils/EnhancedPosterTags.js';
 
 const log = logger.create('MediaGrid');
 
@@ -126,6 +127,27 @@ class MediaGrid extends Component {
 
             lazyLoader.observe(this._gridEl);
         }
+
+        // MediaGrid is shared by search and other poster collections. Resolve
+        // tag metadata in one batch, then decorate only cards already mounted.
+        prepareEnhancedPosterTags(this.items, this.contextType || '')
+            .then(() => {
+                const grid = this._gridEl;
+                if (!grid || !grid.isConnected || !this.items) return;
+
+                const itemsById = new Map();
+                for (const item of this.items) {
+                    if (item && item.Id) itemsById.set(String(item.Id), item);
+                }
+                const cards = grid.querySelectorAll('.media-card[data-item-id]');
+                for (let i = 0; i < cards.length; i++) {
+                    const card = cards[i];
+                    attachEnhancedPosterTagsToCard(card, itemsById.get(card.getAttribute('data-item-id')));
+                }
+            })
+            .catch(() => {
+                // Optional poster metadata must never affect grid navigation.
+            });
     }
 
     destroy() {
