@@ -32,3 +32,13 @@
 .startrack-list-toolbar h2 { margin: 0 16px; color: var(--jf-text-primary); }
 .startrack-back { padding: 9px 13px; }
 @media (max-width: 900px) { .startrack-page-content { padding: 22px 18px 32px; } .startrack-header h1 { font-size: 1.7rem; } .startrack-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+
+.startrack-review-author { margin-right: 10px; color: var(--jf-text-primary); font-weight: 700; }
+.startrack-list-create { display: flex; flex-wrap: wrap; align-items: center; margin: 0 0 22px; }
+.startrack-list-control { box-sizing: border-box; min-width: 210px; max-width: 100%; padding: 11px 13px; margin: 0 9px 9px 0; border: 1px solid var(--jf-divider, rgba(255,255,255,.14)); border-radius: 9px; color: var(--jf-text-primary); background: var(--jf-background-alt, rgba(255,255,255,.05)); font: inherit; }
+.startrack-list-control:focus, .startrack-list-delete:focus, .startrack-list-remove:focus { outline: 3px solid var(--jf-accent); outline-offset: 2px; }
+.startrack-list-create-message { flex-basis: 100%; color: var(--jf-text-secondary); font-size: .9rem; }
+.startrack-list-card-wrap { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+.startrack-list-card-wrap .startrack-list-card { width: 100%; }
+.startrack-list-delete { align-self: flex-start; padding: 7px 10px; margin: 7px 0 0; border: 1px solid var(--jf-divider, rgba(255,255,255,.12)); border-radius: 8px; color: var(--jf-text-secondary); background: transparent; cursor: pointer; }
+.startrack-list-remove { margin-left: auto; }
