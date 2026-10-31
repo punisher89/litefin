@@ -1,0 +1,34 @@
+.startrack-page { overflow: hidden; }
+.startrack-page-content { padding: 38px 48px 52px; overflow-y: auto; }
+.startrack-header { display: flex; display: -webkit-flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.startrack-header h1 { margin: 5px 0 8px; font-size: 2.2rem; color: var(--jf-text-primary); }
+.startrack-header p { margin: 0; color: var(--jf-text-secondary); }
+.startrack-eyebrow { color: var(--jf-accent); font-size: .75rem; font-weight: 700; letter-spacing: .13em; }
+.startrack-refresh, .startrack-tab, .startrack-action, .startrack-back, .startrack-list-card { border: 1px solid var(--jf-divider, rgba(255,255,255,.12)); color: var(--jf-text-primary); background: var(--jf-background-alt, rgba(255,255,255,.04)); border-radius: 10px; cursor: pointer; }
+.startrack-refresh { padding: 12px 18px; font-size: 1rem; }
+.startrack-tabs { display: flex; display: -webkit-flex; flex-wrap: wrap; margin: 0 -6px 26px; }
+.startrack-tab { padding: 11px 16px; margin: 0 6px 10px; font-size: 1rem; font-weight: 600; }
+.startrack-tab.active { background: var(--jf-accent); color: #fff; border-color: var(--jf-accent); }
+.startrack-refresh:focus, .startrack-tab:focus, .startrack-action:focus, .startrack-back:focus, .startrack-list-card:focus { outline: 3px solid var(--jf-accent); outline-offset: 2px; }
+.startrack-loading, .startrack-empty, .startrack-error { padding: 54px 22px; text-align: center; color: var(--jf-text-secondary); }
+.startrack-empty h2 { color: var(--jf-text-primary); }
+.startrack-empty-icon { color: var(--jf-accent); font-size: 3rem; }
+.startrack-error { color: var(--jf-error, #e66); }
+.startrack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); grid-column-gap: 22px; grid-row-gap: 28px; align-items: start; }
+.startrack-entry { min-width: 0; max-width: 280px; }
+.startrack-entry > .media-card { display: block; width: 100%; }
+.startrack-entry-meta { display: flex; display: -webkit-flex; flex-wrap: wrap; align-items: center; min-height: 38px; margin-top: 7px; color: var(--jf-text-secondary); font-size: .9rem; }
+.startrack-score { color: #f4c34f; font-weight: 800; margin-right: 11px; }
+.startrack-date, .startrack-entry-label, .startrack-rewatch { margin-right: 10px; margin-bottom: 4px; }
+.startrack-review { display: block; flex-basis: 100%; margin: 5px 0; color: var(--jf-text-secondary); line-height: 1.35; max-height: 3.9em; overflow: hidden; }
+.startrack-rewatch { color: var(--jf-accent); font-weight: 700; }
+.startrack-action { padding: 6px 10px; margin: 5px 0 5px auto; font-size: .82rem; }
+.startrack-list-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); grid-column-gap: 16px; grid-row-gap: 16px; }
+.startrack-list-card { min-height: 145px; padding: 18px; display: flex; display: -webkit-flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.startrack-list-card strong { margin: 8px 0; font-size: 1.2rem; }
+.startrack-list-card small { margin-top: auto; color: var(--jf-accent); }
+.startrack-list-icon { color: var(--jf-accent); font-size: 1.5rem; }
+.startrack-list-toolbar { display: flex; display: -webkit-flex; align-items: center; margin-bottom: 22px; }
+.startrack-list-toolbar h2 { margin: 0 16px; color: var(--jf-text-primary); }
+.startrack-back { padding: 9px 13px; }
+@media (max-width: 900px) { .startrack-page-content { padding: 22px 18px 32px; } .startrack-header h1 { font-size: 1.7rem; } .startrack-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
