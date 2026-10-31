@@ -409,6 +409,28 @@ class AchievementsPage extends Page {
             button.addEventListener('click', () => this._selectMainSection(button.getAttribute('data-game-section')));
         });
 
+        // TV remotes send arrow keys; keep tab navigation predictable and focusable.
+        this.el.querySelectorAll('[role="tablist"]').forEach((tablist) => {
+            const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+            const selected = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true') || tabs[0];
+            tabs.forEach((tab) => tab.setAttribute('tabindex', tab === selected ? '0' : '-1'));
+            tablist.addEventListener('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                const available = Array.from(tablist.querySelectorAll('[role="tab"]'))
+                    .filter((tab) => !tab.disabled && !tab.closest('[hidden]'));
+                if (!available.length) return;
+                const current = Math.max(0, available.indexOf(document.activeElement));
+                let next = current;
+                if (event.key === 'ArrowRight') next = (current + 1) % available.length;
+                if (event.key === 'ArrowLeft') next = (current - 1 + available.length) % available.length;
+                if (event.key === 'Home') next = 0;
+                if (event.key === 'End') next = available.length - 1;
+                event.preventDefault();
+                available[next].focus();
+                available[next].click();
+            });
+        });
+
         const refresh = this.$('#achievements-refresh');
         if (refresh) refresh.addEventListener('click', () => this._load(true));
 
@@ -528,6 +550,8 @@ class AchievementsPage extends Page {
             const active = button.getAttribute('data-game-section') === selected;
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
+            button.setAttribute('tabindex', active ? '0' : '-1');
+            button.setAttribute('tabindex', active ? '0' : '-1');
         });
         this.el.querySelectorAll('[data-game-section-panel]').forEach((panel) => {
             panel.hidden = panel.getAttribute('data-game-section-panel') !== selected;
