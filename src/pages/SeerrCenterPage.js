@@ -65,6 +65,11 @@ export default class SeerrCenterPage extends Page {
         this._items = [];
         this._issues = [];
         this._issueFilter = 'open';
+        this._issueSort = 'added';
+        this._issuePageSize = 20;
+        this._issueSkip = 0;
+        this._issuePageInfo = null;
+        this._issueMediaDetails = new Map();
         this._watchlist = [];
         this._watchlistFilter = 'all';
         this._watchlistSort = 'release';
@@ -90,11 +95,10 @@ export default class SeerrCenterPage extends Page {
                 <main class="page-content seerr-center-content">
                     <header class="seerr-center-header">
                         <div class="seerr-center-brand">
-                            <div class="seerr-center-mark" aria-hidden="true">S</div>
-                            <div>
-                                <div class="seerr-center-eyebrow">LITEFIN <span>/</span> SEERR</div>
-                                <h1>${escapeHtml(tr('SeerrCenterTitle', 'Центр Seerr'))}</h1>
-                                <p>${escapeHtml(tr('SeerrCenterSubtitle', 'Запросы, проблемы, уведомления и список просмотра в одном месте.'))}</p>
+                            <div class="seerr-center-heading-copy">
+                                <div class="seerr-center-eyebrow">SEERR <span>/</span> LITEFIN</div>
+                                <h1 id="seerr-center-title">${escapeHtml(tr('SeerrCenterTab_requests', 'Запросы'))}</h1>
+                                <p id="seerr-center-subtitle">${escapeHtml(tr('SeerrCenterRequestsSubtitle', 'Управление запросами фильмов и сериалов.'))}</p>
                             </div>
                         </div>
                         <button type="button" class="seerr-center-refresh focusable" data-center-action="refresh" tabindex="0">
@@ -150,6 +154,24 @@ export default class SeerrCenterPage extends Page {
     }
 
     _bindEvents() {
+        this.el.addEventListener('change', (event) => {
+            const select = event.target && event.target.closest ? event.target.closest('[data-center-select]') : null;
+            if (!select) return;
+            const type = select.getAttribute('data-center-select');
+            if (type === 'issue-filter') this._issueFilter = select.value || 'open';
+            else if (type === 'issue-sort') this._issueSort = select.value || 'added';
+            else if (type === 'issue-page-size') this._issuePageSize = Math.max(5, Math.min(100, Number(select.value) || 20));
+            else if (type === 'request-filter') this._filter = select.value || 'all';
+            else if (type === 'request-media') this._mediaFilter = select.value || 'all';
+            else return;
+            if (type.startsWith('issue-')) {
+                this._issueSkip = 0;
+                void this._loadIssues(false);
+            } else {
+                this._skip = 0;
+                void this._loadRequests(false);
+            }
+        });
         this.el.addEventListener('click', (event) => {
             const target = event.target && event.target.closest ? event.target.closest('button,[data-request-id],[data-issue-id],[data-watchlist-id]') : null;
             if (!target) return;
@@ -169,6 +191,11 @@ export default class SeerrCenterPage extends Page {
             if (action === 'load-more') {
                 this._skip += 20;
                 void this._loadRequests(true);
+                return;
+            }
+            if (action === 'issue-load-more') {
+                this._issueSkip += this._issuePageSize;
+                void this._loadIssues(true);
                 return;
             }
             if (action === 'filter') {
@@ -260,7 +287,8 @@ export default class SeerrCenterPage extends Page {
             if (tab === 'requests') {
                 await Promise.all([this._loadRequests(false), this._loadCounts()]);
             } else if (tab === 'issues') {
-                await this._loadIssues();
+                this._issueSkip = 0;
+                await this._loadIssues(false);
             } else if (tab === 'watchlist') {
                 await this._loadWatchlist(force);
             } else {
@@ -280,6 +308,17 @@ export default class SeerrCenterPage extends Page {
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
         });
+        const headings = {
+            requests: ['SeerrCenterTab_requests', 'SeerrCenterRequestsSubtitle'],
+            issues: ['SeerrCenterTab_issues', 'SeerrCenterIssuesSubtitle'],
+            notifications: ['SeerrCenterTab_notifications', 'SeerrCenterNotificationsSubtitle'],
+            watchlist: ['SeerrCenterTab_watchlist', 'SeerrCenterWatchlistSubtitle']
+        };
+        const keys = headings[this._tab] || headings.requests;
+        const title = this.$('#seerr-center-title');
+        const subtitle = this.$('#seerr-center-subtitle');
+        if (title) title.textContent = tr(keys[0], this._tab);
+        if (subtitle) subtitle.textContent = tr(keys[1], '');
     }
 
     async _loadCounts() {
@@ -370,9 +409,13 @@ export default class SeerrCenterPage extends Page {
         const currentPage = Math.floor(this._skip / 20) + 1;
         const canLoadMore = this._items.length > 0 && (Number(result.totalResults || 0) > this._items.length || currentPage < Number(result.pages || 1));
         el.innerHTML = `
-            <div class="seerr-center-filters">
-                <div class="seerr-center-filter-group">${filters.map(([key, label]) => `<button type="button" class="seerr-center-filter${key === this._filter ? ' active' : ''}" data-center-action="filter" data-filter="${key}" tabindex="0">${escapeHtml(label)}</button>`).join('')}</div>
-                <div class="seerr-center-filter-group compact">${mediaFilters.map(([key, label]) => `<button type="button" class="seerr-center-filter${key === this._mediaFilter ? ' active' : ''}" data-center-action="media-filter" data-media-filter="${key}" tabindex="0">${escapeHtml(label)}</button>`).join('')}</div>
+            <div class="seerr-center-toolbar">
+                <label class="seerr-center-select-wrap"><span class="seerr-center-select-icon">⌕</span>
+                    <select class="seerr-center-select" data-center-select="request-filter" tabindex="0">${filters.map(([key, label]) => `<option value="${key}"${key === this._filter ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>
+                </label>
+                <label class="seerr-center-select-wrap"><span class="seerr-center-select-icon">▤</span>
+                    <select class="seerr-center-select" data-center-select="request-media" tabindex="0">${mediaFilters.map(([key, label]) => `<option value="${key}"${key === this._mediaFilter ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>
+                </label>
             </div>
             ${cards || `<div class="seerr-center-empty"><span>▤</span><strong>${escapeHtml(tr('SeerrCenterNoRequests', 'Запросов пока нет'))}</strong><p>${escapeHtml(tr('SeerrCenterNoRequestsDesc', 'Когда появятся запросы, они будут отображаться здесь.'))}</p></div>`}
             ${canLoadMore ? `<div class="seerr-center-more"><button class="seerr-center-action" type="button" data-center-action="load-more" tabindex="0">${escapeHtml(tr('LoadMore', 'Загрузить ещё'))}</button></div>` : ''}
@@ -406,7 +449,7 @@ export default class SeerrCenterPage extends Page {
         }
     }
 
-    async _loadIssues() {
+    async _loadIssues(append = false) {
         const userId = this._currentUser?.id;
         const requestedBy = this._canViewIssues ? null : userId;
         if (!this._canViewIssues && requestedBy == null) {
@@ -414,9 +457,29 @@ export default class SeerrCenterPage extends Page {
             this._renderIssues();
             return;
         }
-        const payload = await seerr.issues(40, 0, this._issueFilter, requestedBy);
-        this._issues = Array.isArray(payload) ? payload : (payload?.results || []);
+        const payload = await seerr.issues(this._issuePageSize, append ? this._issueSkip : 0, this._issueFilter, this._issueSort);
+        const incoming = Array.isArray(payload) ? payload : (payload?.results || []);
+        this._issues = append ? this._issues.concat(incoming) : incoming;
+        this._issuePageInfo = payload?.pageInfo || null;
+        await this._loadIssueMediaDetails();
         this._renderIssues();
+    }
+
+    async _loadIssueMediaDetails() {
+        const candidates = this._issues
+            .filter((issue) => issue?.media?.tmdbId && !this._issueMediaDetails.has(String(issue.id)))
+            .slice(0, 8);
+        await Promise.all(candidates.map(async (issue) => {
+            try {
+                const mediaType = String(issue.media.mediaType || '').toLowerCase() === 'tv' ||
+                    Number(issue.media.mediaType) === 2 ? 'tv' : 'movie';
+                const detail = await seerr.details(mediaType, issue.media.tmdbId);
+                this._issueMediaDetails.set(String(issue.id), detail);
+            } catch (error) {
+                this._issueMediaDetails.set(String(issue.id), null);
+                log.debug('Could not enrich Seerr issue card media details', error);
+            }
+        }));
     }
 
     _renderIssues() {
@@ -444,28 +507,73 @@ export default class SeerrCenterPage extends Page {
             this._registerFocus();
             return;
         }
-        const issueFilters = [
+        const filterOptions = [
             ['open', tr('SeerrCenterIssueFilterOpen', 'Открытые')],
             ['resolved', tr('SeerrCenterIssueFilterResolved', 'Решённые')],
             ['all', tr('SeerrCenterIssueFilterAll', 'Все')]
         ];
+        const sortOptions = [
+            ['added', tr('SeerrCenterIssueSortAdded', 'Сначала новые')],
+            ['modified', tr('SeerrCenterIssueSortModified', 'Последнее изменение')]
+        ];
         const cards = this._issues.map((issue) => {
-            const title = issue.media?.title || issue.media?.name || (issue.media?.tmdbId ? `TMDB #${issue.media.tmdbId}` : `#${issue.id}`);
-            const lastComment = issue.comments?.length ? issue.comments[issue.comments.length - 1].message : (issue.message || '');
+            const media = this._issueMediaDetails.get(String(issue.id)) || {};
+            const title = media.Name || issue.media?.title || issue.media?.name || (issue.media?.tmdbId ? `TMDB #${issue.media.tmdbId}` : `#${issue.id}`);
+            const description = issue.comments?.[0]?.message || issue.message || '';
+            const preview = description.length > 180 ? `${description.slice(0, 177)}…` : description;
+            const issueType = issueTypeLabel(issue.issueType);
+            const isResolved = Number(issue.status) === 2;
+            const mediaType = String(issue.media?.mediaType || '').toLowerCase() === 'tv' || Number(issue.media?.mediaType) === 2 ? tr('Series', 'Сериал') : tr('Movie', 'Фильм');
+            const seasonLine = media._mediaType === 'tv' ? `
+                <span class="seerr-center-issue-tag">${escapeHtml(tr('SeerrIssueSeason', 'Сезон'))}: ${Number(issue.problemSeason) > 0 ? Number(issue.problemSeason) : escapeHtml(tr('All', 'Все'))}</span>
+                ${Number(issue.problemSeason) > 0 ? `<span class="seerr-center-issue-tag">${escapeHtml(tr('SeerrIssueEpisode', 'Эпизод'))}: ${Number(issue.problemEpisode) > 0 ? Number(issue.problemEpisode) : escapeHtml(tr('All', 'Все'))}</span>` : ''}
+            ` : '';
+            const openedBy = issue.createdBy?.displayName || issue.createdBy?.username || tr('UnknownUser', 'Пользователь');
+            const backdrop = media._backdropUrl || '';
+            const poster = media._imageUrl || '';
             return `
-                <button type="button" class="seerr-center-issue-card" data-center-action="issue-open" data-issue-id="${escapeHtml(issue.id)}" tabindex="0">
-                    <span class="seerr-center-issue-type">${escapeHtml(issueTypeLabel(issue.issueType))}</span>
-                    <strong>${escapeHtml(title)}</strong>
-                    <span class="seerr-center-meta">${escapeHtml(issue.createdBy?.displayName || issue.createdBy?.username || tr('UnknownUser', 'Пользователь'))} · #${escapeHtml(issue.id)}</span>
-                    ${lastComment ? `<span class="seerr-center-issue-preview">${escapeHtml(lastComment)}</span>` : ''}
-                </button>
+                <article class="seerr-center-issue-card${backdrop ? ' has-backdrop' : ''}">
+                    ${backdrop ? `<div class="seerr-center-issue-backdrop" style="background-image:url('${escapeHtml(backdrop)}')"></div>` : ''}
+                    <button type="button" class="seerr-center-issue-main" data-center-action="issue-open" data-issue-id="${escapeHtml(issue.id)}" tabindex="0">
+                        ${poster ? `<span class="seerr-center-issue-poster"><img src="${escapeHtml(poster)}" alt="" loading="lazy"></span>` : '<span class="seerr-center-issue-poster placeholder">▣</span>'}
+                        <span class="seerr-center-issue-copy">
+                            <span class="seerr-center-issue-year">${escapeHtml(media.ProductionYear || '')} · ${escapeHtml(mediaType)}</span>
+                            <strong>${escapeHtml(title)}</strong>
+                            <span class="seerr-center-issue-preview">${escapeHtml(preview || tr('SeerrCenterNoIssueDescription', 'Описание не добавлено'))}</span>
+                            <span class="seerr-center-issue-tags">
+                                <span class="seerr-center-issue-tag">${escapeHtml(issueType)}</span>
+                                ${seasonLine}
+                            </span>
+                        </span>
+                    </button>
+                    <div class="seerr-center-issue-side">
+                        <div class="seerr-center-issue-fact"><small>${escapeHtml(tr('SeerrCenterIssueStatus', 'Статус'))}</small><span class="seerr-center-status ${isResolved ? 'available' : 'pending'}">${escapeHtml(isResolved ? tr('SeerrCenterIssueResolved', 'Решено') : tr('SeerrCenterIssueOpen', 'Открыто'))}</span></div>
+                        <div class="seerr-center-issue-fact"><small>${escapeHtml(tr('SeerrCenterIssueType', 'Тип проблемы'))}</small><strong>${escapeHtml(issueType)}</strong></div>
+                        <div class="seerr-center-issue-fact"><small>${escapeHtml(tr('SeerrCenterIssueOpenedBy', 'Открыл'))}</small><strong>${escapeHtml(openedBy)}</strong><small>${escapeHtml(dateLabel(issue.createdAt))}</small></div>
+                        <button type="button" class="seerr-center-action primary seerr-center-issue-view" data-center-action="issue-open" data-issue-id="${escapeHtml(issue.id)}" tabindex="0">${escapeHtml(tr('SeerrCenterViewIssue', 'Открыть обращение'))}</button>
+                    </div>
+                </article>
             `;
         }).join('');
+        const pageInfo = this._issuePageInfo || {};
+        const shown = this._issues.length;
+        const total = Number(pageInfo.results || shown);
+        const canLoadMore = total > shown && shown > 0;
         el.innerHTML = `
-            <div class="seerr-center-filters"><div class="seerr-center-filter-group">
-                ${issueFilters.map(([key, label]) => `<button type="button" class="seerr-center-filter${key === this._issueFilter ? ' active' : ''}" data-center-action="issue-filter" data-filter="${key}" tabindex="0">${escapeHtml(label)}</button>`).join('')}
-            </div></div>
+            <div class="seerr-center-toolbar seerr-center-issue-toolbar">
+                <label class="seerr-center-select-wrap"><span class="seerr-center-select-icon">⌕</span>
+                    <select class="seerr-center-select" data-center-select="issue-filter" tabindex="0">${filterOptions.map(([key,label]) => `<option value="${key}"${key === this._issueFilter ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>
+                </label>
+                <label class="seerr-center-select-wrap"><span class="seerr-center-select-icon">↕</span>
+                    <select class="seerr-center-select" data-center-select="issue-sort" tabindex="0">${sortOptions.map(([key,label]) => `<option value="${key}"${key === this._issueSort ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>
+                </label>
+                <label class="seerr-center-page-size"><span>${escapeHtml(tr('SeerrCenterResultsPerPage', 'На странице'))}</span>
+                    <select class="seerr-center-select small" data-center-select="issue-page-size" tabindex="0">${[10,20,50,100].map((size) => `<option value="${size}"${size === this._issuePageSize ? ' selected' : ''}>${size}</option>`).join('')}</select>
+                </label>
+                <span class="seerr-center-result-count">${escapeHtml(tr('SeerrCenterShowingResults', 'Показано'))} <strong>${shown}</strong> / ${total}</span>
+            </div>
             ${cards || `<div class="seerr-center-empty"><span>⚑</span><strong>${escapeHtml(tr('SeerrCenterNoIssues', 'Открытых проблем нет'))}</strong><p>${escapeHtml(tr('SeerrCenterNoIssuesDesc', 'Сообщения о проблемах с воспроизведением будут отображаться здесь.'))}</p></div>`}
+            ${canLoadMore ? `<div class="seerr-center-more"><button class="seerr-center-action" type="button" data-center-action="issue-load-more" tabindex="0">${escapeHtml(tr('LoadMore', 'Загрузить ещё'))}</button></div>` : ''}
         `;
         this._registerFocus();
     }
@@ -674,7 +782,7 @@ export default class SeerrCenterPage extends Page {
         const panel = this.$('#seerr-center-panel');
         if (!panel) return;
         this.registerFocusSection('seerr-center-content', panel, {
-            focusSelector: 'button:not([disabled]), textarea, input',
+            focusSelector: 'button:not([disabled]), textarea, input, select',
             trap: false
         });
         this.setActiveSection('seerr-center-content');
