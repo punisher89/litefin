@@ -1844,5 +1844,18 @@
     "SeerrCenterIssueFilterResolved": "Resolved",
     "SeerrCenterIssueOpen": "Open",
     "SeerrCenterIssueResolved": "Resolved",
-    "SeerrCenterReopenIssue": "Reopen issue"
+    "SeerrCenterReopenIssue": "Reopen issue",
+    "SeerrCenterRequestsSubtitle": "Manage movie and TV requests.",
+    "SeerrCenterIssuesSubtitle": "Review reports, comments and issue status.",
+    "SeerrCenterNotificationsSubtitle": "Request status updates and new issue replies.",
+    "SeerrCenterWatchlistSubtitle": "Track movies and series awaiting release or request.",
+    "SeerrCenterIssueSortAdded": "Most recent",
+    "SeerrCenterIssueSortModified": "Last modified",
+    "SeerrCenterResultsPerPage": "Per page",
+    "SeerrCenterShowingResults": "Showing",
+    "SeerrCenterIssueStatus": "Status",
+    "SeerrCenterIssueType": "Issue type",
+    "SeerrCenterIssueOpenedBy": "Opened by",
+    "SeerrCenterViewIssue": "View issue",
+    "SeerrCenterNoIssueDescription": "No description provided"
 }
