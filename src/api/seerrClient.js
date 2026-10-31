@@ -613,8 +613,24 @@ export class SeerrClient {
         }).filter(Boolean);
 
         const pageInfo = payload && payload.pageInfo ? payload.pageInfo : {};
+        const enriched = await Promise.all(items.map(async (item) => {
+            if (item._imageUrl && item.Name) return item;
+            try {
+                const detail = await this.details(item._mediaType, item._tmdbId);
+                return detail ? {
+                    ...detail,
+                    ...item,
+                    Name: item.Name || detail.Name,
+                    _imageUrl: item._imageUrl || detail._imageUrl,
+                    _backdropUrl: item._backdropUrl || detail._backdropUrl
+                } : item;
+            } catch (error) {
+                log.debug('Unable to enrich Seerr request card', error);
+                return item;
+            }
+        }));
         return {
-            items,
+            items: enriched,
             pageInfo,
             totalResults: Number(pageInfo.results || pageInfo.totalResults || items.length),
             page: Number(pageInfo.page || 1),
@@ -679,7 +695,7 @@ export class SeerrClient {
     }
 
     async updateIssueStatus(issueId, status) {
-        if (!['approve', 'decline'].includes(status)) throw new Error('Unsupported Seerr issue action');
+        if (!['open', 'resolved'].includes(status)) throw new Error('Unsupported Seerr issue action');
         return this._request(`/issue/${encodeURIComponent(issueId)}/${status}`, { method: 'POST', body: {} });
     }
 
