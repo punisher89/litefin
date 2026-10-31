@@ -60,19 +60,64 @@ export default class StarTrackPage extends Page {
     _t(ru, en) { return this._ru() ? ru : en; }
 
     render() {
-        const tabs = TABS.map((tab) => '<button class="startrack-tab' +
-            (tab[0] === this._tab ? ' active' : '') + '" type="button" tabindex="0" data-startrack-tab="' +
-            tab[0] + '">' + this._t(tab[1], tab[2]) + '</button>').join('');
+        const icons = {
+            ratings: '★',
+            reviews: '✎',
+            watchlist: '◷',
+            diary: '▦',
+            favorites: '✦',
+            likes: '♥',
+            recommendations: '✧',
+            lists: '☷'
+        };
+        const tabs = TABS.map((tab) => {
+            const active = tab[0] === this._tab;
+            return '<button class="startrack-tab' + (active ? ' active' : '') +
+                '" type="button" role="tab" aria-selected="' + (active ? 'true' : 'false') +
+                '" tabindex="0" data-startrack-tab="' + tab[0] + '">' +
+                '<span class="startrack-tab-icon" aria-hidden="true">' + icons[tab[0]] + '</span>' +
+                '<span>' + this._t(tab[1], tab[2]) + '</span></button>';
+        }).join('');
         return '<div class="page startrack-page"><main class="page-content startrack-page-content">' +
-            '<header class="startrack-header"><div><div class="startrack-eyebrow">STARTRACK · PERSONAL MOVIE JOURNAL</div>' +
-            '<h1>' + this._t('Моя киноколлекция', 'My Movie Journal') + '</h1>' +
-            '<p>' + this._t('Оценки, список просмотра, дневник и персональные рекомендации.',
-                'Your ratings, watchlist, diary and personal recommendations.') + '</p></div>' +
-            '<button class="startrack-refresh" id="startrack-refresh" type="button" tabindex="0">↻ ' +
-            this._t('Обновить', 'Refresh') + '</button></header>' +
-            '<nav class="startrack-tabs" id="startrack-tabs">' + tabs + '</nav>' +
+            '<header class="startrack-header">' +
+                '<div class="startrack-heading">' +
+                    '<div class="startrack-brand-mark" aria-hidden="true">★</div>' +
+                    '<div class="startrack-heading-copy">' +
+                        '<div class="startrack-eyebrow"><span>STARTRACK</span><span class="startrack-eyebrow-divider">/</span><span>' +
+                            this._t('ЛИЧНАЯ КИНОТЕКА', 'PERSONAL MOVIE JOURNAL') + '</span></div>' +
+                        '<h1>' + this._t('Моя киноколлекция', 'My Movie Journal') + '</h1>' +
+                        '<p>' + this._t('Оценки, список просмотра, дневник и персональные рекомендации.',
+                            'Your ratings, watchlist, diary and personal recommendations.') + '</p>' +
+                    '</div>' +
+                '</div>' +
+                '<button class="startrack-refresh focusable" id="startrack-refresh" type="button" tabindex="0">' +
+                    '<span class="startrack-refresh-icon" aria-hidden="true">↻</span>' + this._t('Обновить', 'Refresh') +
+                '</button>' +
+            '</header>' +
+            '<nav class="startrack-tabs" id="startrack-tabs" role="tablist" aria-label="' +
+                this._t('Разделы StarTrack', 'StarTrack sections') + '">' + tabs + '</nav>' +
             '<section class="startrack-content" id="startrack-content" aria-live="polite">' +
-            '<div class="startrack-loading">' + this._t('Загружаем…', 'Loading…') + '</div>' +
+                '<div class="startrack-loading"><span class="startrack-loading-mark" aria-hidden="true">★</span>' +
+                    '<span>' + this._t('Загружаем…', 'Loading…') + '</span></div>' +
+            '</section></main></div>';
+    }
+
+</span><span>' +
+                            this._t('ЛИЧНАЯ КИНОТЕКА', 'PERSONAL MOVIE JOURNAL') + '</span></div>' +
+                        '<h1>' + this._t('Моя киноколлекция', 'My Movie Journal') + '</h1>' +
+                        '<p>' + this._t('Оценки, список просмотра, дневник и персональные рекомендации.',
+                            'Your ratings, watchlist, diary and personal recommendations.') + '</p>' +
+                    '</div>' +
+                '</div>' +
+                '<button class="startrack-refresh focusable" id="startrack-refresh" type="button" tabindex="0">' +
+                    '<span class="startrack-refresh-icon" aria-hidden="true">↻</span>' + this._t('Обновить', 'Refresh') +
+                '</button>' +
+            '</header>' +
+            '<nav class="startrack-tabs" id="startrack-tabs" role="tablist" aria-label="' +
+                this._t('Разделы StarTrack', 'StarTrack sections') + '">' + tabs + '</nav>' +
+            '<section class="startrack-content" id="startrack-content" aria-live="polite">' +
+                '<div class="startrack-loading"><span class="startrack-loading-mark" aria-hidden="true">★</span>' +
+                    '<span>' + this._t('Загружаем…', 'Loading…') + '</span></div>' +
             '</section></main></div>';
     }
 
