@@ -1244,19 +1244,22 @@ class CardRenderer {
         titleText = escapeHtml(titleText);
         subtitleText = escapeHtml(subtitleText);
 
-        // Discover's Seerr movie and series cards carry their TMDB score already.
-        // Keep it inline with the year/secondary label, without a separate row or brand text.
+        // Discover cards show their resolved TMDB score; related-content cards
+        // on Details pages show the Jellyfin/normalized TMDB community score when
+        // the user's score-visibility preference allows it.
         const rawTmdbId = item._tmdbId;
         const tmdbId = rawTmdbId === null || rawTmdbId === undefined ? '' : String(rawTmdbId).trim();
         const hasTmdbId = tmdbId !== '' && Number.isFinite(Number(tmdbId)) && Number(tmdbId) > 0;
         const tmdbRating = Number(item.CommunityRating);
+        const isMovieOrSeriesCard = item.Type === 'Movie' || item.Type === 'Series';
+        const isDiscoverRating = contextType === 'discover' && hasTmdbId;
+        const isDetailsRowRating = contextType === 'details-row' && shouldShowScore(item);
         const tmdbRatingInlineHtml =
-            contextType === 'discover' &&
-            (item.Type === 'Movie' || item.Type === 'Series') &&
-            hasTmdbId &&
+            isMovieOrSeriesCard &&
             Number.isFinite(tmdbRating) &&
-            tmdbRating > 0
-                ? `<span class="seerr-discover-rating" title="Rating"><span class="seerr-discover-rating__star">★</span>${tmdbRating.toFixed(1)}</span>`
+            tmdbRating > 0 &&
+            (isDiscoverRating || isDetailsRowRating)
+                ? `<span class="${isDiscoverRating ? 'seerr-discover-rating' : 'card-subtitle-rating'}" title="Rating"><span class="${isDiscoverRating ? 'seerr-discover-rating__star' : 'card-subtitle-rating__star'}">${isDiscoverRating ? '★' : detailsIcons.ratingStar}</span>${tmdbRating.toFixed(1)}</span>`
                 : '';
 
         // --- 3.5. List View Override ---
