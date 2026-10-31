@@ -658,7 +658,6 @@ export class SeerrClient {
             mediaType: 'all'
         });
         const permissionBits = Number(currentUser.permissions || 0);
-        const canViewAllIssues = !!(permissionBits & (2 | 1048576 | 2097152));
         const issueParams = new URLSearchParams({
             take: '30',
             skip: '0',
@@ -666,14 +665,11 @@ export class SeerrClient {
             sortDirection: 'desc',
             filter: 'open'
         });
-        if (!canViewAllIssues && currentUser.id != null) {
-            issueParams.set('requestedBy', String(currentUser.id));
-        }
 
         const requestPayload = await this._request(`/request?${requestParams.toString()}`, { noCache: true });
         let issuePayload = null;
         try {
-            issuePayload = await this._request(`/issue?${issueParams.toString()}`, { noCache: true });
+            issuePayload = await this._request(`/Issues?${issueParams.toString()}`, { noCache: true });
         } catch (error) {
             // Some Seerr roles cannot browse issues. Request status notifications
             // should continue even when the issue endpoint is not permitted.
@@ -705,37 +701,47 @@ export class SeerrClient {
         return this._request(`/request/${encodeURIComponent(requestId)}/${action}`, { method: 'POST', body: {} });
     }
 
-    /** Lists Seerr issues; requestedBy restricts regular users to their own reports. */
-    async issues(take = 30, skip = 0, filter = 'open', requestedBy = null) {
+    /** Lists issues through the Jellyfin companion proxy, which scopes the upstream Seerr user. */
+    async issues(take = 30, skip = 0, filter = 'open') {
         const params = new URLSearchParams({
             take: String(take),
             skip: String(skip),
             sort: 'modified',
-            sortDirection: 'desc',
             filter: String(filter || 'open')
         });
-        if (requestedBy != null) params.set('requestedBy', String(requestedBy));
-        return this._request(`/issue?${params.toString()}`);
+        return this._request(`/Issues?${params.toString()}`);
     }
 
     async issueDetails(issueId) {
-        return this._request(`/issue/${encodeURIComponent(issueId)}`);
+        return this._request(`/Issues/${encodeURIComponent(issueId)}`);
     }
 
-    async createIssue({ mediaId, issueType, message }) {
-        if (!mediaId || ![1, 2, 3, 4].includes(Number(issueType)) || !String(message || '').trim()) {
-            throw new Error('A media item, issue type and message are required');
+    async createIssue({ mediaId, issueType, message, problemSeason = 0, problemEpisode = 0 }) {
+        const internalMediaId = Number(mediaId);
+        const type = Number(issueType);
+        const description = String(message || '').trim();
+        if (!Number.isInteger(internalMediaId) || internalMediaId <= 0 ||
+            ![1, 2, 3, 4].includes(type) || !description) {
+            throw new Error('A registered Seerr media item, issue type and message are required');
         }
-        return this._request('/issue', {
+        const season = Math.max(0, Number(problemSeason) || 0);
+        const episode = Math.max(0, Number(problemEpisode) || 0);
+        return this._request('/Issues', {
             method: 'POST',
-            body: { mediaId: Number(mediaId), issueType: Number(issueType), message: String(message).trim() }
+            body: {
+                mediaId: internalMediaId,
+                issueType: type,
+                message: description,
+                problemSeason: season,
+                problemEpisode: season > 0 ? episode : 0
+            }
         });
     }
 
     async commentIssue(issueId, message) {
         const text = String(message || '').trim();
         if (!text) throw new Error('Comment cannot be empty');
-        return this._request(`/issue/${encodeURIComponent(issueId)}/comment`, {
+        return this._request(`/Issues/${encodeURIComponent(issueId)}/Comments`, {
             method: 'POST',
             body: { message: text }
         });
@@ -743,7 +749,7 @@ export class SeerrClient {
 
     async updateIssueStatus(issueId, status) {
         if (!['open', 'resolved'].includes(status)) throw new Error('Unsupported Seerr issue action');
-        return this._request(`/issue/${encodeURIComponent(issueId)}/${status}`, { method: 'POST', body: {} });
+        return this._request(`/Issues/${encodeURIComponent(issueId)}/Status/${status}`, { method: 'POST', body: {} });
     }
 
     async getRatingsCombined(mediaType, tmdbId) {
