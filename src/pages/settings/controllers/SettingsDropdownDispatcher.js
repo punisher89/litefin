@@ -157,6 +157,12 @@ export class SettingsDropdownDispatcher {
             'display-scale-select': () => layoutManager.setDisplayScale(newValue),
             'text-scale-select': () => layoutManager.setTextScale(newValue),
             'card-label-scale-select': () => layoutManager.setCardLabelScale(newValue),
+            'card-label-align-select': () => {
+                // The CSS alignment engine reads this root attribute. Persist and
+                // update it immediately so the selected option takes effect now.
+                storage.setItem(settingConfig.key, newValue);
+                document.documentElement.setAttribute('data-card-label-align', newValue);
+            },
             'hero-carousel-vignette-select': () => layoutManager.setHeroVignette(newValue),
             'theme-mode-select': () => {
                 layoutManager.setThemeMode(newValue);
