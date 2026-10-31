@@ -21,7 +21,7 @@ test('Seerr Center is registered as a lazy route and available from the sidebar'
 
 test('Seerr Center uses Seerr request APIs and the correct role permissions', () => {
     assert.ok(api.includes('async requestQueue('));
-    assert.ok(api.includes("async requestCounts()\"));
+    assert.ok(api.includes("async requestCounts()"));
     assert.ok(api.includes("/request/count"));
     assert.ok(api.includes('async moderateRequest('));
     assert.ok(api.includes("/request/${encodeURIComponent(requestId)}/retry"));
