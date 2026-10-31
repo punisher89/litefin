@@ -80,6 +80,10 @@ const BUNDLED_PLUGINS = [
     {
         id: 'mdblist-ratings',
         load: () => import('./installed/mdblist-ratings/index.js')
+    },
+    {
+        id: 'startrack',
+        load: () => import('./installed/startrack/index.js')
     }
 ];
 
