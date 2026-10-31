@@ -155,6 +155,10 @@ test('ServerPluginClient: server-wide probes run without an item while item-scop
         const introSkipper = await serverPluginClient._probeEndpoint('intro-skipper', null);
         assert.equal(introSkipper.available, false);
         assert.equal(introSkipper.deferred, true);
+
+        const openSubtitles = await serverPluginClient._probeEndpoint('open-subtitles', null);
+        assert.equal(openSubtitles.available, false);
+        assert.equal(openSubtitles.deferred, true);
         assert.deepEqual(requested, ['/Plugins/StarTrack/Stats']);
     } finally {
         serverPluginClient._api = originalApi;
