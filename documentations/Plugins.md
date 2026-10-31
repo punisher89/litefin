@@ -182,8 +182,8 @@ Litefin includes a lightweight adapter for poster tags:
 - Homepage integration: `src/pages/HomePage.js`
 - Card integration: `src/utils/CardRenderer.js`
 
-The adapter reads the public plugin configuration and the active user's settings, then requests tag metadata through `POST /JellyfinEnhanced/tag-data/{userId}` in batches of up to 200 item IDs. It respects the server's Native Poster Tags master switch, per-user opt-out, supported tag groups and configured positions. Metadata is cached per user for the current homepage visit; it is refreshed on the next homepage load so Spoiler Guard and library-access filtering are re-evaluated.
+The adapter reads the public plugin configuration and the active user's settings, then requests tag metadata through `POST /JellyfinEnhanced/tag-data/{userId}` in batches of up to 200 item IDs. It respects the server's Native Poster Tags master switch, per-user opt-out, supported tag groups and configured positions. Settings are cached for 5 minutes, item metadata for 10 minutes, and negative results for 2 minutes. The item cache is cleared when a new homepage render pipeline starts so Spoiler Guard and library-access filtering are re-evaluated.
 
 If an item's Primary image tag already contains Jellyfin Enhanced's native `-jet` token, Litefin leaves that image to the server compositor and does not draw a second HTML overlay. This avoids duplicate tags. The client adapter does not load Jellyfin Enhanced's injected web scripts, which avoids relying on JavaScript syntax unsupported by older TV browser engines.
 
-The first adapter pass renders quality, genre, language, rating, and age-rating groups on homepage rows. Details-page, search-page, and library-grid integration remain separate follow-up work.
+The adapter renders quality, genre, language, rating, and age-rating groups on homepage rows, shared `MediaGrid` search/result cards, virtualized horizontal rows (including Discover and Favorites), and the Library page grid. Existing server-stamped native posters are left untouched. The adapter decorates already-rendered virtual cards in place, preserving TV focus and avoiding a full row rebuild.
