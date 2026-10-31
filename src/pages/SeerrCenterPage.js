@@ -360,7 +360,8 @@ export default class SeerrCenterPage extends Page {
                 </article>
             `;
         }).join('');
-        const canLoadMore = this._items.length >= 20 && (result.pages > 1 ? this._skip / 20 + 1 < result.pages : true);
+        const currentPage = Math.floor(this._skip / 20) + 1;
+        const canLoadMore = this._items.length > 0 && (Number(result.totalResults || 0) > this._items.length || currentPage < Number(result.pages || 1));
         el.innerHTML = `
             <div class="seerr-center-filters">
                 <div class="seerr-center-filter-group">${filters.map(([key, label]) => `<button type="button" class="seerr-center-filter${key === this._filter ? ' active' : ''}" data-center-action="filter" data-filter="${key}" tabindex="0">${escapeHtml(label)}</button>`).join('')}</div>
