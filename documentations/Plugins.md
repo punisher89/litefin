@@ -196,8 +196,11 @@ Litefin includes a native StarTrack client bridge when the StarTrack Jellyfin se
 - The **My Ratings** navigation entry appears only after the server plugin is detected.
 - The page uses the authenticated `/Plugins/StarTrack/*` JSON API; it does not embed StarTrack's injected Jellyfin Web JavaScript or put the access token in a URL.
 - Ratings, watchlist, diary, favourites, liked titles, recommendations and lists are hydrated through a batched Jellyfin `/Items?Ids=...` request.
-- The media details page adds a TV-remote-friendly StarTrack panel: 0.5-step rating selection, save/remove rating, watchlist toggle, and like toggle. The panel stays hidden unless the server plugin is active.
-- Removing a rating, watchlist entry, like or diary entry uses the corresponding authenticated StarTrack API endpoint.
+- The Reviews tab shows recent written ratings from `/Recent?limit=100`; the server applies its activity/member privacy filters before returning entries.
+- Favourites are grouped into Movie, Series, Season and Episode sections. The current StarTrack server API stores at most 12 favourite IDs in total, so Litefin does not claim a larger server-side capacity.
+- The Lists tab can create collaborative lists, open them, remove entries added by the current user, and delete lists owned by the current user. From a media details page, a user can add that item to an existing list.
+- The media details page adds a TV-remote-friendly StarTrack panel: 0.5-step rating selection, editable review text, save/remove rating, watchlist and like toggles, Top 4 toggle, manual diary logging, and add-to-list actions. The panel stays hidden unless the server plugin is active.
+- Removing ratings, watchlist entries, likes or diary entries uses the corresponding authenticated StarTrack API endpoint.
 - External Letterboxd, Trakt, Simkl and other sync settings remain controlled by the StarTrack server plugin and are not enabled by Litefin automatically.
 
 Server plugin repository: `https://raw.githubusercontent.com/ZL154/jellyfin-plugin-startrack/main/manifest.json`
