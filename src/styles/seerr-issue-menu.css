@@ -1,0 +1,145 @@
+/* Seerr issue form embedded in the player OSD. Keep it self-contained and TV-remote friendly. */
+.seerr-issue-menu-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4vh 4vw;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, .76);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .18s ease, visibility .18s ease;
+}
+.seerr-issue-menu-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+.seerr-issue-menu {
+    width: 100%;
+    max-width: 760px;
+    max-height: 88%;
+    overflow-y: auto;
+    padding: 28px 32px;
+    box-sizing: border-box;
+    border: 1px solid var(--jf-border, rgba(255,255,255,.16));
+    border-radius: var(--jf-border-radius-lg, 18px);
+    color: var(--jf-text-primary, #fff);
+    background: var(--jf-background-alt, #20242b);
+    box-shadow: 0 20px 70px rgba(0,0,0,.58);
+}
+.seerr-issue-menu__eyebrow {
+    margin-bottom: 7px;
+    color: var(--jf-accent, #00a4dc);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+.seerr-issue-menu__header h2 {
+    margin: 0;
+    font-size: 27px;
+    font-weight: 800;
+}
+.seerr-issue-menu__header p {
+    margin: 7px 0 20px;
+    color: var(--jf-text-secondary, #aaa);
+    font-size: 16px;
+}
+.seerr-issue-menu__types {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0 -5px 20px;
+}
+.seerr-issue-type {
+    min-height: 72px;
+    margin: 0 5px;
+    padding: 8px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    border: 1px solid var(--jf-border, rgba(255,255,255,.12));
+    border-radius: var(--jf-border-radius, 11px);
+    color: var(--jf-text-secondary, #aaa);
+    background: var(--jf-card-bg, rgba(255,255,255,.04));
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.seerr-issue-type span:first-child {
+    margin-bottom: 5px;
+    color: var(--jf-text-primary, #fff);
+    font-size: 19px;
+}
+.seerr-issue-type.active {
+    color: var(--jf-accent-content-color, #fff);
+    border-color: var(--jf-accent, #00a4dc);
+    background: var(--jf-accent, #00a4dc);
+}
+.seerr-issue-menu__label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--jf-text-primary, #fff);
+    font-size: 14px;
+    font-weight: 700;
+}
+.seerr-issue-menu textarea {
+    display: block;
+    width: 100%;
+    min-height: 112px;
+    padding: 13px 15px;
+    box-sizing: border-box;
+    border: 1px solid var(--jf-input-border, var(--jf-border, rgba(255,255,255,.16)));
+    border-radius: var(--jf-border-radius, 10px);
+    outline: none;
+    color: var(--jf-text-primary, #fff);
+    background: var(--jf-input-bg, rgba(0,0,0,.24));
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    resize: none;
+}
+.seerr-issue-menu__actions {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 18px -5px 0;
+}
+.seerr-issue-menu__actions button {
+    min-width: 130px;
+    min-height: 43px;
+    margin: 0 5px 7px;
+    padding: 0 17px;
+    border: 1px solid var(--jf-border, rgba(255,255,255,.14));
+    border-radius: var(--jf-border-radius, 10px);
+    color: var(--jf-text-primary, #fff);
+    background: var(--jf-card-bg, rgba(255,255,255,.06));
+    font: inherit;
+    font-weight: 750;
+    cursor: pointer;
+}
+.seerr-issue-menu__actions .seerr-issue-submit {
+    border-color: var(--jf-accent, #00a4dc);
+    color: var(--jf-accent-content-color, #fff);
+    background: var(--jf-accent, #00a4dc);
+}
+.seerr-issue-menu__actions button:disabled {
+    opacity: .55;
+}
+.seerr-issue-menu__hint {
+    margin: 8px 0 0;
+    color: var(--jf-text-secondary, #999);
+    font-size: 12px;
+}
+.seerr-issue-menu button:focus,
+.seerr-issue-menu textarea:focus {
+    outline: 3px solid var(--jf-accent, #00a4dc);
+    outline-offset: 3px;
+}
+@media (max-width: 640px) {
+    .seerr-issue-menu { padding: 18px; }
+    .seerr-issue-menu__types { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .seerr-issue-type { margin-bottom: 8px; }
+}
