@@ -661,30 +661,6 @@ html[data-sidebar-logo-color="black"] .sidebar-header:not(:focus):not(.focused) 
     display: none;
 }
 
-/* Small inbox counter for Seerr Center; remains visible in the collapsed rail. */
-.sidebar-seerr-unread {
-    position: absolute;
-    top: 8px;
-    right: 12px;
-    z-index: 12;
-    min-width: 19px;
-    height: 19px;
-    padding: 0 4px;
-    box-sizing: border-box;
-    border-radius: 12px;
-    color: #fff;
-    background: #d94a4a;
-    font-size: 10px;
-    font-weight: 800;
-    line-height: 19px;
-    text-align: center;
-    box-shadow: 0 2px 7px rgba(0,0,0,.32);
-    pointer-events: none;
-}
-.sidebar-seerr-unread.hidden {
-    display: none !important;
-}
-
 /* Items */
 .sidebar-item {
     display: flex;
