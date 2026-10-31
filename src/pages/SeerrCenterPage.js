@@ -64,6 +64,10 @@ export default class SeerrCenterPage extends Page {
         this._counts = {};
         this._currentUser = null;
         this._isAdmin = false;
+        this._canManageRequests = false;
+        this._canManageIssues = false;
+        this._canViewIssues = false;
+        this._canCreateIssues = false;
         this._loading = false;
         this._issueDetails = null;
         this._destroyed = false;
@@ -117,7 +121,11 @@ export default class SeerrCenterPage extends Page {
             }
             this._currentUser = await seerr.currentUser();
             const permissions = Number(this._currentUser?.permissions || 0);
-            this._isAdmin = !!(permissions & (2 | 8192));
+            this._canManageRequests = !!(permissions & (2 | 16));
+            this._canManageIssues = !!(permissions & (2 | 1048576));
+            this._canViewIssues = !!(permissions & (2 | 1048576 | 2097152));
+            this._canCreateIssues = !!(permissions & (2 | 4194304));
+            this._isAdmin = this._canManageRequests;
             await this._loadTab(this._tab);
         } catch (error) {
             log.warn('Unable to initialize Seerr Center', error);
@@ -291,10 +299,10 @@ export default class SeerrCenterPage extends Page {
             const seasons = item._requestSeasons.length ? ` · ${tr('Seasons', 'Сезоны')}: ${item._requestSeasons.join(', ')}` : '';
             const ownerId = String(item._requestedBy?.id || '');
             const ownRequest = ownerId && String(this._currentUser?.id || '') === ownerId;
-            const controls = this._isAdmin && item._requestStatus === 1
+            const controls = this._canManageRequests && item._requestStatus === 1
                 ? `<button class="seerr-center-action primary" type="button" data-center-action="request-approve" data-request-id="${escapeHtml(item._requestId)}" tabindex="0">${escapeHtml(tr('Approve', 'Одобрить'))}</button>
                    <button class="seerr-center-action danger" type="button" data-center-action="request-decline" data-request-id="${escapeHtml(item._requestId)}" tabindex="0">${escapeHtml(tr('Decline', 'Отклонить'))}</button>`
-                : this._isAdmin && (String(item._requestError || '').length > 0 || item._mediaStatus === 6)
+                : this._canManageRequests && (String(item._requestError || '').length > 0 || item._mediaStatus === 6)
                     ? `<button class="seerr-center-action primary" type="button" data-center-action="request-retry" data-request-id="${escapeHtml(item._requestId)}" tabindex="0">${escapeHtml(tr('Retry', 'Повторить'))}</button>`
                     : (!this._isAdmin && ownRequest && item._requestStatus === 1)
                         ? `<button class="seerr-center-action danger" type="button" data-center-action="request-cancel" data-request-id="${escapeHtml(item._requestId)}" tabindex="0">${escapeHtml(tr('SeerrCancelRequest', 'Отменить'))}</button>`
@@ -361,7 +369,8 @@ export default class SeerrCenterPage extends Page {
 
     async _loadIssues() {
         const userId = this._currentUser?.id;
-        const payload = await seerr.issues(40, 0, 'open', this._isAdmin ? null : userId);
+        const requestedBy = this._canViewIssues ? null : userId;
+        const payload = await seerr.issues(40, 0, 'open', requestedBy);
         this._issues = Array.isArray(payload) ? payload : (payload?.results || []);
         this._renderIssues();
     }
@@ -383,7 +392,7 @@ export default class SeerrCenterPage extends Page {
                     <textarea class="seerr-center-textarea" id="seerr-center-comment" rows="3" maxlength="2000" placeholder="${escapeHtml(tr('SeerrCenterCommentPlaceholder', 'Написать комментарий…'))}"></textarea>
                     <div class="seerr-center-actions">
                         <button class="seerr-center-action primary" type="button" data-center-action="issue-comment" tabindex="0">${escapeHtml(tr('Send', 'Отправить'))}</button>
-                        ${this._isAdmin ? `<button class="seerr-center-action" type="button" data-center-action="issue-resolve" data-issue-action="approve" tabindex="0">${escapeHtml(tr('SeerrCenterResolveIssue', 'Решено'))}</button>` : ''}
+                        ${this._canManageIssues ? `<button class="seerr-center-action" type="button" data-center-action="issue-resolve" data-issue-action="resolved" tabindex="0">${escapeHtml(tr('SeerrCenterResolveIssue', 'Решено'))}</button>` : ''}
                     </div>
                 </div>
             `;
