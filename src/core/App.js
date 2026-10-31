@@ -655,6 +655,9 @@ const discoverChunk = createPageChunkLoader(
 const favoritesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "favorites" */ '../pages/FavoritesPage.js')
 );
+const starTrackChunk = createPageChunkLoader(
+    () => import(/* webpackChunkName: "startrack" */ '../pages/StarTrackPage.js')
+);
 const profilesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "profiles" */ '../pages/ProfilesPage.js')
 );
@@ -873,6 +876,13 @@ class DiscoverPage extends AsyncPageProxy {
 class FavoritesPage extends AsyncPageProxy {
     constructor(options) {
         super(options, favoritesChunk);
+    }
+}
+
+/** Route proxy for the native StarTrack ratings and watchlist page. */
+class StarTrackPage extends AsyncPageProxy {
+    constructor(options) {
+        super(options, starTrackChunk);
     }
 }
 
@@ -2203,6 +2213,7 @@ class App {
         router.register('/discover', DiscoverPage);
         router.register('/favorites', FavoritesPage);
         router.register('/achievements', AchievementsPage);
+        router.register('/my-ratings', StarTrackPage);
         router.register('/settings', SettingsPage);
         router.register('/livetv', LiveTvPage);
         router.register('/offline', OfflinePage);
