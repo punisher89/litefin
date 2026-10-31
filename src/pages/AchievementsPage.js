@@ -770,21 +770,27 @@ class AchievementsPage extends Page {
             this._setGameStatus(gameText('needMoreScore', { amount: achievementNumber(missingScore) }), true);
             return;
         }
-        const name = button.getAttribute('data-achievement-name') || itemId;
-        const price = Number(button.getAttribute('data-achievement-price') || 0);
-        if (!window.confirm(gameText('confirmBuy', { name, price: achievementNumber(price) }))) return;
+        // Do not use window.confirm here: native confirmation dialogs are
+        // unreliable on webOS TV browsers and can swallow Magic Remote input.
+        // A single explicit BUY action performs the purchase.
+        if (button.dataset.purchasePending === 'true') return;
+        button.dataset.purchasePending = 'true';
         button.disabled = true;
         this._setGameStatus(gameText('loadingGame'));
         try {
             const result = await api.post(`${this._userPath}/shop/purchase`, { ItemId: itemId });
-            if (valueOf(result, 'Success', 'success') === false) throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
+            if (valueOf(result, 'Success', 'success') === false) {
+                throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
+            }
             await this._loadLoadout();
             this._renderLoadout();
             this._setGameStatus(gameText('purchaseOk'));
         } catch (err) {
             log.warn('Achievement Badges shop purchase failed:', err);
-            this._setGameStatus(gameText('actionFailed'), true);
+            const reason = localizeAchievementMessage(err && err.message, i18n.currentLang || document.documentElement.lang || 'en');
+            this._setGameStatus(reason || gameText('actionFailed'), true);
             button.disabled = false;
+            delete button.dataset.purchasePending;
         }
     }
 
