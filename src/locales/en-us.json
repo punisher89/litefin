@@ -1817,5 +1817,20 @@
     "SeerrIssueMessageRequired": "Please add a description of the issue.",
     "SeerrIssuePermissionDenied": "Your Seerr account cannot create issues.",
     "SeerrIssueSent": "Issue report sent to Seerr.",
-    "SeerrIssueSendFailed": "Could not send the issue report."
+    "SeerrIssueSendFailed": "Could not send the issue report.",
+    "SeerrCenterUnreadCount": "Unread",
+    "SeerrCenterMarkAllRead": "Mark all read",
+    "SeerrCenterNoNotifications": "No new notifications",
+    "SeerrNotificationNewActivity": "New Seerr activity",
+    "SeerrNotificationNewCount": "New Seerr updates",
+    "SeerrNotificationStatusAwaiting": "Awaiting approval",
+    "SeerrNotificationStatusApproved": "Request approved",
+    "SeerrNotificationStatusDeclined": "Request declined",
+    "SeerrNotificationStatusAvailable": "Now available",
+    "SeerrNotificationStatusProcessing": "Downloading",
+    "SeerrNotificationStatusQueued": "Queued",
+    "SeerrNotificationRequestNew": "New request",
+    "SeerrNotificationStatusUpdated": "Request status updated",
+    "SeerrNotificationIssueReply": "New reply on an issue",
+    "SeerrNotificationIssueNew": "New issue reported"
 }
