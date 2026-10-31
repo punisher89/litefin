@@ -488,7 +488,7 @@ async function getTmdbLibraryIndex(force = false) {
             }
             return tmdbIndex;
         } finally {
-            if (tmdbIndexPromise === requestPromise) tmdbIndexPromise = null;
+            if (tmdbIndexUserId === userId) tmdbIndexPromise = null;
         }
     })();
 
