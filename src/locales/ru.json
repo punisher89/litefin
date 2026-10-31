@@ -1825,5 +1825,11 @@
     "SeerrNotificationRequestNew": "Новый запрос",
     "SeerrNotificationStatusUpdated": "Статус запроса изменён",
     "SeerrNotificationIssueReply": "Новый ответ по проблеме",
-    "SeerrNotificationIssueNew": "Новое сообщение о проблеме"
+    "SeerrNotificationIssueNew": "Новое сообщение о проблеме",
+    "SeerrCenterApproved": "Одобрено",
+    "SeerrCenterFailed": "Ошибка",
+    "SeerrCenterRequestable": "Можно запросить",
+    "SeerrCenterReleaseDateUnknown": "Дата выхода неизвестна",
+    "SeerrCenterSortBy": "Сортировка",
+    "SeerrCenterSortByRelease": "Дата выхода"
 }
