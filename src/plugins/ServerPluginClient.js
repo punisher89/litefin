@@ -78,13 +78,6 @@ const KNOWN_PROBES = {
         },
         dataEndpoint: (itemId) => `/Plugins/MdbListRatings/CachedByItemId?itemId=${itemId}`
     },
-    startrack: {
-        // The status endpoint is user-scoped but does not require a media item.
-        probeWithoutItem: true,
-        probeEndpoint: () => '/Plugins/StarTrack/Stats',
-        dataEndpoint: () => '/Plugins/StarTrack/Stats'
-    },
-
     // Litefin Companion Server Plugin
     litefin: {
         probeEndpoint: () => `/Litefin/Hero?limit=1`,
@@ -307,7 +300,6 @@ class ServerPluginClient {
             'open-subtitles': ['open subtitles', 'opensubtitles'],
             'local-intros': ['local intros', 'localintros'],
             'mdblist-ratings': ['mdblist', 'mdb list', 'mdblist ratings'],
-            startrack: ['startrack', 'internal rating system'],
             litefin: ['litefin']
         };
 
