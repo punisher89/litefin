@@ -1838,5 +1838,11 @@
     "SeerrCenterRequestable": "Can be requested",
     "SeerrCenterReleaseDateUnknown": "Release date unknown",
     "SeerrCenterSortBy": "Sort by",
-    "SeerrCenterSortByRelease": "Release date"
+    "SeerrCenterSortByRelease": "Release date",
+    "SeerrCenterIssueFilterAll": "All issues",
+    "SeerrCenterIssueFilterOpen": "Open",
+    "SeerrCenterIssueFilterResolved": "Resolved",
+    "SeerrCenterIssueOpen": "Open",
+    "SeerrCenterIssueResolved": "Resolved",
+    "SeerrCenterReopenIssue": "Reopen issue"
 }
