@@ -166,13 +166,15 @@ export class SeerrClient {
 
             const now = Date.now();
             const cacheKey = `${api._userId || 'anon'}:${path}`;
-            const cached = this._cache.get(cacheKey);
-            if (cached && now - cached.timestamp < this._cacheTtlMs) {
-                return cached.data;
+            if (!options.noCache) {
+                const cached = this._cache.get(cacheKey);
+                if (cached && now - cached.timestamp < this._cacheTtlMs) {
+                    return cached.data;
+                }
             }
 
             const data = await api.get(`${API_ROOT}${path}`);
-            this._cache.set(cacheKey, { data, timestamp: now });
+            if (!options.noCache) this._cache.set(cacheKey, { data, timestamp: now });
             return data;
         } catch (err) {
             log.warn(`Request failed: ${method} ${path}`, err);
@@ -566,7 +568,7 @@ export class SeerrClient {
      * The standard requests() method is retained for poster rows; the center
      * needs request-level status, owner, timestamps and season selection.
      */
-    async requestQueue(take = 40, skip = 0, filter = 'all', mediaType = 'all') {
+    async requestQueue(take = 20, skip = 0, filter = 'all', mediaType = 'all') {
         const params = new URLSearchParams({
             take: String(take),
             skip: String(skip),
@@ -613,8 +615,12 @@ export class SeerrClient {
         }).filter(Boolean);
 
         const pageInfo = payload && payload.pageInfo ? payload.pageInfo : {};
-        const enriched = await Promise.all(items.map(async (item) => {
-            if (item._imageUrl && item.Name) return item;
+        // Request records from Seerr often contain IDs and status only. Enrich
+        // only the first 10 cards here so entering the TV page does not fan out
+        // into dozens of simultaneous TMDB detail requests. Remaining cards
+        // still keep their request metadata and can be opened individually.
+        const enriched = await Promise.all(items.map(async (item, index) => {
+            if ((item._imageUrl && item.Name) || index >= 10) return item;
             try {
                 const detail = await this.details(item._mediaType, item._tmdbId);
                 return detail ? {
@@ -635,6 +641,42 @@ export class SeerrClient {
             totalResults: Number(pageInfo.results || pageInfo.totalResults || items.length),
             page: Number(pageInfo.page || 1),
             pages: Number(pageInfo.pages || 1)
+        };
+    }
+
+    /**
+     * Minimal, uncached request/issue snapshot for the background notification
+     * poller. This deliberately avoids full TMDB enrichment.
+     */
+    async notificationSnapshot(currentUser = {}) {
+        const requestParams = new URLSearchParams({
+            take: '50',
+            skip: '0',
+            filter: 'all',
+            sort: 'modified',
+            sortDirection: 'desc',
+            mediaType: 'all'
+        });
+        const permissionBits = Number(currentUser.permissions || 0);
+        const canViewAllIssues = !!(permissionBits & (2 | 1048576 | 2097152));
+        const issueParams = new URLSearchParams({
+            take: '30',
+            skip: '0',
+            sort: 'modified',
+            sortDirection: 'desc',
+            filter: 'open'
+        });
+        if (!canViewAllIssues && currentUser.id != null) {
+            issueParams.set('requestedBy', String(currentUser.id));
+        }
+
+        const [requestPayload, issuePayload] = await Promise.all([
+            this._request(`/request?${requestParams.toString()}`, { noCache: true }),
+            this._request(`/issue?${issueParams.toString()}`, { noCache: true })
+        ]);
+        return {
+            requests: this._resultsOf(requestPayload),
+            issues: this._resultsOf(issuePayload)
         };
     }
 
