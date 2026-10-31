@@ -78,6 +78,10 @@ const KNOWN_PROBES = {
         },
         dataEndpoint: (itemId) => `/Plugins/MdbListRatings/CachedByItemId?itemId=${itemId}`
     },
+    startrack: {
+        probeEndpoint: () => '/Plugins/StarTrack/Stats',
+        dataEndpoint: () => '/Plugins/StarTrack/Stats'
+    },
 
     // Litefin Companion Server Plugin
     litefin: {
@@ -301,6 +305,7 @@ class ServerPluginClient {
             'open-subtitles': ['open subtitles', 'opensubtitles'],
             'local-intros': ['local intros', 'localintros'],
             'mdblist-ratings': ['mdblist', 'mdb list', 'mdblist ratings'],
+            startrack: ['startrack', 'internal rating system'],
             litefin: ['litefin']
         };
 
