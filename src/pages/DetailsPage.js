@@ -118,11 +118,11 @@ class DetailsPage extends Page {
      * Override _renderMediaCard to provide a default context for all
      * related content rows (Similar, Next Up, Cast).
      */
-    _renderMediaCard(item, isLandscape, type, options = {}) {
-        // Default to 'details-row' which maps to the 'home' preset (228px posters, 388px thumbs)
-        // rather than the massive 'details' primary image presets.
-        options.contextType = options.contextType || 'details-row';
-        return super._renderMediaCard(item, isLandscape, type, options);
+    _renderMediaCard(item, isLandscape = false, type = 'poster', contextType = null) {
+        // Default related-content rows to the compact details-row card context
+        // instead of accidentally passing an options object where Page expects
+        // a context-type string.
+        return super._renderMediaCard(item, isLandscape, type, contextType || 'details-row');
     }
 
     /**
@@ -5339,8 +5339,9 @@ class DetailsPage extends Page {
             items: this._seerrRecommendations,
             isLandscape: false,
             renderCard: (item) => {
-                // CardRenderer natively formats Seerr items with status badges and poster artwork
-                return CardRenderer.createCardHtml(item, { type: 'poster' });
+                // Use the same details-row context as Jellyfin Similar cards so
+                // normalized TMDB community ratings are rendered inline as well.
+                return this._renderMediaCard(item, false, 'poster');
             },
             focusSectionName: 'details-seerr-recommendations',
             cardType: 'poster',
