@@ -166,6 +166,10 @@ export default class SeerrCenterPage extends Page {
                 router.navigate(`/seerr/${target.dataset.mediaType || 'movie'}/${target.dataset.tmdbId}`);
                 return;
             }
+            if (action === 'request-cancel') {
+                void this._cancelRequest(target.getAttribute('data-request-id'));
+                return;
+            }
             if (action === 'request-approve' || action === 'request-decline' || action === 'request-retry') {
                 void this._requestAction(action, target.getAttribute('data-request-id'));
                 return;
@@ -293,7 +297,7 @@ export default class SeerrCenterPage extends Page {
                 : this._isAdmin && (String(item._requestError || '').length > 0 || item._mediaStatus === 6)
                     ? `<button class="seerr-center-action primary" type="button" data-center-action="request-retry" data-request-id="${escapeHtml(item._requestId)}" tabindex="0">${escapeHtml(tr('Retry', 'Повторить'))}</button>`
                     : (!this._isAdmin && ownRequest && item._requestStatus === 1)
-                        ? `<button class="seerr-center-action danger" type="button" data-center-action="request-decline" data-request-id="${escapeHtml(item._requestId)}" tabindex="0">${escapeHtml(tr('SeerrCancelRequest', 'Отменить'))}</button>`
+                        ? `<button class="seerr-center-action danger" type="button" data-center-action="request-cancel" data-request-id="${escapeHtml(item._requestId)}" tabindex="0">${escapeHtml(tr('SeerrCancelRequest', 'Отменить'))}</button>`
                         : '';
             return `
                 <article class="seerr-center-request">
@@ -327,6 +331,18 @@ export default class SeerrCenterPage extends Page {
             ${canLoadMore ? `<div class="seerr-center-more"><button class="seerr-center-action" type="button" data-center-action="load-more" tabindex="0">${escapeHtml(tr('LoadMore', 'Загрузить ещё'))}</button></div>` : ''}
         `;
         this._registerFocus();
+    }
+
+    async _cancelRequest(requestId) {
+        if (!requestId) return;
+        try {
+            await seerr.cancelRequest(requestId);
+            toast.show(tr('SeerrRequestCancelled', 'Запрос отменён'));
+            this._skip = 0;
+            await Promise.all([this._loadRequests(false), this._loadCounts()]);
+        } catch (error) {
+            toast.show(error?.message || tr('SeerrCancelRequestFailed', 'Не удалось отменить запрос'));
+        }
     }
 
     async _requestAction(action, requestId) {
