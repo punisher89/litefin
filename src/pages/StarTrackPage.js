@@ -306,10 +306,12 @@ export default class StarTrackPage extends Page {
             const description = field(list, 'description', '');
             const rows = field(list, 'items', []);
             const isOwner = !!currentUserId && String(field(list, 'ownerId', '')).replace(/-/g, '').toLowerCase() === currentUserId;
-            const meta = [
-                field(list, 'ownerName', ''),
-                field(list, 'collaborative', true) ? this._t('Совместный', 'Collaborative') : this._t('Личный', 'Private')
-            ].filter(Boolean).join(' · ');
+            const visibility = field(list, 'isPrivate', false)
+                ? this._t('Личный', 'Private')
+                : field(list, 'collaborative', true)
+                    ? this._t('Совместный', 'Collaborative')
+                    : this._t('Обычный', 'Standard');
+            const meta = [field(list, 'ownerName', ''), visibility].filter(Boolean).join(' · ');
             return '<article class="startrack-list-card-wrap">' +
                 '<button class="startrack-list-card" type="button" tabindex="0" data-startrack-list-id="' +
                 esc(id) + '"><span class="startrack-list-icon">☷</span><strong>' + esc(name) + '</strong>' +
