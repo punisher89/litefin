@@ -1241,15 +1241,18 @@ class CardRenderer {
         titleText = escapeHtml(titleText);
         subtitleText = escapeHtml(subtitleText);
 
-        // Discover cards already carry the TMDB ID from Seerr. Show it as a
-        // small source marker under the title without making any extra request.
+        // Discover's Seerr cards include their TMDB ID and voteAverage.
+        // Show the actual TMDB score under the title; no extra request is needed.
         const rawTmdbId = item._tmdbId;
         const tmdbId = rawTmdbId === null || rawTmdbId === undefined ? '' : String(rawTmdbId).trim();
-        const tmdbTagHtml =
+        const tmdbRating = Number(item.CommunityRating);
+        const tmdbRatingHtml =
             contextType === 'discover' &&
             (item.Type === 'Movie' || item.Type === 'Series') &&
-            /^\d+$/.test(tmdbId)
-                ? `<div class="seerr-tmdb-tag" title="The Movie Database ID ${escapeHtml(tmdbId)}"><span class="seerr-tmdb-tag__brand">TMDB</span><span class="seerr-tmdb-tag__id">#${escapeHtml(tmdbId)}</span></div>`
+            /^\\d+$/.test(tmdbId) &&
+            Number.isFinite(tmdbRating) &&
+            tmdbRating > 0
+                ? `<div class="seerr-tmdb-rating" title="TMDB rating"><span class="seerr-tmdb-rating__brand">TMDB</span><span class="seerr-tmdb-rating__score"><span class="seerr-tmdb-rating__star">★</span>${tmdbRating.toFixed(1)}</span></div>`
                 : '';
 
         // --- 3.5. List View Override ---
@@ -1621,7 +1624,7 @@ class CardRenderer {
                                 : `<div class="card-title"><span>${titleText}</span></div>`
                         }
                         ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
-                        ${tmdbTagHtml}
+                        ${tmdbRatingHtml}
                         ${metaHtml}
                     </div>
                     `
@@ -1643,7 +1646,7 @@ class CardRenderer {
                             : `<div class="card-title"><span>${titleText}</span></div>`
                     }
                     ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
-                    ${tmdbTagHtml}
+                    ${tmdbRatingHtml}
                     ${metaHtml}
                 </div>
                 `
