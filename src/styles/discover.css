@@ -12,39 +12,24 @@
    Seerr Card Top-Left Media Type Badges (MOVIE / SERIES)
    ======================================================================== */
 
-/* TMDB rating below Seerr movie and series poster titles */
-.seerr-tmdb-rating {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    margin: 5px auto 0;
-    line-height: 1;
-    white-space: nowrap;
-    font-size: 0.78rem;
-    pointer-events: none;
-}
-
-.seerr-tmdb-rating__brand {
-    color: #01b4e4;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-}
-
-.seerr-tmdb-rating__score {
+/* Compact score inline with the year beneath Discover poster titles */
+.seerr-discover-rating {
     display: inline-flex;
     align-items: center;
     gap: 3px;
+    margin-left: 9px;
     color: var(--jf-text-primary);
+    font-size: 0.95em;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    vertical-align: baseline;
+    white-space: nowrap;
+    pointer-events: none;
 }
 
-.seerr-tmdb-rating__star {
+.seerr-discover-rating__star {
     color: #f5c451;
-    font-size: 0.9rem;
+    font-size: 1em;
 }
 
 .seerr-type-badge {
