@@ -299,14 +299,14 @@ class DetailsPage extends Page {
                                 <div class="startrack-detail-widget hidden" id="startrack-detail-widget" aria-label="StarTrack">
                                     <div class="startrack-detail-heading"><strong>STARTRACK</strong><span id="startrack-community-rating"></span></div>
                                     <div class="startrack-detail-controls">
-                                        <span class="startrack-detail-label">${i18n.t('MyRating') || 'Your rating'}</span>
+                                        <span class="startrack-detail-label">${this._starTrackText('Твоя оценка', 'Your rating')}</span>
                                         <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="step-down" aria-label="Decrease rating">−</button>
                                         <strong id="startrack-rating-draft">—</strong>
                                         <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="step-up" aria-label="Increase rating">+</button>
-                                        <button class="startrack-detail-button primary" type="button" tabindex="0" data-startrack-action="save-rating">${i18n.t('Save') || 'Save'}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="clear-rating">${i18n.t('Remove') || 'Remove'}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="toggle-watchlist" id="startrack-watchlist-action">${i18n.t('Watchlist') || 'Watchlist'}</button>
-                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="toggle-like" id="startrack-like-action">♥ ${i18n.t('Like') || 'Like'}</button>
+                                        <button class="startrack-detail-button primary" type="button" tabindex="0" data-startrack-action="save-rating">${this._starTrackText('Сохранить', 'Save')}</button>
+                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="clear-rating">${this._starTrackText('Удалить', 'Remove')}</button>
+                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="toggle-watchlist" id="startrack-watchlist-action">${this._starTrackText('Посмотреть позже', 'Watchlist')}</button>
+                                        <button class="startrack-detail-button" type="button" tabindex="0" data-startrack-action="toggle-like" id="startrack-like-action">♥ ${this._starTrackText('Нравится', 'Like')}</button>
                                     </div>
                                     <div class="startrack-detail-message" id="startrack-detail-message"></div>
                                 </div>
@@ -1347,8 +1347,9 @@ class DetailsPage extends Page {
             const action = button.getAttribute('data-startrack-action');
             if (action === 'step-up' || action === 'step-down') {
                 const delta = action === 'step-up' ? 0.5 : -0.5;
-                const current = Number(this._starTrackRatingDraft || 0.5);
-                this._starTrackRatingDraft = Math.max(0.5, Math.min(5, Math.round((current + delta) * 2) / 2));
+                const current = Number(this._starTrackRatingDraft || 0);
+                const next = Math.round((current + delta) * 2) / 2;
+                this._starTrackRatingDraft = Math.max(0, Math.min(5, next));
                 this._renderStarTrackControls();
                 return;
             }
@@ -1373,7 +1374,7 @@ class DetailsPage extends Page {
                 String(entry.userId || '').replace(/-/g, '').toLowerCase() === normalizedUserId
             );
             this._starTrackCurrentRating = ownRating ? Number(ownRating.stars) : 0;
-            this._starTrackRatingDraft = this._starTrackCurrentRating || 0.5;
+            this._starTrackRatingDraft = this._starTrackCurrentRating;
             panel.classList.remove('hidden');
             this._renderStarTrackControls();
             focusManager.invalidateCache('details-actions');
@@ -1387,11 +1388,15 @@ class DetailsPage extends Page {
         const panel = this.$('#startrack-detail-widget');
         if (!panel || panel.classList.contains('hidden')) return;
         const draft = this.$('#startrack-rating-draft');
+        const save = this.$('[data-startrack-action="save-rating"]');
+        const clear = this.$('[data-startrack-action="clear-rating"]');
         const community = this.$('#startrack-community-rating');
         const watchlist = this.$('#startrack-watchlist-action');
         const like = this.$('#startrack-like-action');
         const message = this.$('#startrack-detail-message');
-        if (draft) draft.textContent = String(this._starTrackRatingDraft || 0.5) + ' ★';
+        if (draft) draft.textContent = this._starTrackRatingDraft > 0 ? String(this._starTrackRatingDraft) + ' ★' : '—';
+        if (save) save.disabled = !(this._starTrackRatingDraft >= 0.5 && this._starTrackRatingDraft <= 5);
+        if (clear) clear.disabled = !(this._starTrackCurrentRating > 0);
         if (community) {
             const average = Number(this._starTrackRatings && this._starTrackRatings.averageRating || 0);
             const count = Number(this._starTrackRatings && this._starTrackRatings.totalRatings || 0);
@@ -1423,9 +1428,13 @@ class DetailsPage extends Page {
         button.disabled = true;
         try {
             if (action === 'save-rating') {
-                await serverPluginClient.call('/Plugins/StarTrack/Ratings/' + id, 'POST', {
-                    stars: Number(this._starTrackRatingDraft || 0.5)
-                });
+                const stars = Number(this._starTrackRatingDraft || 0);
+                if (!Number.isFinite(stars) || stars < 0.5 || stars > 5 || Math.round(stars * 2) !== stars * 2) {
+                    const message = this.$('#startrack-detail-message');
+                    if (message) message.textContent = this._starTrackText('Сначала выбери оценку от 0,5 до 5.', 'Choose a rating from 0.5 to 5 first.');
+                    return;
+                }
+                await serverPluginClient.call('/Plugins/StarTrack/Ratings/' + id, 'POST', { stars: stars });
             } else if (action === 'clear-rating') {
                 await serverPluginClient.call('/Plugins/StarTrack/Ratings/' + id, 'DELETE');
             } else if (action === 'toggle-watchlist') {
