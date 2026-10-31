@@ -1317,7 +1317,6 @@ class CardRenderer {
         // --- 4. HTML Assembly ---
 
         let cssClass = isLandscape ? 'media-card landscape' : 'media-card';
-        if (type === 'person') cssClass += ' person-card';
         // 'artist' is an alias for the square type — same 1:1 aspect ratio card.
         // In Expanded Posters layout, person cards (cast/crew/guest stars) render as square (1:1) cards.
         if (type === 'square' || type === 'artist' || (isExpanded && type === 'person')) cssClass = 'media-card square';
@@ -1576,20 +1575,13 @@ class CardRenderer {
         // For library cards, inside .card-info is bypassed in favor of clean native artwork or .card-overlay-label on dynamic thumbs
         // Person cards always retain their name and role, even when the
         // global media-card label style is set to title-only or hidden.
-        const isExpandingPersonCard = isExpanding && isPersonCard;
         const shouldShowCardLabels = options.showMeta || cardLabelStyle !== 'hidden' || isPersonCard;
         const showInside =
-            (renderInside || isExpandingPersonCard) &&
+            renderInside &&
             type !== 'library' &&
             !isHiddenLibraryLabel &&
             shouldShowCardLabels;
-        // In Expanding mode cast/crew names are overlaid at the bottom of the
-        // portrait; do not emit an outside block that can be clipped by row paint containment.
-        const showOutside =
-            renderOutside &&
-            !isHiddenLibraryLabel &&
-            shouldShowCardLabels &&
-            !isExpandingPersonCard;
+        const showOutside = renderOutside && !isHiddenLibraryLabel && shouldShowCardLabels;
         const expansionClass = canExpand ? ' has-expansion' : '';
 
         const gameBadgeHtml = CardRenderer.getGameBadgeHtml(item);
@@ -1630,7 +1622,7 @@ class CardRenderer {
                     ${
                         showInside
                             ? `
-                    <div class="card-info inside${isExpandingPersonCard ? ' person-card-info' : ''}">
+                    <div class="card-info inside">
                         ${
                             options.showMeta
                                 ? `
