@@ -1810,5 +1810,20 @@
     "SeerrIssueMessageRequired": "Добавьте описание проблемы.",
     "SeerrIssuePermissionDenied": "У вашей учётной записи Seerr нет права создавать обращения.",
     "SeerrIssueSent": "Сообщение отправлено в Seerr.",
-    "SeerrIssueSendFailed": "Не удалось отправить обращение."
+    "SeerrIssueSendFailed": "Не удалось отправить обращение.",
+    "SeerrCenterUnreadCount": "Непрочитано",
+    "SeerrCenterMarkAllRead": "Прочитать всё",
+    "SeerrCenterNoNotifications": "Новых уведомлений нет",
+    "SeerrNotificationNewActivity": "Новое событие Seerr",
+    "SeerrNotificationNewCount": "Новые события Seerr",
+    "SeerrNotificationStatusAwaiting": "Ожидает одобрения",
+    "SeerrNotificationStatusApproved": "Запрос одобрен",
+    "SeerrNotificationStatusDeclined": "Запрос отклонён",
+    "SeerrNotificationStatusAvailable": "Уже доступно",
+    "SeerrNotificationStatusProcessing": "Загружается",
+    "SeerrNotificationStatusQueued": "В очереди",
+    "SeerrNotificationRequestNew": "Новый запрос",
+    "SeerrNotificationStatusUpdated": "Статус запроса изменён",
+    "SeerrNotificationIssueReply": "Новый ответ по проблеме",
+    "SeerrNotificationIssueNew": "Новое сообщение о проблеме"
 }
