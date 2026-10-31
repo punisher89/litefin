@@ -487,38 +487,64 @@ export default class SeerrCenterPage extends Page {
     _renderWatchlist() {
         const el = this.$('#seerr-center-panel');
         if (!el) return;
+        const isUpcoming = (item) => {
+            const release = item.ReleaseDate || item.PremiereDate || item.FirstAired || '';
+            const timestamp = release ? new Date(release).getTime() : 0;
+            return timestamp > Date.now();
+        };
+        const statusOf = (item) => Number(item._seerrStatus || 0);
+        const availableCount = this._watchlist.filter((item) => statusOf(item) === 5).length;
+        const processingCount = this._watchlist.filter((item) => [2, 3, 4].includes(statusOf(item))).length;
+        const upcomingCount = this._watchlist.filter(isUpcoming).length;
+        const requestableCount = this._watchlist.filter((item) => [0, 1, 6].includes(statusOf(item))).length;
         const filters = [
-            ['all', tr('All', 'Все')],
-            ['available', tr('SeerrCenterFilterAvailable', 'Доступны')],
-            ['pending', tr('SeerrCenterFilterProcessing', 'В работе')],
-            ['upcoming', tr('SeerrCenterUpcoming', 'Скоро')]
+            ['all', tr('All', 'Все'), this._watchlist.length],
+            ['available', tr('SeerrCenterFilterAvailable', 'Доступны'), availableCount],
+            ['pending', tr('SeerrCenterFilterProcessing', 'В работе'), processingCount],
+            ['upcoming', tr('SeerrCenterUpcoming', 'Скоро'), upcomingCount],
+            ['requestable', tr('SeerrCenterRequestable', 'Можно запросить'), requestableCount]
         ];
         const items = this._watchlist.filter((item) => {
-            if (this._filter === 'available') return Number(item._seerrStatus) === 5;
-            if (this._filter === 'pending') return [2, 3, 4].includes(Number(item._seerrStatus));
-            if (this._filter === 'upcoming') return item.ReleaseDate && new Date(item.ReleaseDate).getTime() > Date.now();
+            const status = statusOf(item);
+            if (this._watchlistFilter === 'available') return status === 5;
+            if (this._watchlistFilter === 'pending') return [2, 3, 4].includes(status);
+            if (this._watchlistFilter === 'upcoming') return isUpcoming(item);
+            if (this._watchlistFilter === 'requestable') return [0, 1, 6].includes(status);
             return true;
         });
-        const cards = items.map((item) => `
+        items.sort((a, b) => {
+            if (this._watchlistSort === 'title') {
+                return String(a.Name || '').localeCompare(String(b.Name || ''));
+            }
+            const releaseA = a.ReleaseDate || a.PremiereDate || a.FirstAired || '2999-12-31';
+            const releaseB = b.ReleaseDate || b.PremiereDate || b.FirstAired || '2999-12-31';
+            return new Date(releaseA).getTime() - new Date(releaseB).getTime();
+        });
+        const cards = items.map((item) => {
+            const status = requestStatus(item);
+            const releaseDate = item.ReleaseDate || item.PremiereDate || item.FirstAired;
+            return `
             <article class="seerr-center-watch-card">
                 <button class="seerr-center-poster" type="button" data-center-action="watchlist-open" data-media-type="${escapeHtml(item._mediaType)}" data-tmdb-id="${escapeHtml(item._tmdbId)}" tabindex="0">
                     ${item._imageUrl ? `<img src="${escapeHtml(item._imageUrl)}" alt="" loading="lazy">` : '<span>▣</span>'}
                 </button>
                 <div class="seerr-center-watch-main">
-                    <strong>${escapeHtml(item.Name || '')}</strong>
-                    <span class="seerr-center-meta">${escapeHtml(item.ProductionYear || '')} · ${escapeHtml(requestStatus(item).fallback)}</span>
-                    <span class="seerr-center-meta">${escapeHtml(item.ReleaseDate || '')}</span>
+                    <div class="seerr-center-watch-heading"><strong>${escapeHtml(item.Name || '')}</strong><span class="seerr-center-status ${status.tone}">${escapeHtml(tr(status.key, status.fallback))}</span></div>
+                    <span class="seerr-center-meta">${escapeHtml(item.ProductionYear || '')} · ${escapeHtml(item._mediaType === 'tv' ? tr('Series', 'Сериал') : tr('Movie', 'Фильм'))}</span>
+                    <span class="seerr-center-meta">${releaseDate ? escapeHtml(dateLabel(releaseDate)) : escapeHtml(tr('SeerrCenterReleaseDateUnknown', 'Дата выхода неизвестна'))}</span>
                     <div class="seerr-center-actions">
                         <button class="seerr-center-action" type="button" data-center-action="watchlist-open" data-media-type="${escapeHtml(item._mediaType)}" data-tmdb-id="${escapeHtml(item._tmdbId)}" tabindex="0">${escapeHtml(tr('ViewDetails', 'Подробнее'))}</button>
+                        ${[0, 1, 6].includes(statusOf(item)) ? `<button class="seerr-center-action primary" type="button" data-center-action="watchlist-open" data-media-type="${escapeHtml(item._mediaType)}" data-tmdb-id="${escapeHtml(item._tmdbId)}" tabindex="0">${escapeHtml(tr('SeerrRequest', 'Запросить'))}</button>` : ''}
                         <button class="seerr-center-action danger" type="button" data-center-action="watchlist-remove" data-watchlist-id="${escapeHtml(item._tmdbId)}" tabindex="0">${escapeHtml(tr('Remove', 'Убрать'))}</button>
                     </div>
                 </div>
             </article>
-        `).join('');
+        `;
+        }).join('');
         el.innerHTML = `
             <div class="seerr-center-filters"><div class="seerr-center-filter-group">
-                ${filters.map(([key,label]) => `<button type="button" class="seerr-center-filter${key === this._filter ? ' active' : ''}" data-center-action="watchlist-filter" data-filter="${key}" tabindex="0">${escapeHtml(label)}</button>`).join('')}
-            </div></div>
+                ${filters.map(([key,label,count]) => `<button type="button" class="seerr-center-filter${key === this._watchlistFilter ? ' active' : ''}" data-center-action="watchlist-filter" data-filter="${key}" tabindex="0">${escapeHtml(label)} <span class="seerr-center-filter-count">${count}</span></button>`).join('')}
+            </div><button type="button" class="seerr-center-filter seerr-center-sort" data-center-action="watchlist-sort" tabindex="0">${escapeHtml(tr('SeerrCenterSortBy', 'Сортировка'))}: ${escapeHtml(this._watchlistSort === 'title' ? tr('Name', 'Название') : tr('SeerrCenterSortByRelease', 'Дата выхода'))}</button></div>
             ${cards || `<div class="seerr-center-empty"><span>◷</span><strong>${escapeHtml(tr('SeerrCenterEmptyWatchlist', 'В этом разделе пока пусто'))}</strong></div>`}
         `;
         this._registerFocus();
