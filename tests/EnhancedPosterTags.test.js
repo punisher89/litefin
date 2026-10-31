@@ -32,6 +32,7 @@ globalThis.__APP_VERSION__ = '1.0.0';
 
 const {
     buildEnhancedPosterTagGroups,
+    getEnhancedPosterTagLookupId,
     hasNativePosterTagStamp,
     renderEnhancedPosterTags
 } = await import('../src/utils/EnhancedPosterTags.js');
@@ -70,6 +71,16 @@ test('JE native poster tokens are recognized with and without the Spoiler Guard 
     assert.equal(hasNativePosterTagStamp({ ImageTags: { Primary: 'sb-1234abcd-base-jet' + variant + '-jeu' + marker } }), true);
     assert.equal(hasNativePosterTagStamp({ ImageTags: { Primary: 'ordinary-image-tag' } }), false);
     assert.equal(hasNativePosterTagStamp({}), false);
+});
+
+test('Seerr cards resolve to real Jellyfin IDs and skip synthetic TMDB IDs', () => {
+    assert.equal(
+        getEnhancedPosterTagLookupId({ Id: 'tmdb-movie-12345', _jellyfinMediaId: 'jellyfin-guid-1' }),
+        'jellyfin-guid-1'
+    );
+    assert.equal(getEnhancedPosterTagLookupId({ Id: 'tmdb-tv-67890' }), '');
+    assert.equal(getEnhancedPosterTagLookupId({ Id: 'jellyfin-guid-2' }), 'jellyfin-guid-2');
+    assert.equal(getEnhancedPosterTagLookupId(null), '');
 });
 
 test('poster tag groups are built from the server-provided batch metadata', () => {
