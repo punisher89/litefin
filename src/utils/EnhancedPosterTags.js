@@ -384,10 +384,27 @@ async function loadMissingItems(ids, userId) {
     }
 }
 
+/**
+ * Resolves the real Jellyfin item ID used by Jellyfin Enhanced's tag-data API.
+ * Seerr/TMDB cards use synthetic IDs (tmdb-movie-123), which are not valid
+ * Jellyfin item IDs. Only query JE for those cards when Seerr supplies the
+ * backing Jellyfin media ID.
+ * @param {Object} item
+ * @returns {string}
+ */
+export function getEnhancedPosterTagLookupId(item) {
+    if (!item) return '';
+    const linkedId = item._jellyfinMediaId || item.JellyfinMediaId;
+    if (linkedId) return String(linkedId);
+
+    const id = item.Id ? String(item.Id) : '';
+    return id && !/^tmdb-/i.test(id) ? id : '';
+}
+
 export async function prepareEnhancedPosterTags(items, contextType = '') {
     if (!Array.isArray(items) || !items.length) return items;
     const candidates = items.filter((item) =>
-        item && item.Id && SUPPORTED_TYPES.has(item.Type) &&
+        item && getEnhancedPosterTagLookupId(item) && SUPPORTED_TYPES.has(item.Type) &&
         !item._isGenreCard && !item._isStudioCard && !item._isNetworkCard &&
         !hasNativePosterTagStamp(item)
     );
@@ -399,7 +416,7 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
 
     const now = Date.now();
     const missing = candidates
-        .map((item) => String(item.Id))
+        .map((item) => getEnhancedPosterTagLookupId(item))
         .filter((id) => {
             const cached = itemCache.get(id);
             return !cached || cached.expiresAt <= now;
@@ -411,7 +428,7 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
 
     const firstEpisodeIds = [];
     for (const item of candidates) {
-        const cached = itemCache.get(String(item.Id));
+        const cached = itemCache.get(getEnhancedPosterTagLookupId(item));
         const record = cached && cached.expiresAt > Date.now() ? cached.data : null;
         if (record && record.FirstEpisode && record.FirstEpisode.NeedsStreamFetch && record.FirstEpisode.Id) {
             firstEpisodeIds.push(String(record.FirstEpisode.Id));
@@ -422,7 +439,7 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
     }
 
     for (const item of candidates) {
-        const cached = itemCache.get(String(item.Id));
+        const cached = itemCache.get(getEnhancedPosterTagLookupId(item));
         const record = cached && cached.expiresAt > Date.now() ? cached.data : null;
         if (!record) continue;
         const renderData = { ...record };
