@@ -187,3 +187,20 @@ The adapter reads the public plugin configuration and the active user's settings
 If an item's Primary image tag already contains Jellyfin Enhanced's native `-jet` token, Litefin leaves that image to the server compositor and does not draw a second HTML overlay. This avoids duplicate tags. The client adapter does not load Jellyfin Enhanced's injected web scripts, which avoids relying on JavaScript syntax unsupported by older TV browser engines.
 
 The adapter renders quality, genre, language, rating, and age-rating groups on homepage rows, shared `MediaGrid` search/result cards, virtualized horizontal rows (including Discover and Favorites), and the Library page grid. Existing server-stamped native posters are left untouched. The adapter decorates already-rendered virtual cards in place, preserving TV focus and avoiding a full row rebuild. Seerr/TMDB results first use a backing Jellyfin media ID (`_jellyfinMediaId`) when Seerr provides one. Otherwise, Litefin builds a per-user, 10-minute cached lookup from Jellyfin `/Items?HasTmdbId=true` results, requesting only `ProviderIds` (no images), then matches TMDB ID and media type locally. Synthetic `tmdb-*` IDs are never sent to Jellyfin Enhanced. Unrequested or not-yet-imported catalogue entries have no local media streams, so technical quality/audio tags are not available for them.
+
+
+## StarTrack native integration
+
+Litefin includes a native StarTrack client bridge when the StarTrack Jellyfin server plugin is installed and active.
+
+- The **My Ratings** navigation entry appears only after the server plugin is detected.
+- The page uses the authenticated `/Plugins/StarTrack/*` JSON API; it does not embed StarTrack's injected Jellyfin Web JavaScript or put the access token in a URL.
+- Ratings, watchlist, diary, favourites, liked titles, recommendations and lists are hydrated through a batched Jellyfin `/Items?Ids=...` request.
+- Removing a rating, watchlist entry, like or diary entry uses the corresponding authenticated StarTrack API endpoint.
+- External Letterboxd, Trakt, Simkl and other sync settings remain controlled by the StarTrack server plugin and are not enabled by Litefin automatically.
+
+Server plugin repository: `https://raw.githubusercontent.com/ZL154/jellyfin-plugin-startrack/main/manifest.json`
+
+## Community add-on catalogue
+
+Settings → Plugins contains a curated list of project links. Server-side DLL plugins must be installed through Jellyfin Dashboard → Plugins. Injected Jellyfin Web UI extensions are not automatically loaded by Litefin. Litefin does not download or execute arbitrary third-party client JavaScript.
