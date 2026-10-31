@@ -11,6 +11,7 @@ import {
     localizeAchievementMessage
 } from '../utils/AchievementBadgeLocalization.js';
 import { logger } from '../utils/Logger.js';
+import { focusManager } from '../ui/FocusManager.js';
 import { achievementNotifications } from '../utils/AchievementNotifications.js';
 import '../styles/achievements.css';
 
@@ -400,7 +401,17 @@ class AchievementsPage extends Page {
     async onInit() {
         this.title = i18n.t('Achievements');
         this._bindEvents();
+
+        // This page owns its focus scope. Without a registered section the global
+        // TV FocusManager keeps the previous page's scope and D-pad navigation
+        // cannot reach Game Center controls on webOS.
+        this.registerFocusSection('achievements-game-center', this.el, {
+            orientation: 'grid'
+        });
+        this.setActiveSection('achievements-game-center', true);
+
         await this._load();
+        focusManager.invalidateCache('achievements-game-center');
         this.markReady();
     }
 
@@ -409,26 +420,11 @@ class AchievementsPage extends Page {
             button.addEventListener('click', () => this._selectMainSection(button.getAttribute('data-game-section')));
         });
 
-        // TV remotes send arrow keys; keep tab navigation predictable and focusable.
-        this.el.querySelectorAll('[role="tablist"]').forEach((tablist) => {
-            const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
-            const selected = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true') || tabs[0];
-            tabs.forEach((tab) => tab.setAttribute('tabindex', tab === selected ? '0' : '-1'));
-            tablist.addEventListener('keydown', (event) => {
-                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-                const available = Array.from(tablist.querySelectorAll('[role="tab"]'))
-                    .filter((tab) => !tab.disabled && !tab.closest('[hidden]'));
-                if (!available.length) return;
-                const current = Math.max(0, available.indexOf(document.activeElement));
-                let next = current;
-                if (event.key === 'ArrowRight') next = (current + 1) % available.length;
-                if (event.key === 'ArrowLeft') next = (current - 1 + available.length) % available.length;
-                if (event.key === 'Home') next = 0;
-                if (event.key === 'End') next = available.length - 1;
-                event.preventDefault();
-                available[next].focus();
-                available[next].click();
-            });
+        // Keep every visible tab in the TV focus order. The shared FocusManager
+        // handles D-pad navigation; roving tabindex=-1 would hide sibling tabs
+        // from its selector on webOS, where native tablist keydown is not reliable.
+        this.el.querySelectorAll('[role="tablist"] [role="tab"]').forEach((tab) => {
+            tab.setAttribute('tabindex', '0');
         });
 
         const refresh = this.$('#achievements-refresh');
@@ -550,12 +546,13 @@ class AchievementsPage extends Page {
             const active = button.getAttribute('data-game-section') === selected;
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
-            button.setAttribute('tabindex', active ? '0' : '-1');
+            button.setAttribute('tabindex', '0');
         });
         this.el.querySelectorAll('[data-game-section-panel]').forEach((panel) => {
             panel.hidden = panel.getAttribute('data-game-section-panel') !== selected;
         });
         if (selected === 'shop') this._selectGameTab('shop');
+        focusManager.invalidateCache('achievements-game-center');
     }
 
     _selectGameTab(tab) {
