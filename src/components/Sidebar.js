@@ -52,6 +52,11 @@ class Sidebar extends Component {
          * @type {boolean}
          */
         this._seerrAvailable = false;
+        this._onSeerrNotificationsChanged = (payload) => {
+            this._updateSeerrUnreadBadge(payload && payload.unread ? payload.unread : 0);
+        };
+        eventBus.on('seerr:notificationsChanged', this._onSeerrNotificationsChanged);
+        this._seerrNotificationsStarted = false;
         this._starTrackAvailable = pluginManager.isEnabled('startrack');
         this._onStarTrackEnabled = () => {
             this._starTrackAvailable = true;
@@ -108,7 +113,10 @@ class Sidebar extends Component {
                     </button>
 
                     <button class="sidebar-item" id="sidebar-seerr-center" tabindex="0" data-path="/seerr-center" style="display: none;">
-                        <div class="item-icon" aria-hidden="true"><span>▤</span></div>
+                        <div class="item-icon" aria-hidden="true">
+                            <span>▤</span>
+                            <span class="sidebar-seerr-unread hidden" id="sidebar-seerr-center-unread">0</span>
+                        </div>
                         <span class="item-text" data-i18n="SeerrCenterTitle">Seerr Center</span>
                     </button>
 
@@ -464,7 +472,16 @@ class Sidebar extends Component {
         // Don't probe while unauthenticated — the API call will fail and may
         // cause other pages to read a stale 'false' result from the in-memory cache.
         // The auth:restored → _onAuthChange path ensures we re-run once ready.
-        if (!auth.isAuthenticated()) return;
+        if (!auth.isAuthenticated()) {
+            if (this._seerrNotificationsStarted) {
+                import('../utils/SeerrNotificationService.js').then(({ seerrNotificationService }) => {
+                    seerrNotificationService.stop();
+                }).catch(() => {});
+                this._seerrNotificationsStarted = false;
+            }
+            this._updateSeerrUnreadBadge(0);
+            return;
+        }
 
         // seerrClient is dynamically imported so it (and its normalize/genre
         // helpers) stay out of the initial main bundle on TV tiers. Only the
@@ -482,8 +499,33 @@ class Sidebar extends Component {
         this._seerrAvailable = isAvailable;
         if (button) button.style.display = isAvailable ? '' : 'none';
         if (centerButton) centerButton.style.display = isAvailable ? '' : 'none';
+
+        // The inbox poller is loaded only when Seerr is configured and available.
+        try {
+            const { seerrNotificationService } = await import('../utils/SeerrNotificationService.js');
+            if (isAvailable) {
+                await seerrNotificationService.start();
+                this._seerrNotificationsStarted = true;
+                this._updateSeerrUnreadBadge(seerrNotificationService.getUnreadCount());
+            } else {
+                seerrNotificationService.stop();
+                this._seerrNotificationsStarted = false;
+                this._updateSeerrUnreadBadge(0);
+            }
+        } catch (notificationError) {
+            log.debug('Seerr notification service is unavailable', notificationError);
+        }
         focusManager.invalidateCache('sidebar');
         this._updateFloatingIslandGeometry();
+    }
+
+    _updateSeerrUnreadBadge(count) {
+        const badge = this.$('#sidebar-seerr-center-unread');
+        if (!badge) return;
+        const unread = Math.max(0, Number(count) || 0);
+        badge.textContent = unread > 99 ? '99+' : String(unread);
+        badge.classList.toggle('hidden', unread === 0);
+        badge.setAttribute('aria-label', unread ? `${unread} unread Seerr notifications` : 'No unread Seerr notifications');
     }
 
     onDestroyed() {
@@ -492,6 +534,16 @@ class Sidebar extends Component {
             this._focusObserver = null;
         }
         focusManager.unregister('sidebar');
+        if (this._onSeerrNotificationsChanged) {
+            eventBus.off('seerr:notificationsChanged', this._onSeerrNotificationsChanged);
+            this._onSeerrNotificationsChanged = null;
+        }
+        if (this._seerrNotificationsStarted) {
+            import('../utils/SeerrNotificationService.js').then(({ seerrNotificationService }) => {
+                seerrNotificationService.stop();
+            }).catch(() => {});
+            this._seerrNotificationsStarted = false;
+        }
         eventBus.off('router:navigate', this._onNavigate.bind(this));
         if (this._onStarTrackEnabled) {
             eventBus.off('startrack:enabled', this._onStarTrackEnabled);
@@ -605,6 +657,13 @@ class Sidebar extends Component {
             // and any other seerr UI reflects the current session state correctly
             this._loadLibraries().then(() => this._updateSeerrVisibility());
         } else {
+            if (this._seerrNotificationsStarted) {
+                import('../utils/SeerrNotificationService.js').then(({ seerrNotificationService }) => {
+                    seerrNotificationService.stop();
+                }).catch(() => {});
+                this._seerrNotificationsStarted = false;
+            }
+            this._updateSeerrUnreadBadge(0);
             // Clear loaded library items from the sub-libraries container on logout.
             // NOTE: Do NOT clear #sidebar-libraries (the toggle button itself) — that would wipe its
             // icon, label, and chevron, leaving it as an invisible-but-focusable empty element.
