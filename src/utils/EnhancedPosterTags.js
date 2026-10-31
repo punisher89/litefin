@@ -470,6 +470,24 @@ export function renderEnhancedPosterTags(item) {
     return output.length ? '<div class="lf-je-poster-tags">' + output.join('') + '</div>' : '';
 }
 
+
+export function attachEnhancedPosterTagsToCard(card, item) {
+    if (!card || !item) return false;
+    const image = card.querySelector('.card-image');
+    if (!image || image.querySelector('.lf-je-poster-tags')) return false;
+
+    const html = renderEnhancedPosterTags(item);
+    if (!html) return false;
+
+    const holder = document.createElement('div');
+    holder.innerHTML = html;
+    const overlay = holder.firstElementChild;
+    if (!overlay) return false;
+
+    image.appendChild(overlay);
+    return true;
+}
+
 export function clearEnhancedPosterTagItemCache() {
     // A fresh homepage visit must see current Spoiler Guard and library-access filtering.
     itemCache.clear();
