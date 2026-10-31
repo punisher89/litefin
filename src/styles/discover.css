@@ -12,30 +12,30 @@
    Seerr Card Top-Left Media Type Badges (MOVIE / SERIES)
    ======================================================================== */
 
-/* Keep the release year and TMDB score aligned as one centered metadata row */
-.seerr-discover-subtitle {
+/* Keep the release year and score aligned as one centered metadata row.
+   Use margins instead of flex gap: LG webOS 6 uses Chromium 79, which does
+   not support gap for flex containers. */
+.card-subtitle.seerr-discover-subtitle {
     display: flex !important;
     align-items: center;
     justify-content: center;
-    gap: 18px;
     width: 100%;
-    text-align: center;
+    text-align: center !important;
     line-height: 1.25;
 }
 
-.seerr-discover-subtitle > span:first-child {
+.card-subtitle.seerr-discover-subtitle > span:first-child {
     flex: 0 1 auto;
     min-width: 0;
     margin: 0;
 }
 
-.seerr-discover-rating {
-    display: inline-flex;
+.card-subtitle .seerr-discover-rating {
+    display: inline-flex !important;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    margin: 0;
+    margin: 0 0 0 22px !important;
     color: var(--jf-text-primary);
     font-size: 0.95em;
     font-weight: 700;
@@ -45,8 +45,9 @@
     pointer-events: none;
 }
 
-.seerr-discover-rating__star {
+.card-subtitle .seerr-discover-rating__star {
     display: inline-block;
+    margin-right: 4px;
     color: #f5c451;
     font-size: 1em;
     line-height: 1;
