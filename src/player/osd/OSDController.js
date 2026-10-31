@@ -28,7 +28,6 @@ import ChaptersModal from './ChaptersModal.js';
 import QueueModal from './QueueModal.js';
 import LyricsModal from './LyricsModal.js';
 import DescriptionModal from './DescriptionModal.js';
-import SeerrIssueMenu from './SeerrIssueMenu.js';
 import SyncPlayNotification from './SyncPlayNotification.js';
 import ConfirmExitModal from './ConfirmExitModal.js';
 import ResumeProfilesMenu from './ResumeProfilesMenu.js';
@@ -325,9 +324,6 @@ export default class OSDController extends Component {
         // Description modal — shows item details and overview
         this.descriptionModal = new DescriptionModal(this);
 
-        // Report playback or media issues to Seerr without leaving the player.
-        this.seerrIssueMenu = new SeerrIssueMenu(this);
-
         // SyncPlay notification overlay
         this.syncPlayNotification = new SyncPlayNotification(this);
         this.resumeProfilesMenu = new ResumeProfilesMenu(this);
@@ -358,7 +354,6 @@ export default class OSDController extends Component {
             this.queueModal,
             this.lyricsModal,
             this.descriptionModal,
-            this.seerrIssueMenu,
             this.syncPlayNotification,
             this.confirmExitModal,
             this.resumeProfilesMenu,
@@ -605,7 +600,6 @@ export default class OSDController extends Component {
                                 </div>
                             </button>
                             <button class="osd-btn" data-action="description" id="osdInfoBtn" tabindex="0" aria-label="Description">${osdIcons.info}</button>
-                            ${!this._isAudio ? `<button class="osd-btn" data-action="reportIssue" id="osdReportIssueBtn" tabindex="0" aria-label="${i18n.t('SeerrIssueReportTitle') || 'Report issue'}" title="${i18n.t('SeerrIssueReportTitle') || 'Report issue'}">⚑</button>` : ''}
                             <button class="osd-btn" id="osdFavoriteBtn" data-action="favorite" tabindex="0">${osdIcons.favorite}</button>
                             <button class="osd-btn" data-action="settings" tabindex="0">${osdIcons.settings}</button>
                             ${(platformInfo.isDesktop || platformInfo.isWeb) ? `
@@ -3350,7 +3344,7 @@ export default class OSDController extends Component {
         overlays.forEach(overlay => {
             if (overlay.classList.contains('visible')) {
                 // Find focusables inside visible overlay
-                const focusables = Array.from(overlay.querySelectorAll('button, input[type="range"], textarea, select'));
+                const focusables = Array.from(overlay.querySelectorAll('button, input[type="range"]'));
                 this._cachedOverlayRow.push(...focusables);
             }
         });
@@ -3811,9 +3805,6 @@ export default class OSDController extends Component {
                 break;
             case 'description':
                 this.toggleDescriptionModal(true);
-                break;
-            case 'reportIssue':
-                this.toggleSeerrIssueMenu(true);
                 break;
             case 'syncplay':
                 // Lazy-import to avoid loading the group menu CSS on every startup
@@ -5338,26 +5329,6 @@ export default class OSDController extends Component {
         clearTimeout(this._autoHideTimer);
         this.hide();
         this.emit('exit');
-    }
-
-    toggleSeerrIssueMenu(show) {
-        if (show) {
-            if (!this._currentItem || this._isAudio) return;
-            this.seerrIssueMenu.open(this._currentItem);
-            this._cacheFocusableElements();
-            this._currentFocusRow = -1;
-            this._currentFocusIndex = 0;
-            this._updateFocus();
-        } else {
-            if (this.activeMenu === this.seerrIssueMenu) this.activeMenu = null;
-            this.seerrIssueMenu.hide();
-            this._cacheFocusableElements();
-            this.show();
-            this._currentFocusRow = 1;
-            const playIdx = this._findActionIndex('togglePlay');
-            this._currentFocusIndex = playIdx !== -1 ? playIdx : 0;
-            this._updateFocus();
-        }
     }
 
     toggleDescriptionModal(show) {
