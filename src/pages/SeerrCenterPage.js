@@ -64,6 +64,7 @@ export default class SeerrCenterPage extends Page {
         this._skip = 0;
         this._items = [];
         this._issues = [];
+        this._issueFilter = 'open';
         this._watchlist = [];
         this._watchlistFilter = 'all';
         this._watchlistSort = 'release';
@@ -192,6 +193,12 @@ export default class SeerrCenterPage extends Page {
             }
             if (action === 'request-approve' || action === 'request-decline' || action === 'request-retry') {
                 void this._requestAction(action, target.getAttribute('data-request-id'));
+                return;
+            }
+            if (action === 'issue-filter') {
+                this._issueFilter = target.getAttribute('data-filter') || 'open';
+                this._issueDetails = null;
+                void this._loadIssues();
                 return;
             }
             if (action === 'issue-open') {
@@ -407,7 +414,7 @@ export default class SeerrCenterPage extends Page {
             this._renderIssues();
             return;
         }
-        const payload = await seerr.issues(40, 0, 'open', requestedBy);
+        const payload = await seerr.issues(40, 0, this._issueFilter, requestedBy);
         this._issues = Array.isArray(payload) ? payload : (payload?.results || []);
         this._renderIssues();
     }
@@ -424,18 +431,23 @@ export default class SeerrCenterPage extends Page {
                 <div class="seerr-center-issue-detail">
                     <button type="button" class="seerr-center-action" data-center-action="issue-back" tabindex="0">← ${escapeHtml(tr('Back', 'Назад'))}</button>
                     <h2>${escapeHtml(issue.media?.title || issue.media?.name || tr('SeerrCenterIssue', 'Проблема'))}</h2>
-                    <span class="seerr-center-status pending">${escapeHtml(issueTypeLabel(issue.issueType))}</span>
+                    <span class="seerr-center-status ${Number(issue.status) === 2 ? 'available' : 'pending'}">${escapeHtml(Number(issue.status) === 2 ? tr('SeerrCenterIssueResolved', 'Решено') : tr('SeerrCenterIssueOpen', 'Открыто'))} · ${escapeHtml(issueTypeLabel(issue.issueType))}</span>
                     <div class="seerr-center-comments">${comments || `<p>${escapeHtml(tr('SeerrCenterNoComments', 'Комментариев пока нет.'))}</p>`}</div>
                     <textarea class="seerr-center-textarea" id="seerr-center-comment" rows="3" maxlength="2000" placeholder="${escapeHtml(tr('SeerrCenterCommentPlaceholder', 'Написать комментарий…'))}"></textarea>
                     <div class="seerr-center-actions">
                         <button class="seerr-center-action primary" type="button" data-center-action="issue-comment" tabindex="0">${escapeHtml(tr('Send', 'Отправить'))}</button>
-                        ${this._canManageIssues ? `<button class="seerr-center-action" type="button" data-center-action="issue-resolve" data-issue-action="resolved" tabindex="0">${escapeHtml(tr('SeerrCenterResolveIssue', 'Решено'))}</button>` : ''}
+                        ${this._canManageIssues ? (Number(issue.status) === 2 ? `<button class="seerr-center-action" type="button" data-center-action="issue-resolve" data-issue-action="open" tabindex="0">${escapeHtml(tr('SeerrCenterReopenIssue', 'Открыть снова'))}</button>` : `<button class="seerr-center-action" type="button" data-center-action="issue-resolve" data-issue-action="resolved" tabindex="0">${escapeHtml(tr('SeerrCenterResolveIssue', 'Решено'))}</button>`) : ''}
                     </div>
                 </div>
             `;
             this._registerFocus();
             return;
         }
+        const issueFilters = [
+            ['open', tr('SeerrCenterIssueFilterOpen', 'Открытые')],
+            ['resolved', tr('SeerrCenterIssueFilterResolved', 'Решённые')],
+            ['all', tr('SeerrCenterIssueFilterAll', 'Все')]
+        ];
         const cards = this._issues.map((issue) => {
             const title = issue.media?.title || issue.media?.name || (issue.media?.tmdbId ? `TMDB #${issue.media.tmdbId}` : `#${issue.id}`);
             const lastComment = issue.comments?.length ? issue.comments[issue.comments.length - 1].message : '';
@@ -448,7 +460,12 @@ export default class SeerrCenterPage extends Page {
                 </button>
             `;
         }).join('');
-        el.innerHTML = cards || `<div class="seerr-center-empty"><span>⚑</span><strong>${escapeHtml(tr('SeerrCenterNoIssues', 'Открытых проблем нет'))}</strong><p>${escapeHtml(tr('SeerrCenterNoIssuesDesc', 'Сообщения о проблемах с воспроизведением будут отображаться здесь.'))}</p></div>`;
+        el.innerHTML = `
+            <div class="seerr-center-filters"><div class="seerr-center-filter-group">
+                ${issueFilters.map(([key, label]) => `<button type="button" class="seerr-center-filter${key === this._issueFilter ? ' active' : ''}" data-center-action="issue-filter" data-filter="${key}" tabindex="0">${escapeHtml(label)}</button>`).join('')}
+            </div></div>
+            ${cards || `<div class="seerr-center-empty"><span>⚑</span><strong>${escapeHtml(tr('SeerrCenterNoIssues', 'Открытых проблем нет'))}</strong><p>${escapeHtml(tr('SeerrCenterNoIssuesDesc', 'Сообщения о проблемах с воспроизведением будут отображаться здесь.'))}</p></div>`}
+        `;
         this._registerFocus();
     }
 
