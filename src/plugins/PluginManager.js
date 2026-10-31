@@ -722,6 +722,9 @@ class PluginManager {
             try {
                 await plugin.init(api);
                 log.info(`Plugin '${plugin.id}' (${plugin.name}) initialized`);
+                if (plugin.id === 'startrack') {
+                    eventBus.emit('startrack:enabled');
+                }
             } catch (err) {
                 log.error(`Plugin '${id}' init() threw:`, err);
                 // Disable the plugin to prevent broken state on future calls
