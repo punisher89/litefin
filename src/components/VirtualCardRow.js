@@ -456,8 +456,7 @@ export class VirtualCardRow {
                     isExpanding &&
                     !this.isLandscape &&
                     this.cardType !== 'square' &&
-                    this.cardType !== 'artist' &&
-                    this.cardType !== 'person';
+                    this.cardType !== 'artist';
 
                 if (!this.hideLabels && !isIntegratedExpanding && !isPortraitExpanding) {
                     const infoDiv = document.createElement('div');
