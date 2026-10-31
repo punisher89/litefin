@@ -52,22 +52,6 @@ class Sidebar extends Component {
          * @type {boolean}
          */
         this._seerrAvailable = false;
-        this._onSeerrNotificationsChanged = (payload) => {
-            this._updateSeerrUnreadBadge(payload && payload.unread ? payload.unread : 0);
-        };
-        eventBus.on('seerr:notificationsChanged', this._onSeerrNotificationsChanged);
-        this._seerrNotificationsStarted = false;
-        this._starTrackAvailable = pluginManager.isEnabled('startrack');
-        this._onStarTrackEnabled = () => {
-            this._starTrackAvailable = true;
-            if (this.el) this._applySidebarLayout();
-        };
-        this._onStarTrackDisabled = () => {
-            this._starTrackAvailable = false;
-            if (this.el) this._applySidebarLayout();
-        };
-        eventBus.on('startrack:enabled', this._onStarTrackEnabled);
-        eventBus.on('startrack:disabled', this._onStarTrackDisabled);
     }
 
     render() {
@@ -112,14 +96,6 @@ class Sidebar extends Component {
                         <span class="item-text" data-i18n="SeerrDiscover">Discover</span>
                     </button>
 
-                    <button class="sidebar-item" id="sidebar-seerr-center" tabindex="0" data-path="/seerr-center" style="display: none;">
-                        <div class="item-icon" aria-hidden="true">
-                            <span>▤</span>
-                            <span class="sidebar-seerr-unread hidden" id="sidebar-seerr-center-unread">0</span>
-                        </div>
-                        <span class="item-text" data-i18n="SeerrCenterTitle">Seerr Center</span>
-                    </button>
-
                     <button class="sidebar-item" id="sidebar-favorites" tabindex="0" data-path="/favorites">
                         <div class="item-icon">
                             ${sidebarIcons.favorites}
@@ -132,11 +108,6 @@ class Sidebar extends Component {
                             <span>🏆</span>
                         </div>
                         <span class="item-text" data-i18n="Achievements">Achievements</span>
-                    </button>
-
-                    <button class="sidebar-item" id="sidebar-startrack" tabindex="0" data-path="/my-ratings" style="display: none;">
-                        <div class="item-icon" aria-hidden="true"><span>★</span></div>
-                        <span class="item-text" data-i18n="MyRatings">${i18n.t('MyRatings') || 'My Ratings'}</span>
                     </button>
 
                     <button class="sidebar-item" id="sidebar-search" tabindex="0" data-path="/search">
@@ -466,20 +437,12 @@ class Sidebar extends Component {
 
     async _updateSeerrVisibility() {
         const button = this.$('#sidebar-discover');
-        const centerButton = this.$('#sidebar-seerr-center');
-        if (!button && !centerButton) return;
+        if (!button) return;
 
         // Don't probe while unauthenticated — the API call will fail and may
         // cause other pages to read a stale 'false' result from the in-memory cache.
         // The auth:restored → _onAuthChange path ensures we re-run once ready.
         if (!auth.isAuthenticated()) {
-            if (this._seerrNotificationsStarted) {
-                import('../utils/SeerrNotificationService.js').then(({ seerrNotificationService }) => {
-                    seerrNotificationService.stop();
-                }).catch(() => {});
-                this._seerrNotificationsStarted = false;
-            }
-            this._updateSeerrUnreadBadge(0);
             return;
         }
 
@@ -498,34 +461,8 @@ class Sidebar extends Component {
         // across any layout rebuild without an additional network call
         this._seerrAvailable = isAvailable;
         if (button) button.style.display = isAvailable ? '' : 'none';
-        if (centerButton) centerButton.style.display = isAvailable ? '' : 'none';
-
-        // The inbox poller is loaded only when Seerr is configured and available.
-        try {
-            const { seerrNotificationService } = await import('../utils/SeerrNotificationService.js');
-            if (isAvailable) {
-                await seerrNotificationService.start();
-                this._seerrNotificationsStarted = true;
-                this._updateSeerrUnreadBadge(seerrNotificationService.getUnreadCount());
-            } else {
-                seerrNotificationService.stop();
-                this._seerrNotificationsStarted = false;
-                this._updateSeerrUnreadBadge(0);
-            }
-        } catch (notificationError) {
-            log.debug('Seerr notification service is unavailable', notificationError);
-        }
         focusManager.invalidateCache('sidebar');
         this._updateFloatingIslandGeometry();
-    }
-
-    _updateSeerrUnreadBadge(count) {
-        const badge = this.$('#sidebar-seerr-center-unread');
-        if (!badge) return;
-        const unread = Math.max(0, Number(count) || 0);
-        badge.textContent = unread > 99 ? '99+' : String(unread);
-        badge.classList.toggle('hidden', unread === 0);
-        badge.setAttribute('aria-label', unread ? `${unread} unread Seerr notifications` : 'No unread Seerr notifications');
     }
 
     onDestroyed() {
@@ -534,26 +471,7 @@ class Sidebar extends Component {
             this._focusObserver = null;
         }
         focusManager.unregister('sidebar');
-        if (this._onSeerrNotificationsChanged) {
-            eventBus.off('seerr:notificationsChanged', this._onSeerrNotificationsChanged);
-            this._onSeerrNotificationsChanged = null;
-        }
-        if (this._seerrNotificationsStarted) {
-            import('../utils/SeerrNotificationService.js').then(({ seerrNotificationService }) => {
-                seerrNotificationService.stop();
-            }).catch(() => {});
-            this._seerrNotificationsStarted = false;
-        }
         eventBus.off('router:navigate', this._onNavigate.bind(this));
-        if (this._onStarTrackEnabled) {
-            eventBus.off('startrack:enabled', this._onStarTrackEnabled);
-            this._onStarTrackEnabled = null;
-        }
-        if (this._onStarTrackDisabled) {
-            eventBus.off('startrack:disabled', this._onStarTrackDisabled);
-            this._onStarTrackDisabled = null;
-        }
-
         // Remove auth listeners
         eventBus.off('auth:login', this._onAuthChange.bind(this));
         eventBus.off('auth:logout', this._onAuthChange.bind(this));
@@ -657,13 +575,6 @@ class Sidebar extends Component {
             // and any other seerr UI reflects the current session state correctly
             this._loadLibraries().then(() => this._updateSeerrVisibility());
         } else {
-            if (this._seerrNotificationsStarted) {
-                import('../utils/SeerrNotificationService.js').then(({ seerrNotificationService }) => {
-                    seerrNotificationService.stop();
-                }).catch(() => {});
-                this._seerrNotificationsStarted = false;
-            }
-            this._updateSeerrUnreadBadge(0);
             // Clear loaded library items from the sub-libraries container on logout.
             // NOTE: Do NOT clear #sidebar-libraries (the toggle button itself) — that would wipe its
             // icon, label, and chevron, leaving it as an invisible-but-focusable empty element.
@@ -1972,10 +1883,8 @@ class Sidebar extends Component {
                 // Discover requires Seerr to be available — hide it if the probe hasn't
                 // confirmed availability yet, regardless of the saved layout preference
                 const isDiscover = id === 'discover';
-                const isSeerrCenter = id === 'seerr-center';
-                const seerrHidden = (isDiscover || isSeerrCenter) && !this._seerrAvailable;
-                const starTrackHidden = id === 'startrack' && !this._starTrackAvailable;
-                const shouldHide = hidden || pluginHidden || seerrHidden || starTrackHidden;
+                const seerrHidden = isDiscover && !this._seerrAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden;
 
                 el.style.display = shouldHide ? 'none' : '';
                 sidebarContent.appendChild(el);
