@@ -31,9 +31,11 @@ globalThis.window = globalThis;
 globalThis.__APP_VERSION__ = '1.0.0';
 
 const {
+    attachJellyfinIdsToSeerrItems,
     buildEnhancedPosterTagGroups,
     getEnhancedPosterTagLookupId,
     hasNativePosterTagStamp,
+    indexJellyfinItemsByTmdbId,
     renderEnhancedPosterTags
 } = await import('../src/utils/EnhancedPosterTags.js');
 
@@ -71,6 +73,28 @@ test('JE native poster tokens are recognized with and without the Spoiler Guard 
     assert.equal(hasNativePosterTagStamp({ ImageTags: { Primary: 'sb-1234abcd-base-jet' + variant + '-jeu' + marker } }), true);
     assert.equal(hasNativePosterTagStamp({ ImageTags: { Primary: 'ordinary-image-tag' } }), false);
     assert.equal(hasNativePosterTagStamp({}), false);
+});
+
+test('Jellyfin library TMDB index maps Seerr movie and series cards to real item IDs', () => {
+    const index = indexJellyfinItemsByTmdbId([
+        { Id: 'jf-movie-1', Type: 'Movie', ProviderIds: { Tmdb: '12345' } },
+        { Id: 'jf-series-1', Type: 'Series', ProviderIds: { tmdb: '67890' } },
+        { Id: 'ignored-person', Type: 'Person', ProviderIds: { Tmdb: '555' } },
+        { Id: 'ignored-no-tmdb', Type: 'Movie', ProviderIds: { Imdb: 'tt123' } }
+    ]);
+
+    const cards = [
+        { Id: 'tmdb-movie-12345', Type: 'Movie', _tmdbId: 12345 },
+        { Id: 'tmdb-tv-67890', Type: 'Series', _tmdbId: 67890 },
+        { Id: 'tmdb-movie-555', Type: 'Movie', _tmdbId: 555 },
+        { Id: 'tmdb-movie-999', Type: 'Movie', _tmdbId: 999, _jellyfinMediaId: 'explicit-id' }
+    ];
+
+    attachJellyfinIdsToSeerrItems(cards, index);
+    assert.equal(cards[0]._jellyfinMediaId, 'jf-movie-1');
+    assert.equal(cards[1]._jellyfinMediaId, 'jf-series-1');
+    assert.equal(cards[2]._jellyfinMediaId, undefined);
+    assert.equal(cards[3]._jellyfinMediaId, 'explicit-id');
 });
 
 test('Seerr cards resolve to real Jellyfin IDs and skip synthetic TMDB IDs', () => {
