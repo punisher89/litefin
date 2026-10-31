@@ -282,6 +282,8 @@ export default class SeerrCenterPage extends Page {
         if (this._destroyed) return;
         this._tab = tab;
         this._updateTabs();
+        const stats = this.$('#seerr-center-stats');
+        if (stats) stats.style.display = tab === 'requests' ? '' : 'none';
         this.setLoading(true);
         try {
             if (tab === 'requests') {
