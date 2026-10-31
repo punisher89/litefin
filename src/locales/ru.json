@@ -1746,5 +1746,21 @@
     "EnhancedPersonYearOne": "год",
     "EnhancedPersonYearFew": "года",
     "EnhancedPersonYearMany": "лет",
-    "EnhancedAwardsList": "Список наград"
+    "EnhancedAwardsList": "Список наград",
+    "MyRatings": "Мои оценки",
+    "PluginCatalog": "Каталог дополнений",
+    "PluginCatalogDescription": "Подборка серверных плагинов Jellyfin и нативных интеграций Litefin. Сторонний код не загружается и не выполняется автоматически.",
+    "NativeLitefinIntegration": "Нативная интеграция Litefin",
+    "JellyfinServerPlugin": "Серверный плагин Jellyfin",
+    "JellyfinWebExtension": "Расширение Jellyfin Web",
+    "CommunityDirectory": "Каталог сообщества",
+    "StarTrackCatalogDescription": "Личные оценки, список просмотра, дневник, избранное, рекомендации и списки. Требуется серверный плагин StarTrack.",
+    "OscarsCatalogDescription": "Добавляет в Jellyfin сведения о премии «Оскар». Отдельный блок наград в Litefin пока не реализован.",
+    "ActorPlusCatalogDescription": "Добавляет сведения об актёрах и фильмографию в стандартный интерфейс Jellyfin Web. Его встроенный веб-интерфейс Litefin не загружает.",
+    "AwesomeJellyfinCatalogDescription": "Большая подборка серверных плагинов, клиентов, тем и дополнительных инструментов. Совместимость нужно проверять для каждого проекта отдельно.",
+    "Integrated": "Интегрировано",
+    "OpenProject": "Открыть проект",
+    "BrowseCatalog": "Открыть каталог",
+    "ServerPluginInstallTitle": "Установка серверного плагина Jellyfin",
+    "ServerPluginInstallDescription": "Открой Dashboard Jellyfin → Плагины → Репозитории, добавь репозиторий автора, установи плагин и перезапусти сервер, если это требуется. Litefin показывает нативно только те интеграции, которые реализованы в самом клиенте."
 }
