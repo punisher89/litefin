@@ -1831,5 +1831,11 @@
     "SeerrCenterRequestable": "Можно запросить",
     "SeerrCenterReleaseDateUnknown": "Дата выхода неизвестна",
     "SeerrCenterSortBy": "Сортировка",
-    "SeerrCenterSortByRelease": "Дата выхода"
+    "SeerrCenterSortByRelease": "Дата выхода",
+    "SeerrCenterIssueFilterAll": "Все обращения",
+    "SeerrCenterIssueFilterOpen": "Открытые",
+    "SeerrCenterIssueFilterResolved": "Решённые",
+    "SeerrCenterIssueOpen": "Открыто",
+    "SeerrCenterIssueResolved": "Решено",
+    "SeerrCenterReopenIssue": "Открыть снова"
 }
