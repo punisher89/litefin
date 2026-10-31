@@ -1808,5 +1808,14 @@
     "SeerrIssueVideo": "Video",
     "SeerrIssueAudio": "Audio",
     "SeerrIssueSubtitles": "Subtitles",
-    "SeerrIssueOther": "Other"
+    "SeerrIssueOther": "Other",
+    "SeerrIssueReportTitle": "Report a playback issue",
+    "SeerrIssueDescription": "Describe the problem",
+    "SeerrIssueDescriptionPlaceholder": "For example: no sound on the Russian audio track…",
+    "SeerrIssueHint": "Your report will appear in Seerr Center.",
+    "SeerrIssueNoTmdb": "No TMDB ID was found for this item.",
+    "SeerrIssueMessageRequired": "Please add a description of the issue.",
+    "SeerrIssuePermissionDenied": "Your Seerr account cannot create issues.",
+    "SeerrIssueSent": "Issue report sent to Seerr.",
+    "SeerrIssueSendFailed": "Could not send the issue report."
 }
