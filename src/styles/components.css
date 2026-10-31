@@ -2049,6 +2049,36 @@ html[data-layout-tier="ultra-legacy"] .subtitle-result-meta {
     display: block;
 }
 
+/* Inline community score displayed beside the year on details recommendation cards. */
+.card-subtitle .card-subtitle-rating {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 14px;
+    color: var(--jf-text-primary);
+    font-size: 0.95em;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.card-subtitle .card-subtitle-rating__star {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 4px;
+    color: #f5c451;
+}
+
+.card-subtitle .card-subtitle-rating__star svg {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    vertical-align: middle;
+}
+
 /* ==========================================================================
    Card Text Marquee Scrolling (Loop Overflowing Titles/Subtitles)
    ========================================================================== */
