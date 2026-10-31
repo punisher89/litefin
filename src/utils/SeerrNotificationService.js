@@ -195,7 +195,7 @@ class SeerrNotificationService {
             const media = request?.media || {};
             const id = request && (request.id || request.requestId);
             if (id == null) return;
-            const tmdbId = media.tmdbId || media.id || request.tmdbId || request.mediaId || null;
+            const tmdbId = media.tmdbId || request.tmdbId || request.mediaId || null;
             const mediaType = mediaTypeOf(media, request);
             requests[String(id)] = {
                 id: String(id),
