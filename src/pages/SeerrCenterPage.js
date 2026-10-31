@@ -169,9 +169,11 @@ export default class SeerrCenterPage extends Page {
             if (type.startsWith('issue-')) {
                 this._issueSkip = 0;
                 void this._loadIssues(false);
-            } else {
+            } else if (type.startsWith('request-')) {
                 this._skip = 0;
                 void this._loadRequests(false);
+            } else if (type.startsWith('watchlist-')) {
+                this._renderWatchlist();
             }
         });
         this.el.addEventListener('click', (event) => {
