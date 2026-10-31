@@ -55,6 +55,8 @@ test('Seerr Center uses a wide Seerr-style page and native issue controls', () =
     assert.ok(center.includes('data-center-select="issue-filter"'));
     assert.ok(center.includes('data-center-select="issue-sort"'));
     assert.ok(center.includes('data-center-select="issue-page-size"'));
+    assert.ok(center.includes('data-center-select="watchlist-filter"'));
+    assert.ok(center.includes('data-center-select="watchlist-sort"'));
     assert.ok(center.includes('seerr-center-issue-backdrop'));
     assert.ok(center.includes('seerr-center-issue-poster'));
     assert.ok(center.includes('seerr-center-issue-side'));
