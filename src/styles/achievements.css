@@ -1989,3 +1989,46 @@
         font-size: 21px;
     }
 }
+
+
+/* webOS performance pass: keep TV rendering lightweight and D-pad focus obvious. */
+.achievements-main-tabs {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,.16);
+}
+.achievements-main-panel:not([hidden]),
+.achievement-game-panel:not([hidden]) {
+    animation: none !important;
+}
+.achievement-badge,
+.achievement-game-card,
+.achievement-action-button,
+.achievement-game-tab,
+.achievements-main-tab,
+.achievement-filter,
+.achievements-refresh,
+.achievements-more,
+.achievement-reroll-button {
+    transition: none !important;
+}
+.achievement-badge:hover,
+.achievement-badge:focus-visible,
+.achievement-action-button:hover,
+.achievement-action-button:focus-visible,
+.achievement-game-tab:hover,
+.achievement-game-tab:focus-visible,
+.achievements-main-tab:hover,
+.achievements-main-tab:focus-visible {
+    transform: none !important;
+    filter: none !important;
+}
+.achievements-page :focus {
+    outline: 3px solid #c2afff;
+    outline-offset: 3px;
+}
+.achievements-page button:focus,
+.achievements-page [tabindex="0"]:focus {
+    position: relative;
+    z-index: 2;
+}
