@@ -102,24 +102,6 @@ export default class StarTrackPage extends Page {
             '</section></main></div>';
     }
 
-</span><span>' +
-                            this._t('ЛИЧНАЯ КИНОТЕКА', 'PERSONAL MOVIE JOURNAL') + '</span></div>' +
-                        '<h1>' + this._t('Моя киноколлекция', 'My Movie Journal') + '</h1>' +
-                        '<p>' + this._t('Оценки, список просмотра, дневник и персональные рекомендации.',
-                            'Your ratings, watchlist, diary and personal recommendations.') + '</p>' +
-                    '</div>' +
-                '</div>' +
-                '<button class="startrack-refresh focusable" id="startrack-refresh" type="button" tabindex="0">' +
-                    '<span class="startrack-refresh-icon" aria-hidden="true">↻</span>' + this._t('Обновить', 'Refresh') +
-                '</button>' +
-            '</header>' +
-            '<nav class="startrack-tabs" id="startrack-tabs" role="tablist" aria-label="' +
-                this._t('Разделы StarTrack', 'StarTrack sections') + '">' + tabs + '</nav>' +
-            '<section class="startrack-content" id="startrack-content" aria-live="polite">' +
-                '<div class="startrack-loading"><span class="startrack-loading-mark" aria-hidden="true">★</span>' +
-                    '<span>' + this._t('Загружаем…', 'Loading…') + '</span></div>' +
-            '</section></main></div>';
-    }
 
     async onInit() {
         this.title = this._t('Мои оценки', 'My Ratings');
