@@ -454,7 +454,9 @@ export default class SeerrCenterPage extends Page {
     async _loadIssues(append = false) {
         // The Jellyfin companion proxy resolves and scopes the authenticated Seerr
         // user server-side. The public /User payload may expose permissions only.
-        const payload = await seerr.issues(this._issuePageSize, append ? this._issueSkip : 0, this._issueFilter, this._issueSort);
+        const requestSkip = append ? this._issueSkip : 0;
+        if (!append) this._issueSkip = 0;
+        const payload = await seerr.issues(this._issuePageSize, requestSkip, this._issueFilter, this._issueSort);
         const incoming = Array.isArray(payload) ? payload : (payload?.results || []);
         this._issues = append ? this._issues.concat(incoming) : incoming;
         this._issuePageInfo = payload?.pageInfo || null;
