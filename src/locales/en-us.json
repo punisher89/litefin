@@ -1753,5 +1753,21 @@
     "EnhancedPersonYearOne": "year",
     "EnhancedPersonYearFew": "years",
     "EnhancedPersonYearMany": "years",
-    "EnhancedAwardsList": "Awards list"
+    "EnhancedAwardsList": "Awards list",
+    "MyRatings": "My Ratings",
+    "PluginCatalog": "Community Add-on Catalog",
+    "PluginCatalogDescription": "A curated list of Jellyfin server plugins and native Litefin integrations. Third-party code is never loaded or executed automatically.",
+    "NativeLitefinIntegration": "Native Litefin integration",
+    "JellyfinServerPlugin": "Jellyfin server plugin",
+    "JellyfinWebExtension": "Jellyfin Web extension",
+    "CommunityDirectory": "Community directory",
+    "StarTrackCatalogDescription": "Personal ratings, watchlist, diary, favourites, recommendations and lists. Requires the StarTrack plugin on your Jellyfin server.",
+    "OscarsCatalogDescription": "Adds Academy Awards metadata to Jellyfin. A dedicated awards panel is not yet implemented in Litefin.",
+    "ActorPlusCatalogDescription": "Adds cast details and filmography to the standard Jellyfin Web interface. Litefin does not load its injected Web UI.",
+    "AwesomeJellyfinCatalogDescription": "A wider collection of server plugins, clients, themes and companion tools. Check compatibility for each project individually.",
+    "Integrated": "Integrated",
+    "OpenProject": "Open project",
+    "BrowseCatalog": "Browse catalogue",
+    "ServerPluginInstallTitle": "Installing a Jellyfin server plugin",
+    "ServerPluginInstallDescription": "Open Jellyfin Dashboard → Plugins → Repositories, add the author's repository if provided, install the plugin, then restart Jellyfin when required. Litefin only displays integrations implemented natively in the client."
 }
