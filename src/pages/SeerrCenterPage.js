@@ -432,6 +432,7 @@ export default class SeerrCenterPage extends Page {
                     <button type="button" class="seerr-center-action" data-center-action="issue-back" tabindex="0">← ${escapeHtml(tr('Back', 'Назад'))}</button>
                     <h2>${escapeHtml(issue.media?.title || issue.media?.name || tr('SeerrCenterIssue', 'Проблема'))}</h2>
                     <span class="seerr-center-status ${Number(issue.status) === 2 ? 'available' : 'pending'}">${escapeHtml(Number(issue.status) === 2 ? tr('SeerrCenterIssueResolved', 'Решено') : tr('SeerrCenterIssueOpen', 'Открыто'))} · ${escapeHtml(issueTypeLabel(issue.issueType))}</span>
+                    ${issue.message ? `<p class="seerr-center-issue-description">${escapeHtml(issue.message)}</p>` : ''}
                     <div class="seerr-center-comments">${comments || `<p>${escapeHtml(tr('SeerrCenterNoComments', 'Комментариев пока нет.'))}</p>`}</div>
                     <textarea class="seerr-center-textarea" id="seerr-center-comment" rows="3" maxlength="2000" placeholder="${escapeHtml(tr('SeerrCenterCommentPlaceholder', 'Написать комментарий…'))}"></textarea>
                     <div class="seerr-center-actions">
@@ -450,7 +451,7 @@ export default class SeerrCenterPage extends Page {
         ];
         const cards = this._issues.map((issue) => {
             const title = issue.media?.title || issue.media?.name || (issue.media?.tmdbId ? `TMDB #${issue.media.tmdbId}` : `#${issue.id}`);
-            const lastComment = issue.comments?.length ? issue.comments[issue.comments.length - 1].message : '';
+            const lastComment = issue.comments?.length ? issue.comments[issue.comments.length - 1].message : (issue.message || '');
             return `
                 <button type="button" class="seerr-center-issue-card" data-center-action="issue-open" data-issue-id="${escapeHtml(issue.id)}" tabindex="0">
                     <span class="seerr-center-issue-type">${escapeHtml(issueTypeLabel(issue.issueType))}</span>
