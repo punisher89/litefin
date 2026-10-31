@@ -1223,13 +1223,10 @@ class CardRenderer {
 
         // --- 3.4. Label Visibility Styles & Special Card Overrides ---
         const cardLabelStyle = prefs.cardLabelStyle || 'default';
-        const isPersonCard = type === 'person';
         if (item._isStudioCard || item._isNetworkCard || item._isGenreCard) {
             titleText = '';
             subtitleText = '';
-        } else if (!options.showMeta && !isPersonCard) {
-            // General media-card label preferences must not hide cast/crew
-            // identities: on person cards both the name and role are essential.
+        } else if (!options.showMeta) {
             if (cardLabelStyle === 'titleOnly' || cardLabelStyle === 'titleOnly2Lines') {
                 subtitleText = '';
             } else if (cardLabelStyle === 'hidden') {
@@ -1575,7 +1572,7 @@ class CardRenderer {
         // For library cards, inside .card-info is bypassed in favor of clean native artwork or .card-overlay-label on dynamic thumbs
         // Person cards always retain their name and role, even when the
         // global media-card label style is set to title-only or hidden.
-        const shouldShowCardLabels = options.showMeta || cardLabelStyle !== 'hidden' || isPersonCard;
+        const shouldShowCardLabels = options.showMeta || cardLabelStyle !== 'hidden';
         const showInside =
             renderInside &&
             type !== 'library' &&
