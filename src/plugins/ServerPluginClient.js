@@ -350,17 +350,13 @@ class ServerPluginClient {
             return { available: false, data: null };
         }
 
-        // Some probes need an item — if not provided, we can't probe yet.
-        // Return deferred:true so PluginManager enables the plugin tentatively
-        // and re-checks at playback time (when we have a real item).
-        if (!item) {
-            log.debug(`Plugin '${pluginId}' probe requires an item — deferring until playback`);
-            return { available: false, deferred: true, data: null };
-        }
-
+        // Let each probe decide whether it needs a media item. Some plugins
+        // expose a server-wide endpoint (for example StarTrack /Stats) and can
+        // be detected immediately, while item-scoped probes return null until
+        // a suitable item is available.
         const endpoint = probe.probeEndpoint(item);
         if (!endpoint) {
-            // Cannot probe with this item, defer
+            log.debug(`Plugin '${pluginId}' probe has no endpoint for the current context — deferring`);
             return { available: false, deferred: true, data: null };
         }
 
