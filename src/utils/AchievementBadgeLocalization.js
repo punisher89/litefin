@@ -573,5 +573,23 @@ export function localizeAchievementMessage(message, language = '') {
         'This power-up is already active.': 'Это усиление уже активно.',
         'You already have the maximum number of this power-up.': 'У вас уже максимальное количество этого усиления.'
     };
-    return exact[text] || text;
+    if (exact[text]) return exact[text];
+
+    // ShopService includes the live balance and item price in its rejection
+    // message; translate the whole response instead of leaking server English.
+    let match = text.match(/^Not enough score\\. You have ([\\d,]+), item costs ([\\d,]+)\\.?$/i);
+    if (match) {
+        return `Недостаточно очков. На балансе: ${match[1]}, стоимость предмета: ${match[2]}.`;
+    }
+    if (/^You already own that cosmetic\\.?$/i.test(text)) return 'Этот предмет уже куплен.';
+    if (/^Item not found in catalog\\.?$/i.test(text)) return 'Предмет не найден в магазине.';
+    if (/^Profile not found\\.?$/i.test(text)) return 'Профиль игрока не найден.';
+    if (/^Cosmetic not found\\.?$/i.test(text)) return 'Предмет оформления не найден.';
+    if (/^You don't own that cosmetic\\.?$/i.test(text)) return 'У вас нет этого предмета.';
+    if (/^Specify a cosmetic id to equip/i.test(text)) return 'Не удалось определить предмет для применения.';
+    if (/^Purchased .+\\.$/i.test(text)) return 'Покупка выполнена.';
+    if (/^.+ unlocked\\.$/i.test(text)) return 'Предмет открыт.';
+    if (/^.+ equipped\\.$/i.test(text)) return 'Предмет применён.';
+    if (/^Slot cleared\\.$/i.test(text)) return 'Слот оформления очищен.';
+    return text;
 }
