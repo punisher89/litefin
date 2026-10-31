@@ -123,6 +123,51 @@ function extractYear(dateStr) {
 }
 
 /**
+ * Formats an ISO calendar date for compact Seerr metadata.
+ * It uses UTC calendar fields to avoid timezone-related day shifts.
+ * @param {string} value
+ * @param {string} [locale]
+ * @returns {string}
+ */
+export function formatSeerrReleaseDate(value, locale = '') {
+    if (typeof value !== 'string') return '';
+
+    const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return '';
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(0);
+    date.setUTCFullYear(year, month - 1, day);
+    date.setUTCHours(12, 0, 0, 0);
+
+    if (
+        !Number.isFinite(date.getTime()) ||
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return '';
+    }
+
+    try {
+        if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+            return new Intl.DateTimeFormat(locale || undefined, {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                timeZone: 'UTC'
+            }).format(date);
+        }
+    } catch (_) {
+        // Use a deterministic day-first fallback on limited TV runtimes.
+    }
+
+    return match[3] + '.' + match[2] + '.' + match[1];
+}
+
+/**
  * Converts a Jellyseerr result into a Jellyfin-shaped item.
  * @param {Object} result - Raw result from /discover, /search, /movie or /tv
  * @param {string} [fallbackMediaType] - Explicit fallback ('tv' or 'movie') when result.mediaType is missing
