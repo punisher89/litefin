@@ -7,9 +7,8 @@ export default {
     defaultEnabled: true,
     init(api) {
         api.log.info('StarTrack server integration is available.');
-        api.emit('startrack:availability', true);
     },
     destroy(api) {
-        api.emit('startrack:availability', false);
+        api.log.info('StarTrack server integration disabled.');
     }
 };
