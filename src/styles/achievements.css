@@ -1869,3 +1869,123 @@
         transform: none !important;
     }
 }
+
+
+/* Game Center visual pass — restore the layered, premium concept and keep
+   icons, text, rarity and status in independent layout tracks. */
+.achievement-badge {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) 25px;
+    align-items: start;
+    column-gap: 15px;
+    row-gap: 8px;
+    padding: 19px;
+    border-radius: 19px;
+    background:
+        radial-gradient(ellipse at 100% 0%, rgba(139,124,255,.13), transparent 48%),
+        linear-gradient(145deg, rgba(30,29,55,.96), rgba(18,20,34,.96));
+    border-color: rgba(174,157,255,.13);
+}
+.achievement-badge-icon {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    align-self: start;
+}
+.achievement-badge-info {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-width: 0;
+    width: 100%;
+}
+.achievement-badge-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    min-width: 0;
+    gap: 7px 10px;
+}
+.achievement-badge-title-row strong {
+    flex: 1 1 145px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.achievement-rarity {
+    flex: 0 1 auto;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+}
+.achievement-badge-state {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    margin: 0;
+}
+.achievement-game-card {
+    display: grid;
+    grid-template-columns: 50px minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+    padding: 19px;
+    border: 1px solid rgba(174,157,255,.14);
+    border-radius: 19px;
+    background:
+        radial-gradient(ellipse at 100% 0%, rgba(139,124,255,.12), transparent 52%),
+        linear-gradient(145deg, rgba(30,29,55,.96), rgba(18,20,34,.96));
+}
+.achievement-game-card-icon {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    flex: none;
+}
+.achievement-game-card-content {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+    overflow-wrap: anywhere;
+}
+.achievement-game-card-content > strong,
+.achievement-game-card-content > small,
+.achievement-game-card-content > p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+.achievement-game-card-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.achievement-game-card-foot .achievement-action-button {
+    flex: 0 1 auto;
+    min-width: 112px;
+    max-width: 100%;
+}
+@media (max-width: 600px) {
+    .achievement-badge {
+        grid-template-columns: 46px minmax(0, 1fr) 23px;
+        column-gap: 11px;
+        padding: 14px;
+    }
+    .achievement-badge-icon {
+        width: 46px;
+        height: 46px;
+        flex-basis: 46px;
+        font-size: 22px;
+    }
+    .achievement-game-card {
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 11px;
+        padding: 14px;
+    }
+    .achievement-game-card-icon {
+        width: 42px;
+        height: 42px;
+        font-size: 21px;
+    }
+}
