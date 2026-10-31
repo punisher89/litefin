@@ -222,6 +222,8 @@ export default class StarTrackPage extends Page {
             el.innerHTML = this._renderLists();
         } else if (!this._entries.length) {
             el.innerHTML = this._renderEmpty();
+        } else if (this._tab === 'favorites') {
+            el.innerHTML = this._renderFavorites();
         } else {
             el.innerHTML = '<div class="startrack-grid">' +
                 this._entries.map((entry) => this._renderEntry(entry)).join('') + '</div>';
@@ -296,6 +298,27 @@ export default class StarTrackPage extends Page {
     _currentUserId() {
         const value = typeof api.userId === 'function' ? api.userId() : api.userId || api._userId;
         return String(value || '').replace(/-/g, '').toLowerCase();
+    }
+
+    _renderFavorites() {
+        const labels = {
+            Movie: this._t('Топ-4 фильмов', 'Top 4 Movies'),
+            Series: this._t('Топ-4 сериалов', 'Top 4 Series'),
+            Season: this._t('Топ-4 сезонов', 'Top 4 Seasons'),
+            Episode: this._t('Топ-4 эпизодов', 'Top 4 Episodes')
+        };
+        const order = ['Movie', 'Series', 'Season', 'Episode'];
+        const groups = Object.create(null);
+        this._entries.forEach((entry) => {
+            const type = String(field(entry.item, 'type', 'Other') || 'Other');
+            if (!groups[type]) groups[type] = [];
+            groups[type].push(entry);
+        });
+        return order.concat(Object.keys(groups).filter((type) => order.indexOf(type) < 0)).filter((type) => groups[type] && groups[type].length)
+            .map((type) => '<section class="startrack-favorites-group"><h2>' +
+                esc(labels[type] || type) + '</h2><div class="startrack-grid">' +
+                groups[type].map((entry) => this._renderEntry(entry)).join('') + '</div></section>')
+            .join('');
     }
 
     _renderLists() {
