@@ -1241,19 +1241,19 @@ class CardRenderer {
         titleText = escapeHtml(titleText);
         subtitleText = escapeHtml(subtitleText);
 
-        // Discover's Seerr cards include their TMDB ID and voteAverage.
-        // Show the actual TMDB score under the title; no extra request is needed.
+        // Discover's Seerr movie and series cards carry their TMDB score already.
+        // Keep it inline with the year/secondary label, without a separate row or brand text.
         const rawTmdbId = item._tmdbId;
         const tmdbId = rawTmdbId === null || rawTmdbId === undefined ? '' : String(rawTmdbId).trim();
         const hasTmdbId = tmdbId !== '' && Number.isFinite(Number(tmdbId)) && Number(tmdbId) > 0;
         const tmdbRating = Number(item.CommunityRating);
-        const tmdbRatingHtml =
+        const tmdbRatingInlineHtml =
             contextType === 'discover' &&
             (item.Type === 'Movie' || item.Type === 'Series') &&
             hasTmdbId &&
             Number.isFinite(tmdbRating) &&
             tmdbRating > 0
-                ? `<div class="seerr-tmdb-rating" title="TMDB rating"><span class="seerr-tmdb-rating__brand">TMDB</span><span class="seerr-tmdb-rating__score"><span class="seerr-tmdb-rating__star">★</span>${tmdbRating.toFixed(1)}</span></div>`
+                ? `<span class="seerr-discover-rating" title="Rating"><span class="seerr-discover-rating__star">★</span>${tmdbRating.toFixed(1)}</span>`
                 : '';
 
         // --- 3.5. List View Override ---
@@ -1624,8 +1624,8 @@ class CardRenderer {
                         `
                                 : `<div class="card-title"><span>${titleText}</span></div>`
                         }
-                        ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
-                        ${tmdbRatingHtml}
+                        ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
+                        ${tmdbRatingInlineHtml}
                         ${metaHtml}
                     </div>
                     `
@@ -1646,8 +1646,8 @@ class CardRenderer {
                     `
                             : `<div class="card-title"><span>${titleText}</span></div>`
                     }
-                    ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
-                    ${tmdbRatingHtml}
+                    ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
+                    ${tmdbRatingInlineHtml}
                     ${metaHtml}
                 </div>
                 `
