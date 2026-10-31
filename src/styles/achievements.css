@@ -3,9 +3,10 @@
 }
 
 .achievements-content {
-    max-width: 1500px;
-    margin: 0 auto;
-    padding: 28px 34px 64px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 28px clamp(18px, 2.4vw, 42px) 64px;
 }
 
 .achievements-header,
