@@ -34,15 +34,34 @@ test('Seerr Center uses Seerr request APIs and the correct role permissions', ()
 
 test('Seerr issues support create, comment, resolve and reopen flows', () => {
     assert.ok(api.includes('async createIssue('));
-    assert.ok(api.includes("body: { mediaId: Number(mediaId), issueType: Number(issueType), message: String(message).trim() }"));
+    assert.ok(api.includes("async createIssue({ mediaId, issueType, message, problemSeason = 0, problemEpisode = 0 })"));
+    assert.ok(api.includes("return this._request('/Issues'"));
+    assert.ok(api.includes('internalMediaId = Number(mediaId)'));
+    assert.ok(api.includes('problemSeason: season'));
     assert.ok(api.includes('async commentIssue('));
+    assert.ok(api.includes('/Comments'));
+
     assert.ok(api.includes("async updateIssueStatus(issueId, status)"));
     assert.ok(api.includes("['open', 'resolved']"));
+    assert.ok(api.includes('/Status/${status}'));
     assert.ok(center.includes("data-center-action=\"issue-filter\""));
     assert.ok(center.includes("data-issue-action=\"resolved\""));
     assert.ok(center.includes("data-issue-action=\"open\""));
 });
 
+test('Seerr Center uses a wide Seerr-style page and native issue controls', () => {
+    const css = read('../src/styles/seerr-center.css');
+    assert.ok(center.includes('id="seerr-center-title"'));
+    assert.ok(center.includes('data-center-select="issue-filter"'));
+    assert.ok(center.includes('data-center-select="issue-sort"'));
+    assert.ok(center.includes('data-center-select="issue-page-size"'));
+    assert.ok(center.includes('seerr-center-issue-backdrop'));
+    assert.ok(center.includes('seerr-center-issue-poster'));
+    assert.ok(center.includes('seerr-center-issue-side'));
+    assert.ok(center.includes('async _loadIssueMediaDetails()'));
+    assert.ok(css.includes('max-width: none;'));
+    assert.ok(css.includes('.seerr-center-issue-card'));
+});
 test('Player OSD opens an authenticated Seerr issue report against the current media item', () => {
     assert.ok(osd.includes("data-action=\"reportIssue\""));
     assert.ok(osd.includes("case 'reportIssue':"));
