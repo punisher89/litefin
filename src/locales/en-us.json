@@ -1832,5 +1832,11 @@
     "SeerrNotificationRequestNew": "New request",
     "SeerrNotificationStatusUpdated": "Request status updated",
     "SeerrNotificationIssueReply": "New reply on an issue",
-    "SeerrNotificationIssueNew": "New issue reported"
+    "SeerrNotificationIssueNew": "New issue reported",
+    "SeerrCenterApproved": "Approved",
+    "SeerrCenterFailed": "Failed",
+    "SeerrCenterRequestable": "Can be requested",
+    "SeerrCenterReleaseDateUnknown": "Release date unknown",
+    "SeerrCenterSortBy": "Sort by",
+    "SeerrCenterSortByRelease": "Release date"
 }
