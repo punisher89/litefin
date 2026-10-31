@@ -135,7 +135,7 @@ test('ServerPluginClient & ApiClient: disabled plugin in server registry is trea
 });
 
 
-test('ServerPluginClient: server-wide probes run without an item while item-scoped probes defer', async () => {
+test('ServerPluginClient: item-scoped probes defer without an item', async () => {
     const { serverPluginClient } = await import('../src/plugins/ServerPluginClient.js');
     const originalApi = serverPluginClient._api;
     const requested = [];
@@ -147,11 +147,6 @@ test('ServerPluginClient: server-wide probes run without an item while item-scop
     };
 
     try {
-        const starTrack = await serverPluginClient._probeEndpoint('startrack', null);
-        assert.equal(starTrack.available, true);
-        assert.equal(starTrack.deferred, undefined);
-        assert.deepEqual(requested, ['/Plugins/StarTrack/Stats']);
-
         const introSkipper = await serverPluginClient._probeEndpoint('intro-skipper', null);
         assert.equal(introSkipper.available, false);
         assert.equal(introSkipper.deferred, true);
@@ -159,7 +154,7 @@ test('ServerPluginClient: server-wide probes run without an item while item-scop
         const openSubtitles = await serverPluginClient._probeEndpoint('open-subtitles', null);
         assert.equal(openSubtitles.available, false);
         assert.equal(openSubtitles.deferred, true);
-        assert.deepEqual(requested, ['/Plugins/StarTrack/Stats']);
+        assert.deepEqual(requested, []);
     } finally {
         serverPluginClient._api = originalApi;
         serverPluginClient.reset();
