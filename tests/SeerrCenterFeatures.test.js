@@ -44,7 +44,7 @@ test('Seerr issues support create, comment, resolve and reopen flows', () => {
     assert.ok(api.includes("async updateIssueStatus(issueId, status)"));
     assert.ok(api.includes("['open', 'resolved']"));
     assert.ok(api.includes('/Status/${status}'));
-    assert.ok(center.includes("data-center-action=\"issue-filter\""));
+    assert.ok(center.includes('data-center-select=\"issue-filter\"'));
     assert.ok(center.includes("data-issue-action=\"resolved\""));
     assert.ok(center.includes("data-issue-action=\"open\""));
 });
@@ -68,7 +68,7 @@ test('Player OSD opens an authenticated Seerr issue report against the current m
     assert.ok(osd.includes('this.seerrIssueMenu = new SeerrIssueMenu(this)'));
     assert.ok(osd.includes("overlay.querySelectorAll('button, input[type=\"range\"], textarea')"));
     assert.ok(issueMenu.includes("seerr.createIssue({"));
-    assert.ok(issueMenu.includes('(2 | 4194304)'));
+    assert.ok(issueMenu.includes('(2 | 1048576 | 4194304)'));
     assert.ok(issueMenu.includes('SeerrIssueMessageRequired'));
 });
 
