@@ -46,10 +46,8 @@ const CLASSIC_STATIC_ITEMS = [
 const MODERN_STATIC_ITEMS = [
     { id: 'home', label: 'Home' },
     { id: 'discover', label: 'SeerrDiscover' },
-    { id: 'seerr-center', label: 'SeerrCenterTitle' },
     { id: 'favorites', label: 'Favorites' },
     { id: 'achievements', label: 'Achievements' },
-    { id: 'startrack', label: 'MyRatings' },
     { id: 'search', label: 'Search' },
     { id: 'random', label: 'Random' },
     { id: 'syncplay', label: 'SyncPlay' },
