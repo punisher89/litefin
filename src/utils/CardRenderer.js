@@ -1625,7 +1625,6 @@ class CardRenderer {
                                 : `<div class="card-title"><span>${titleText}</span></div>`
                         }
                         ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
-                        ${tmdbRatingInlineHtml}
                         ${metaHtml}
                     </div>
                     `
@@ -1647,7 +1646,6 @@ class CardRenderer {
                             : `<div class="card-title"><span>${titleText}</span></div>`
                     }
                     ${subtitleText || tmdbRatingInlineHtml ? `<div class="card-subtitle">${subtitleText ? `<span>${subtitleText}</span>` : ''}${tmdbRatingInlineHtml}</div>` : ''}
-                    ${tmdbRatingInlineHtml}
                     ${metaHtml}
                 </div>
                 `
