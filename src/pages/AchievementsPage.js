@@ -817,20 +817,27 @@ class AchievementsPage extends Page {
     }
 
     async _equipCosmetic(cosmeticId, button) {
-        if (!cosmeticId || !this._userPath) return;
-        const name = button.getAttribute('data-achievement-name') || cosmeticId;
-        if (!window.confirm(gameText('confirmEquip', { name }))) return;
+        if (!cosmeticId || !this._userPath || !button) return;
+        // Native confirm dialogs can swallow Magic Remote input on webOS.
+        // Match the TV-friendly shop flow: one explicit activation equips immediately.
+        if (button.dataset.equipPending === 'true') return;
+        button.dataset.equipPending = 'true';
         button.disabled = true;
         this._setGameStatus(gameText('loadingGame'));
         try {
             const result = await api.post(`${this._userPath}/cosmetics/equip`, { CosmeticId: cosmeticId });
-            if (valueOf(result, 'Success', 'success') === false) throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
+            if (valueOf(result, 'Success', 'success') === false) {
+                throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
+            }
             await this._loadLoadout();
             this._renderLoadout();
             this._setGameStatus(gameText('equipOk'));
         } catch (err) {
             log.warn('Achievement Badges cosmetic equip failed:', err);
-            this._setGameStatus(gameText('actionFailed'), true);
+            const reason = localizeAchievementMessage(err && err.message ? err.message : gameText('actionFailed'), i18n.currentLang || document.documentElement.lang || 'en');
+            this._setGameStatus(reason || gameText('actionFailed'), true);
+        } finally {
+            button.dataset.equipPending = 'false';
             button.disabled = false;
         }
     }
