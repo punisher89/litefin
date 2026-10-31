@@ -1934,10 +1934,8 @@ class Sidebar extends Component {
                 const pluginHidden = isSyncPlay && !pluginManager.isEnabled('syncplay');
                 // Same seerr-awareness as Modern mode — discover stays hidden until probed
                 const isDiscover = id === 'discover';
-                const isSeerrCenter = id === 'seerr-center';
-                const seerrHidden = (isDiscover || isSeerrCenter) && !this._seerrAvailable;
-                const starTrackHidden = id === 'startrack' && !this._starTrackAvailable;
-                const shouldHide = hidden || pluginHidden || seerrHidden || starTrackHidden;
+                const seerrHidden = isDiscover && !this._seerrAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden;
 
                 el.style.display = shouldHide ? 'none' : '';
                 sidebarContent.appendChild(el);
