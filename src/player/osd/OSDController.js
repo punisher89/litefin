@@ -3350,7 +3350,7 @@ export default class OSDController extends Component {
         overlays.forEach(overlay => {
             if (overlay.classList.contains('visible')) {
                 // Find focusables inside visible overlay
-                const focusables = Array.from(overlay.querySelectorAll('button, input[type="range"], textarea'));
+                const focusables = Array.from(overlay.querySelectorAll('button, input[type="range"], textarea, select'));
                 this._cachedOverlayRow.push(...focusables);
             }
         });
