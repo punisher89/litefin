@@ -23,7 +23,7 @@ const GAME_TEXT = {
         showcaseIntro: 'Твои лучшие разблокированные значки. Выбирай, что будет отображаться в витрине профиля.',
         showcaseLoading: 'Загружаем витрину…', showcaseEmpty: 'Пока нет экипированных значков.', showcaseAvailable: 'Доступные значки', showcaseSlots: 'Мест занято', showcaseAdd: 'В витрину', showcaseRemove: 'Убрать', showcaseNoAvailable: 'Нет других разблокированных значков.', showcaseUnavailable: 'Не удалось загрузить витрину.',
         challengesIntro: 'Сезонные и ограниченные по времени испытания сервера.', challengesLoading: 'Загружаем испытания…', challengesEmpty: 'Сейчас нет доступных испытаний.', challengesUnavailable: 'Испытания недоступны или скрыты настройками сервера.', challengeActive: 'Идёт', challengeUpcoming: 'Скоро', challengeEnded: 'Завершено', challengeCompleted: 'Выполнено', challengePeriod: 'Период',
-        prestigeIntro: 'Начни новый цикл достижений и получи постоянный бонус к очкам.', prestigeLevel: 'Уровень престижа', prestigeLifetime: 'Очков за всё время', prestigeScore: 'Очки текущего цикла', prestigeRequired: 'Для престижа требуется 12 000 очков текущего цикла.', prestigeReady: 'Условие выполнено', prestigeLocked: 'Пока рано для престижа', prestigeReset: 'Перейти к престижу', prestigeConfirmTitle: 'Подтвердить престиж?', prestigeConfirm: 'Да, начать престиж', prestigeCancel: 'Отмена', prestigeWarning: 'Будут сброшены текущие достижения, прогресс и счётчики просмотров. Уровень престижа, накопленные очки за всё время и банк очков сохранятся. Это действие нельзя отменить.', prestigeSuccess: 'Престиж успешно повышен.', prestigeUnavailable: 'Не удалось выполнить престиж.',
+        prestigeIntro: 'Начни новый цикл достижений и получи постоянный бонус к очкам.', prestigeLevel: 'Уровень престижа', prestigeLifetime: 'Очков за всё время', prestigeScore: 'Очки текущего цикла', prestigeRequired: 'Для престижа требуется 12 000 очков текущего цикла.', prestigeReady: 'Условие выполнено', prestigeLocked: 'Пока рано для престижа', prestigeReset: 'Перейти к престижу', prestigeConfirmTitle: 'Подтвердить престиж?', prestigeConfirm: 'Да, начать престиж', prestigeCancel: 'Отмена', prestigeWarning: 'Будут сброшены текущие достижения, прогресс, счётчики просмотров и экипированные значки витрины. Уровень престижа, накопленные очки за всё время и банк очков сохранятся. Купленная косметика профиля останется. Это действие нельзя отменить.', prestigeSuccess: 'Престиж успешно повышен.', prestigeUnavailable: 'Не удалось выполнить престиж.',
         settingsIntro: 'Уведомления, приватность и отображение достижений. Настройки сохраняются в профиле Jellyfin.',
         settingsNotifications: 'Уведомления', settingsPrivacy: 'Приватность', settingsDisplay: 'Отображение',
         settingsSaved: 'Настройки сохранены.', settingsSaving: 'Сохраняем…', settingsSaveError: 'Не удалось сохранить настройки.',
@@ -73,7 +73,7 @@ const GAME_TEXT = {
         showcaseIntro: 'Your best unlocked badges. Choose what appears in your profile showcase.',
         showcaseLoading: 'Loading showcase…', showcaseEmpty: 'No equipped badges yet.', showcaseAvailable: 'Available badges', showcaseSlots: 'Slots used', showcaseAdd: 'Add to showcase', showcaseRemove: 'Remove', showcaseNoAvailable: 'No other unlocked badges available.', showcaseUnavailable: 'Could not load the showcase.',
         challengesIntro: 'Seasonal and time-limited challenges on this server.', challengesLoading: 'Loading challenges…', challengesEmpty: 'There are no available challenges right now.', challengesUnavailable: 'Challenges are unavailable or hidden by server settings.', challengeActive: 'In progress', challengeUpcoming: 'Upcoming', challengeEnded: 'Ended', challengeCompleted: 'Completed', challengePeriod: 'Period',
-        prestigeIntro: 'Start a new achievement cycle and gain a permanent score bonus.', prestigeLevel: 'Prestige level', prestigeLifetime: 'Lifetime score', prestigeScore: 'Current cycle score', prestigeRequired: 'Prestige requires 12,000 score in the current cycle.', prestigeReady: 'Requirement reached', prestigeLocked: 'Prestige not available yet', prestigeReset: 'Start prestige', prestigeConfirmTitle: 'Confirm prestige?', prestigeConfirm: 'Yes, prestige now', prestigeCancel: 'Cancel', prestigeWarning: 'Your current achievements, progress and watch counters will be reset. Prestige level, lifetime score and score bank will remain. This action cannot be undone.', prestigeSuccess: 'Prestige increased successfully.', prestigeUnavailable: 'Prestige could not be completed.',
+        prestigeIntro: 'Start a new achievement cycle and gain a permanent score bonus.', prestigeLevel: 'Prestige level', prestigeLifetime: 'Lifetime score', prestigeScore: 'Current cycle score', prestigeRequired: 'Prestige requires 12,000 score in the current cycle.', prestigeReady: 'Requirement reached', prestigeLocked: 'Prestige not available yet', prestigeReset: 'Start prestige', prestigeConfirmTitle: 'Confirm prestige?', prestigeConfirm: 'Yes, prestige now', prestigeCancel: 'Cancel', prestigeWarning: 'Your current achievements, progress, watch counters and equipped showcase badges will be reset. Prestige level, lifetime score and score bank will remain. Purchased profile cosmetics will stay owned. This action cannot be undone.', prestigeSuccess: 'Prestige increased successfully.', prestigeUnavailable: 'Prestige could not be completed.',
         settingsIntro: 'Notifications, privacy and achievement display. Settings are saved to your Jellyfin profile.',
         settingsNotifications: 'Notifications', settingsPrivacy: 'Privacy', settingsDisplay: 'Display',
         settingsSaved: 'Settings saved.', settingsSaving: 'Saving…', settingsSaveError: 'Could not save settings.',
@@ -1626,9 +1626,10 @@ class AchievementsPage extends Page {
                 : startMs && startMs > now ? gameText('challengeUpcoming')
                 : endMs && endMs < now ? gameText('challengeEnded')
                 : gameText('challengeActive');
-            const localized = localizeAchievementBadge(merged, i18n.currentLang || document.documentElement.lang || 'en');
-            const title = valueOf(localized, 'Title', 'title') || id;
-            const description = valueOf(localized, 'Description', 'description') || '';
+            // Challenge titles and descriptions may be administrator-authored;
+            // preserve their server wording instead of applying badge heuristics.
+            const title = valueOf(merged, 'Title', 'title') || id;
+            const description = valueOf(merged, 'Description', 'description') || '';
             const rarity = localizedBadgeValue(valueOf(merged, 'Rarity', 'rarity') || '', 'rarity', this._serverTranslations);
             const period = start || end
                 ? (start ? achievementDate(start, true) : '—') + ' — ' + (end ? achievementDate(end, true) : '—')
@@ -1699,6 +1700,7 @@ class AchievementsPage extends Page {
                 throw new Error(valueOf(result, 'Message', 'message') || gameText('prestigeUnavailable'));
             }
             this._prestigeConfirm = false;
+            this._showcaseBadges = null;
             await this._load(true);
             this._setFeatureStatus('achievement-prestige-status', gameText('prestigeSuccess'));
             this._renderPrestige();
