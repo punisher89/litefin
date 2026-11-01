@@ -32,7 +32,7 @@ const GAME_TEXT = {
         prefActivity: 'Показывать мои открытия в общей ленте', prefHideCompare: 'Скрыть мой профиль от сравнения', prefHidePrestige: 'Скрыть меня в таблице престижа', prefHideLeaderboard: 'Скрыть мой профиль из рейтингов веб-клиента', prefOffline: 'Показывать меня офлайн друзьям', prefHideNowPlaying: 'Скрывать, что я сейчас смотрю', prefHideLastWatched: 'Скрывать последний просмотр',
         prefShowcase: 'Показывать витрину экипированных значков', prefAutoEquip: 'Автоматически экипировать новые значки', prefSlots: 'Количество мест в витрине', prefSpoilers: 'Скрывать описания закрытых достижений', prefExtremeSpoilers: 'Полностью скрывать закрытые достижения',
         optionDefault: 'По умолчанию сервера{position}', optionAll: 'Все', optionRare: 'Редкие и выше', optionEpic: 'Эпические и выше', optionLegendary: 'Только легендарные', optionGrouped: 'Группировать', optionIndividual: 'По одному', optionAllDevices: 'На всех устройствах', optionOriginDevice: 'Только на устройстве просмотра',
-        optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.', settingsUnavailable: 'Не удалось загрузить настройки профиля.', showcaseEquipSuccess: 'Значок добавлен в витрину.', showcaseRemoveSuccess: 'Значок убран из витрины.', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.', settingsUnavailable: 'Не удалось загрузить настройки профиля.', showcaseEquipSuccess: 'Значок добавлен в витрину.', showcaseRemoveSuccess: 'Значок убран из витрины.', overviewProfileTitle: 'Твой игровой профиль', overviewProfileSubtitle: 'Собирай награды за просмотр и активность', overviewAwards: 'Получено наград', overviewQuests: 'Заданий выполнено', overviewStreak: 'Серия активности', overviewScore: 'Очки', overviewDays: 'дней', overviewRecent: 'Недавно полученные', overviewGoal: 'Ближайшая цель', overviewNoRecent: 'Новые награды появятся здесь после разблокировки.', overviewNoGoal: 'Сейчас нет незавершённых заданий. Отличная работа!', overviewUnlocked: 'Получено', overviewBestStreak: 'Лучшая серия', overviewQuestTotal: '{count} всего', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -82,7 +82,7 @@ const GAME_TEXT = {
         prefActivity: 'Show my unlocks in the public activity feed', prefHideCompare: 'Hide my profile from comparisons', prefHidePrestige: 'Hide me from prestige board', prefHideLeaderboard: 'Hide my profile from web-client leaderboards', prefOffline: 'Appear offline to friends', prefHideNowPlaying: 'Hide what I am currently watching', prefHideLastWatched: 'Hide last watched item',
         prefShowcase: 'Show equipped badge showcase', prefAutoEquip: 'Automatically equip newly unlocked badges', prefSlots: 'Showcase slot count', prefSpoilers: 'Hide descriptions of locked achievements', prefExtremeSpoilers: 'Hide locked achievements completely',
         optionDefault: 'Server default{position}', optionAll: 'All', optionRare: 'Rare and above', optionEpic: 'Epic and above', optionLegendary: 'Legendary only', optionGrouped: 'Grouped', optionIndividual: 'Individual', optionAllDevices: 'All devices', optionOriginDevice: 'Unlocking device only',
-        optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.', settingsUnavailable: 'Could not load profile settings.', showcaseEquipSuccess: 'Badge added to showcase.', showcaseRemoveSuccess: 'Badge removed from showcase.', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.', settingsUnavailable: 'Could not load profile settings.', showcaseEquipSuccess: 'Badge added to showcase.', showcaseRemoveSuccess: 'Badge removed from showcase.', overviewProfileTitle: 'Your gaming profile', overviewProfileSubtitle: 'Earn rewards as you watch and explore your library', overviewAwards: 'Awards earned', overviewQuests: 'Quests completed', overviewStreak: 'Activity streak', overviewScore: 'Score', overviewDays: 'days', overviewRecent: 'Recently unlocked', overviewGoal: 'Next goal', overviewNoRecent: 'New rewards will appear here when you unlock them.', overviewNoGoal: 'No unfinished quests right now. Great work!', overviewUnlocked: 'Unlocked', overviewBestStreak: 'Best streak', overviewQuestTotal: '{count} total', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -1846,71 +1846,103 @@ class AchievementsPage extends Page {
     }
 
     _renderOverview() {
-        const target = this.$('#achievements-overview');
+        const target = this.$("#achievements-overview");
         if (!target) return;
+        const summary = this._data.summary || {};
+        const rank = this._data.rank || {};
+        const tier = valueOf(rank, "Tier", "tier") || {};
+        const nextTier = valueOf(rank, "NextTier", "nextTier") || {};
+        const score = Number(valueOf(summary, "Score", "score", "UnlockedScore") || valueOf(rank, "Score", "score") || 0);
+        const unlocked = Number(valueOf(summary, "Unlocked", "unlocked") || 0);
+        const total = Number(valueOf(summary, "Total", "total") || this._data.badges.length);
+        const percent = Number(valueOf(summary, "Percentage", "percentage") || 0);
+        const language = i18n.currentLang || document.documentElement.lang || "en";
+        const rankName = localizeAchievementRank(valueOf(tier, "Name", "name") || "—", language, this._serverTranslations);
+        const nextName = localizeAchievementRank(valueOf(nextTier, "Name", "name"), language, this._serverTranslations);
+        const rankProgress = Math.max(0, Math.min(100, Number(valueOf(rank, "ProgressToNext", "progressToNext") || 0)));
+        const streak = Number(valueOf(summary, "CurrentWatchStreak", "currentWatchStreak") || 0);
+        const bestStreak = Number(valueOf(summary, "BestWatchStreak", "bestWatchStreak") || 0);
 
-        const summary = this._data.summary;
-        const rank = this._data.rank;
-        const tier = valueOf(rank, 'Tier', 'tier') || {};
-        const nextTier = valueOf(rank, 'NextTier', 'nextTier') || {};
-        const score = Number(valueOf(summary, 'Score', 'score', 'UnlockedScore') || valueOf(rank, 'Score', 'score') || 0);
-        const unlocked = Number(valueOf(summary, 'Unlocked', 'unlocked') || 0);
-        const total = Number(valueOf(summary, 'Total', 'total') || this._data.badges.length);
-        const percent = Number(valueOf(summary, 'Percentage', 'percentage') || 0);
-        const language = i18n.currentLang || document.documentElement.lang || 'en';
-        const rankName = localizeAchievementRank(valueOf(tier, 'Name', 'name') || '—', language, this._serverTranslations);
-        const nextName = localizeAchievementRank(valueOf(nextTier, 'Name', 'name'), language, this._serverTranslations);
-        const rankProgress = Math.max(0, Math.min(100, Number(valueOf(rank, 'ProgressToNext', 'progressToNext') || 0)));
-        const streak = Number(valueOf(summary, 'CurrentWatchStreak', 'currentWatchStreak') || 0);
-        const bestStreak = Number(valueOf(summary, 'BestWatchStreak', 'bestWatchStreak') || 0);
-
-        const playerRank = this.$('#achievement-player-rank');
-        const playerScore = this.$('#achievement-player-score');
-        const playerNext = this.$('#achievement-player-next');
-        const playerProgress = this.$('#achievement-player-progress');
-        const playerPercent = this.$('#achievement-player-percent');
-        if (playerRank) playerRank.textContent = rankName || '—';
+        const playerRank = this.$("#achievement-player-rank");
+        const playerScore = this.$("#achievement-player-score");
+        const playerNext = this.$("#achievement-player-next");
+        const playerProgress = this.$("#achievement-player-progress");
+        const playerPercent = this.$("#achievement-player-percent");
+        if (playerRank) playerRank.textContent = rankName || "—";
         if (playerScore) playerScore.textContent = achievementNumber(score);
-        if (playerNext) playerNext.textContent = nextName ? gameText('nextRank', { name: nextName }) : gameText('maxRank');
-        if (playerProgress) playerProgress.style.width = `${rankProgress}%`;
-        if (playerPercent) playerPercent.textContent = `${rankProgress}%`;
+        if (playerNext) playerNext.textContent = nextName ? gameText("nextRank", { name: nextName }) : gameText("maxRank");
+        if (playerProgress) playerProgress.style.width = rankProgress + "%";
+        if (playerPercent) playerPercent.textContent = rankProgress + "%";
+
+        const dailyValue = valueOf(this._data.quests, "Daily", "daily");
+        const weeklyValue = valueOf(this._data.quests, "Weekly", "weekly");
+        const dailyQuests = Array.isArray(dailyValue) ? dailyValue : [];
+        const weeklyQuests = Array.isArray(weeklyValue) ? weeklyValue : [];
+        const allQuests = dailyQuests.map((quest) => ({ quest, period: "daily" }))
+            .concat(weeklyQuests.map((quest) => ({ quest, period: "weekly" })));
+        const completedQuests = allQuests.filter(({ quest }) => !!valueOf(quest, "Completed", "completed")).length;
+        const nextGoal = allQuests
+            .filter(({ quest }) => !valueOf(quest, "Completed", "completed"))
+            .map(({ quest, period }) => {
+                const localized = localizeAchievementQuest(quest, language, this._serverTranslations);
+                const current = Number(valueOf(quest, "Current", "current") || 0);
+                const goal = Number(valueOf(quest, "Target", "target") || 0);
+                return {
+                    quest,
+                    period,
+                    title: valueOf(localized, "Title", "title") || "",
+                    description: valueOf(localized, "Description", "description") || "",
+                    current,
+                    goal,
+                    reward: Number(valueOf(quest, "Reward", "reward") || 0),
+                    percent: progressPercent(current, goal)
+                };
+            })
+            .sort((a, b) => b.percent - a.percent)[0];
 
         const recent = this._data.badges
-            .filter((badge) => valueOf(badge, 'Unlocked', 'unlocked') && valueOf(badge, 'UnlockedAt', 'unlockedAt'))
-            .sort((a, b) => new Date(valueOf(b, 'UnlockedAt', 'unlockedAt')) - new Date(valueOf(a, 'UnlockedAt', 'unlockedAt')))
-            .slice(0, 4);
+            .filter((badge) => valueOf(badge, "Unlocked", "unlocked") && valueOf(badge, "UnlockedAt", "unlockedAt"))
+            .sort((a, b) => new Date(valueOf(b, "UnlockedAt", "unlockedAt")) - new Date(valueOf(a, "UnlockedAt", "unlockedAt")))
+            .slice(0, 3);
         const recentHtml = recent.length
-            ? `<div class="achievements-recent">${recent.map((badge) => `<span title="${escapeHtml(valueOf(localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang, this._serverTranslations), 'Title', 'title'))}">${badgeIcon(badge)}</span>`).join('')}</div>`
-            : '';
+            ? recent.map((badge) => {
+                const localized = localizeAchievementBadge(badge, language, this._serverTranslations);
+                const title = valueOf(localized, "Title", "title") || "";
+                const description = valueOf(localized, "Description", "description") || "";
+                return "<article class=\"achievement-recent-card\">" +
+                    "<span class=\"achievement-recent-icon\" aria-hidden=\"true\">" + badgeIcon(badge) + "</span>" +
+                    "<span class=\"achievement-recent-copy\"><strong>" + escapeHtml(title) + "</strong>" +
+                    (description ? "<span>" + escapeHtml(description) + "</span>" : "") +
+                    "<small>✓ " + escapeHtml(gameText("overviewUnlocked")) + "</small></span></article>";
+            }).join("")
+            : "<p class=\"achievements-muted achievement-overview-empty\">" + escapeHtml(gameText("overviewNoRecent")) + "</p>";
 
-        target.innerHTML = `
-            <div class="achievement-stat achievement-stat-score">
-                <span class="achievement-stat-icon">⭐</span>
-                <span class="achievement-stat-label">${escapeHtml(i18n.t('AchievementScore'))}</span>
-                <strong>${achievementNumber(score)}</strong>
-            </div>
-            <div class="achievement-stat achievement-stat-rank">
-                <span class="achievement-stat-icon">👑</span>
-                <span class="achievement-stat-label">${escapeHtml(i18n.t('AchievementRank'))}</span>
-                <strong>${escapeHtml(rankName)}</strong>
-                <div class="achievement-progress"><span style="width:${rankProgress}%"></span></div>
-                <small>${nextName ? `${rankProgress}% · ${escapeHtml(nextName)}` : `${rankProgress}%`}</small>
-            </div>
-            <div class="achievement-stat achievement-stat-unlocked">
-                <span class="achievement-stat-icon">🏆</span>
-                <span class="achievement-stat-label">${escapeHtml(i18n.t('AchievementUnlocked'))}</span>
-                <strong>${unlocked} / ${total}</strong>
-                <div class="achievement-progress"><span style="width:${Math.max(0, Math.min(100, percent))}%"></span></div>
-                <small>${percent.toFixed(1)}%</small>
-            </div>
-            <div class="achievement-stat achievement-stat-streak">
-                <span class="achievement-stat-icon">🔥</span>
-                <span class="achievement-stat-label">${escapeHtml(i18n.t('AchievementProgress'))}</span>
-                <strong>${streak} ${escapeHtml('·')} ${bestStreak}</strong>
-                <small>${escapeHtml(i18n.t('AchievementWatchStreak'))}</small>
-                ${recentHtml}
-            </div>
-        `;
+        const goalHtml = nextGoal
+            ? "<div class=\"achievement-goal-main\">" +
+                "<span class=\"achievement-goal-icon\" aria-hidden=\"true\">" + badgeIcon(nextGoal.quest) + "</span>" +
+                "<div class=\"achievement-goal-copy\"><div class=\"achievement-goal-title-row\">" +
+                "<strong>" + escapeHtml(nextGoal.title) + "</strong>" +
+                "<span>" + escapeHtml(gameText(nextGoal.period)) + "</span></div>" +
+                "<p>" + escapeHtml(nextGoal.description) + "</p></div></div>" +
+                "<div class=\"achievement-goal-progress\"><div class=\"achievement-progress\"><span style=\"width:" + nextGoal.percent + "%\"></span></div>" +
+                "<div><span>" + nextGoal.current + " / " + nextGoal.goal + "</span><strong>+" + achievementNumber(nextGoal.reward) + " ⭐</strong></div></div>"
+            : "<p class=\"achievements-muted achievement-overview-empty\">" + escapeHtml(gameText("overviewNoGoal")) + "</p>";
+
+        target.innerHTML = [
+            "<div class=\"achievement-overview-layout\">",
+            "<div class=\"achievement-overview-heading\"><div><h2>" + escapeHtml(gameText("overviewProfileTitle")) + "</h2><p>" + escapeHtml(gameText("overviewProfileSubtitle")) + "</p></div>",
+            "<span class=\"achievement-overview-rank\">✦ " + escapeHtml(rankName) + "</span></div>",
+            "<div class=\"achievement-profile-stats\">",
+            "<article class=\"achievement-stat achievement-profile-stat achievement-stat-awards\"><span class=\"achievement-stat-icon\">🏅</span><strong>" + achievementNumber(unlocked) + "</strong><span class=\"achievement-stat-label\">" + escapeHtml(gameText("overviewAwards")) + "</span><small>" + unlocked + " / " + total + " · " + percent.toFixed(1) + "%</small></article>",
+            "<article class=\"achievement-stat achievement-profile-stat achievement-stat-quests\"><span class=\"achievement-stat-icon\">🎯</span><strong>" + achievementNumber(completedQuests) + "</strong><span class=\"achievement-stat-label\">" + escapeHtml(gameText("overviewQuests")) + "</span><small>" + escapeHtml(gameText("overviewQuestTotal", { count: allQuests.length })) + "</small></article>",
+            "<article class=\"achievement-stat achievement-profile-stat achievement-stat-streak\"><span class=\"achievement-stat-icon\">🔥</span><strong>" + achievementNumber(streak) + " " + escapeHtml(gameText("overviewDays")) + "</strong><span class=\"achievement-stat-label\">" + escapeHtml(gameText("overviewStreak")) + "</span><small>" + escapeHtml(gameText("overviewBestStreak")) + ": " + achievementNumber(bestStreak) + "</small></article>",
+            "<article class=\"achievement-stat achievement-profile-stat achievement-stat-score\"><span class=\"achievement-stat-icon\">✦</span><strong>" + achievementNumber(score) + "</strong><span class=\"achievement-stat-label\">" + escapeHtml(gameText("overviewScore")) + "</span><small>" + escapeHtml(gameText("scoreBank")) + "</small></article>",
+            "</div>",
+            "<div class=\"achievement-overview-lower\">",
+            "<section class=\"achievement-overview-panel achievement-recent-panel\"><div class=\"achievement-overview-panel-heading\"><h3>" + escapeHtml(gameText("overviewRecent")) + "</h3><span>" + recent.length + "</span></div><div class=\"achievement-recent-grid\">" + recentHtml + "</div></section>",
+            "<section class=\"achievement-overview-panel achievement-goal-panel\"><div class=\"achievement-overview-panel-heading\"><h3>" + escapeHtml(gameText("overviewGoal")) + "</h3><span class=\"achievement-goal-status\">" + (nextGoal ? nextGoal.percent + "%" : "✓") + "</span></div>" + goalHtml + "</section>",
+            "</div></div>"
+        ].join("");
     }
 
     _renderQuests() {
