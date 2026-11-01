@@ -617,6 +617,9 @@ class AchievementsPage extends Page {
             await this._loadLoadout();
             this._render();
             this._applyServerUiTranslations();
+            const activeSection = this.el.querySelector('[data-game-section].active')?.getAttribute('data-game-section');
+            if (force && activeSection === 'stats') this._loadStats(this._statsPeriod);
+            if (force && activeSection === 'activity') this._loadActivity(false);
         } catch (err) {
             log.warn('Achievement Badges data could not be loaded:', err);
             this._showError(err);
