@@ -378,7 +378,13 @@ function localizedDescription(raw) {
 
 export function localizeAchievementBadge(badge, language = '') {
     if (!badge || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return badge;
+
+    // Custom badges are authored on the Jellyfin server. Keep their exact
+    // Name/Description: only the server administrator can supply the right
+    // translation, and generic pattern matching could corrupt their wording.
+    const category = String(badge.Category || badge.category || '').trim().toLowerCase();
     const id = String(badge.Id || badge.id || '').trim().toLowerCase();
+    if (category === 'custom' || /^[0-9a-f]{32}$/.test(id)) return badge;
     const title = RUSSIAN_TITLES[id];
     const description = localizedDescription(badge.Description || badge.description || '');
     if (!title && !description) return badge;
@@ -517,9 +523,12 @@ export function localizeAchievementQuest(quest, language = '') {
     if (!quest || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return quest;
     const id = String(quest.Id || quest.id || '').trim().toLowerCase();
     const localized = RUSSIAN_QUESTS[id];
+
+    // Only known stock quest IDs belong to the local fallback catalogue.
+    // Unknown IDs are admin-authored server content and remain untouched.
+    if (!localized) return quest;
     const originalDescription = quest.Description || quest.description || '';
-    const description = localized?.description || localizedDescription(originalDescription);
-    if (!localized && (!description || description === originalDescription)) return quest;
+    const description = localized.description || originalDescription;
     return {
         ...quest,
         Title: localized?.title || quest.Title || quest.title,
