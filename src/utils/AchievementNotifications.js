@@ -45,6 +45,7 @@ class AchievementNotifications {
         this._firstPoll = false;
         this._prefs = null;
         this._prefsFetchedAt = 0;
+        this._defaultToastPosition = '';
         this._features = null;
         this._featuresFetchedAt = 0;
         this._seen = new Set();
@@ -55,11 +56,13 @@ class AchievementNotifications {
         this._lastWarningAt = 0;
     }
 
-    updatePreferences(prefs) {
-        if (!prefs || typeof prefs !== 'object') return;
-        this._prefs = { ...prefs };
-        this._prefsFetchedAt = Date.now();
-        this._applyToastPosition(this._prefs);
+    updatePreferences(prefs, defaultToastPosition = '') {
+        if (prefs && typeof prefs === 'object') {
+            this._prefs = { ...prefs };
+            this._prefsFetchedAt = Date.now();
+        }
+        this._defaultToastPosition = String(defaultToastPosition || this._defaultToastPosition || '').toLowerCase();
+        this._applyToastPosition(this._prefs || {});
     }
 
     init() {
@@ -132,6 +135,7 @@ class AchievementNotifications {
         this._firstPoll = false;
         this._prefs = null;
         this._prefsFetchedAt = 0;
+        this._defaultToastPosition = '';
         this._features = null;
         this._featuresFetchedAt = 0;
         this._seen.clear();
@@ -306,7 +310,7 @@ class AchievementNotifications {
     _applyToastPosition(prefs = {}) {
         const container = document.getElementById('litefin-achievement-toast-container');
         if (!container) return;
-        const position = String(prefs.ToastPosition || prefs.toastPosition || '').toLowerCase();
+        const position = String(prefs.ToastPosition || prefs.toastPosition || this._defaultToastPosition || '').toLowerCase();
         container.style.top = '';
         container.style.right = '';
         container.style.bottom = '';
