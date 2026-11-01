@@ -1452,6 +1452,352 @@ class AchievementsPage extends Page {
         focusManager.invalidateCache('achievements-game-center');
     }
 
+
+    _setFeatureStatus(id, message, isError = false) {
+        const node = this.$('#' + id);
+        if (!node) return;
+        node.textContent = localizeAchievementMessage(message || '', i18n.currentLang || document.documentElement.lang || 'en');
+        node.classList.toggle('is-error', !!isError);
+        node.hidden = !message;
+    }
+
+    async _loadShowcase(force = false) {
+        if (!this._userPath || this._showcaseLoading) return;
+        if (!force && Array.isArray(this._showcaseBadges)) {
+            this._renderShowcase();
+            return;
+        }
+        this._showcaseLoading = true;
+        const equipped = this.$('#achievement-showcase-equipped');
+        if (equipped) equipped.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('showcaseLoading')) + '</p>';
+        try {
+            const lang = encodeURIComponent(String(i18n.currentLang || document.documentElement.lang || 'en'));
+            const result = await api.get(this._userPath + '/equipped?lang=' + lang);
+            this._showcaseBadges = Array.isArray(result) ? result : [];
+            this._renderShowcase();
+        } catch (err) {
+            log.warn('Achievement Badges showcase could not be loaded:', err);
+            this._showcaseBadges = [];
+            if (equipped) equipped.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('showcaseUnavailable')) + '</p>';
+            this._setFeatureStatus('achievement-showcase-status', gameText('showcaseUnavailable'), true);
+        } finally {
+            this._showcaseLoading = false;
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
+    _renderShowcase() {
+        const equippedTarget = this.$('#achievement-showcase-equipped');
+        const availableTarget = this.$('#achievement-showcase-available');
+        const slotsTarget = this.$('#achievement-showcase-slots');
+        if (!equippedTarget || !availableTarget || !this._data) return;
+        const equipped = Array.isArray(this._showcaseBadges) ? this._showcaseBadges : [];
+        const equippedIds = new Set(equipped.map((badge) => String(valueOf(badge, 'Id', 'id') || '')));
+        const configuredSlots = Number(valueOf(this._preferences, 'EquippedBadgeSlots', 'equippedBadgeSlots') || 5);
+        const slots = Math.max(1, Math.min(10, configuredSlots));
+        if (slotsTarget) slotsTarget.textContent = gameText('showcaseSlots') + ': ' + equipped.length + ' / ' + slots;
+
+        const renderBadge = (badge, action) => {
+            const localized = localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang || 'en');
+            const id = String(valueOf(badge, 'Id', 'id') || '');
+            const title = valueOf(localized, 'Title', 'title') || id;
+            const description = valueOf(localized, 'Description', 'description') || '';
+            const rarity = localizedBadgeValue(valueOf(badge, 'Rarity', 'rarity') || '', 'rarity', this._serverTranslations);
+            const canEquip = action === 'equip' && equipped.length < slots;
+            const button = action === 'remove'
+                ? '<button class="achievement-action-button focusable" type="button" data-showcase-remove="' + escapeHtml(id) + '" tabindex="0">' + escapeHtml(gameText('showcaseRemove')) + '</button>'
+                : '<button class="achievement-action-button focusable" type="button" data-showcase-equip="' + escapeHtml(id) + '" tabindex="0" ' + (canEquip ? '' : 'disabled') + '>' + escapeHtml(gameText('showcaseAdd')) + '</button>';
+            return '<article class="achievement-game-card achievement-showcase-card">'
+                + '<div class="achievement-game-card-icon">' + escapeHtml(badgeIcon(badge)) + '</div>'
+                + '<div class="achievement-game-card-content"><strong>' + escapeHtml(title) + '</strong>'
+                + (rarity ? '<small>' + escapeHtml(rarity) + '</small>' : '')
+                + (description ? '<p>' + escapeHtml(description) + '</p>' : '')
+                + '<div class="achievement-game-card-foot">' + button + '</div></div></article>';
+        };
+
+        equippedTarget.innerHTML = equipped.length
+            ? equipped.map((badge) => renderBadge(badge, 'remove')).join('')
+            : '<p class="achievements-muted">' + escapeHtml(gameText('showcaseEmpty')) + '</p>';
+
+        const available = this._data.badges.filter((badge) =>
+            !!valueOf(badge, 'Unlocked', 'unlocked')
+            && !equippedIds.has(String(valueOf(badge, 'Id', 'id') || ''))
+        );
+        availableTarget.innerHTML = available.length
+            ? available.map((badge) => renderBadge(badge, 'equip')).join('')
+            : '<p class="achievements-muted">' + escapeHtml(gameText('showcaseNoAvailable')) + '</p>';
+    }
+
+    async _equipShowcaseBadge(badgeId, button) {
+        if (!badgeId || !this._userPath || (button && button.dataset.showcasePending)) return;
+        if (button) { button.dataset.showcasePending = '1'; button.disabled = true; }
+        try {
+            const result = await api.post(this._userPath + '/equipped/' + encodeURIComponent(badgeId));
+            this._showcaseBadges = Array.isArray(result) ? result : null;
+            if (!this._showcaseBadges) await this._loadShowcase(true);
+            else this._renderShowcase();
+            this._setFeatureStatus('achievement-showcase-status', 'Badge equipped.');
+        } catch (err) {
+            log.warn('Achievement badge could not be added to showcase:', err);
+            this._setFeatureStatus('achievement-showcase-status', localizeAchievementMessage(err.message || gameText('actionFailed'), i18n.currentLang || document.documentElement.lang || 'en'), true);
+        } finally {
+            if (button) { delete button.dataset.showcasePending; button.disabled = false; }
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
+    async _unequipShowcaseBadge(badgeId, button) {
+        if (!badgeId || !this._userPath || (button && button.dataset.showcasePending)) return;
+        if (button) { button.dataset.showcasePending = '1'; button.disabled = true; }
+        try {
+            const result = await api.delete(this._userPath + '/equipped/' + encodeURIComponent(badgeId));
+            this._showcaseBadges = Array.isArray(result) ? result : null;
+            if (!this._showcaseBadges) await this._loadShowcase(true);
+            else this._renderShowcase();
+            this._setFeatureStatus('achievement-showcase-status', 'Badge unequipped.');
+        } catch (err) {
+            log.warn('Achievement badge could not be removed from showcase:', err);
+            this._setFeatureStatus('achievement-showcase-status', localizeAchievementMessage(err.message || gameText('actionFailed'), i18n.currentLang || document.documentElement.lang || 'en'), true);
+        } finally {
+            if (button) { delete button.dataset.showcasePending; button.disabled = false; }
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
+    async _loadChallenges(force = false) {
+        if (!this._userPath || this._challengeLoading) return;
+        if (!force && Array.isArray(this._challengeDefinitions)) {
+            this._renderChallenges();
+            return;
+        }
+        this._challengeLoading = true;
+        const target = this.$('#achievement-challenges-content');
+        if (target) target.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('challengesLoading')) + '</p>';
+        try {
+            // This route is elevation-gated. Non-admin users still get their
+            // active/ended challenge badges from the normal user badge list.
+            const result = await api.get('/Plugins/AchievementBadges/admin/challenges').catch(() => null);
+            this._challengeDefinitions = Array.isArray(result) ? result : [];
+            this._renderChallenges();
+        } catch (err) {
+            log.debug('Achievement Badges challenge catalogue unavailable:', err);
+            this._challengeDefinitions = [];
+            this._renderChallenges();
+        } finally {
+            this._challengeLoading = false;
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
+    _renderChallenges() {
+        const target = this.$('#achievement-challenges-content');
+        if (!target || !this._data) return;
+        const badges = this._data.badges || [];
+        const byId = new Map(badges.map((badge) => [String(valueOf(badge, 'Id', 'id') || '').toLowerCase(), badge]));
+        const isChallenge = (item) => {
+            const id = String(valueOf(item, 'Id', 'id') || '').toLowerCase();
+            const category = String(valueOf(item, 'Category', 'category') || '').toLowerCase();
+            return valueOf(item, 'IsChallenge', 'isChallenge') === true || category === 'challenge' || id.startsWith('challenge-') || id.startsWith('seasonal-');
+        };
+        const definitions = Array.isArray(this._challengeDefinitions) ? this._challengeDefinitions.filter(isChallenge) : [];
+        const source = definitions.length ? definitions : badges.filter(isChallenge);
+        if (!source.length) {
+            target.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('challengesEmpty')) + '</p>';
+            return;
+        }
+        const now = Date.now();
+        target.innerHTML = source.map((definition) => {
+            const id = String(valueOf(definition, 'Id', 'id') || '');
+            const badge = byId.get(id.toLowerCase()) || {};
+            const merged = { ...definition, ...badge };
+            const current = Number(valueOf(badge, 'CurrentValue', 'currentValue') ?? valueOf(definition, 'CurrentValue', 'currentValue') ?? 0);
+            const goal = Number(valueOf(badge, 'TargetValue', 'targetValue') ?? valueOf(definition, 'TargetValue', 'targetValue') ?? 0);
+            const unlocked = !!valueOf(badge, 'Unlocked', 'unlocked');
+            const percent = progressPercent(current, goal);
+            const start = valueOf(definition, 'ChallengeStart', 'challengeStart');
+            const end = valueOf(definition, 'ChallengeEnd', 'challengeEnd');
+            const startMs = start ? new Date(start).getTime() : 0;
+            const endMs = end ? new Date(end).getTime() : 0;
+            const status = unlocked ? gameText('challengeCompleted')
+                : startMs && startMs > now ? gameText('challengeUpcoming')
+                : endMs && endMs < now ? gameText('challengeEnded')
+                : gameText('challengeActive');
+            const localized = localizeAchievementBadge(merged, i18n.currentLang || document.documentElement.lang || 'en');
+            const title = valueOf(localized, 'Title', 'title') || id;
+            const description = valueOf(localized, 'Description', 'description') || '';
+            const rarity = localizedBadgeValue(valueOf(merged, 'Rarity', 'rarity') || '', 'rarity', this._serverTranslations);
+            const period = start || end
+                ? (start ? achievementDate(start, true) : '—') + ' — ' + (end ? achievementDate(end, true) : '—')
+                : '';
+            return '<article class="achievement-game-card achievement-challenge-card">'
+                + '<div class="achievement-game-card-icon">' + escapeHtml(badgeIcon(merged)) + '</div>'
+                + '<div class="achievement-game-card-content"><div class="achievement-challenge-heading"><strong>' + escapeHtml(title) + '</strong><span class="achievement-challenge-status">' + escapeHtml(status) + '</span></div>'
+                + (rarity ? '<small>' + escapeHtml(rarity) + '</small>' : '')
+                + '<p>' + escapeHtml(description) + '</p>'
+                + '<div class="achievement-progress"><span style="width:' + percent + '%"></span></div>'
+                + '<div class="achievement-game-card-meta"><span>' + current + ' / ' + goal + '</span>'
+                + (period ? '<span>' + escapeHtml(gameText('challengePeriod')) + ': ' + escapeHtml(period) + '</span>' : '')
+                + '</div></div></article>';
+        }).join('');
+    }
+
+    _getPrestigeNumbers() {
+        const bank = this._loadout && this._loadout.bank ? this._loadout.bank : {};
+        const level = Number(valueOf(bank, 'PrestigeLevel', 'prestigeLevel') || 0);
+        const lifetime = Number(valueOf(bank, 'LifetimeScore', 'lifetimeScore') || 0);
+        const multipliedScore = Number(valueOf(this._data && this._data.summary, 'Score', 'score') || 0);
+        const multiplier = 1 + (0.5 * level);
+        // PrestigeReset checks the pre-multiplier cycle score (12,000).
+        const cycleScore = Math.round(multipliedScore / multiplier);
+        return { level, lifetime, cycleScore, bank: Number(valueOf(bank, 'ScoreBank', 'scoreBank') || 0) };
+    }
+
+    _renderPrestige() {
+        const target = this.$('#achievement-prestige-content');
+        if (!target || !this._data) return;
+        const values = this._getPrestigeNumbers();
+        const ready = values.cycleScore >= 12000;
+        const progress = Math.max(0, Math.min(100, values.cycleScore / 12000 * 100));
+        const confirmation = this._prestigeConfirm && ready;
+        target.innerHTML = '<div class="achievement-prestige-metrics">'
+            + '<article class="achievement-stat"><span class="achievement-stat-icon">✦</span><span class="achievement-stat-label">' + escapeHtml(gameText('prestigeLevel')) + '</span><strong>' + achievementNumber(values.level) + '</strong></article>'
+            + '<article class="achievement-stat"><span class="achievement-stat-icon">🏆</span><span class="achievement-stat-label">' + escapeHtml(gameText('prestigeLifetime')) + '</span><strong>' + achievementNumber(values.lifetime) + '</strong></article>'
+            + '<article class="achievement-stat"><span class="achievement-stat-icon">⭐</span><span class="achievement-stat-label">' + escapeHtml(gameText('prestigeScore')) + '</span><strong>' + achievementNumber(values.cycleScore) + ' / 12 000</strong></article>'
+            + '</div>'
+            + '<section class="achievement-stats-card achievement-prestige-progress"><div class="achievement-progress"><span style="width:' + progress + '%"></span></div>'
+            + '<p>' + escapeHtml(gameText(ready ? 'prestigeReady' : 'prestigeRequired')) + '</p>'
+            + '<p>' + escapeHtml(gameText('scoreBank')) + ': <strong>' + achievementNumber(values.bank) + '</strong></p>'
+            + '<button class="achievement-action-button focusable" type="button" data-prestige-start="1" tabindex="0" ' + (!ready || confirmation ? 'disabled' : '') + '>' + escapeHtml(gameText('prestigeReset')) + '</button>'
+            + (confirmation ? '<div class="achievement-prestige-confirm"><h3>' + escapeHtml(gameText('prestigeConfirmTitle')) + '</h3><p>' + escapeHtml(gameText('prestigeWarning')) + '</p><div class="achievement-game-card-foot"><button class="achievement-action-button focusable" type="button" data-prestige-confirm="1" tabindex="0">' + escapeHtml(gameText('prestigeConfirm')) + '</button><button class="achievement-action-button achievement-secondary-button focusable" type="button" data-prestige-cancel="1" tabindex="0">' + escapeHtml(gameText('prestigeCancel')) + '</button></div></div>' : '')
+            + '</section>';
+    }
+
+    _showPrestigeConfirmation() {
+        const values = this._getPrestigeNumbers();
+        if (values.cycleScore < 12000) return;
+        this._prestigeConfirm = true;
+        this._renderPrestige();
+        focusManager.invalidateCache('achievements-game-center');
+    }
+
+    _cancelPrestigeConfirmation() {
+        this._prestigeConfirm = false;
+        this._renderPrestige();
+        focusManager.invalidateCache('achievements-game-center');
+    }
+
+    async _confirmPrestige(button) {
+        if (!this._prestigeConfirm || !this._userPath || (button && button.dataset.prestigePending)) return;
+        if (button) { button.dataset.prestigePending = '1'; button.disabled = true; }
+        try {
+            const result = await api.post(this._userPath + '/prestige', {});
+            if (valueOf(result, 'Success', 'success') === false) {
+                throw new Error(valueOf(result, 'Message', 'message') || gameText('prestigeUnavailable'));
+            }
+            this._prestigeConfirm = false;
+            await this._load(true);
+            this._setFeatureStatus('achievement-prestige-status', gameText('prestigeSuccess'));
+            this._renderPrestige();
+        } catch (err) {
+            log.warn('Achievement Badges prestige reset failed:', err);
+            this._setFeatureStatus('achievement-prestige-status', err.message || gameText('prestigeUnavailable'), true);
+        } finally {
+            if (button) { delete button.dataset.prestigePending; button.disabled = false; }
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
+    _renderSettings() {
+        const target = this.$('#achievement-settings-content');
+        if (!target) return;
+        if (!this._preferencesLoaded || !this._preferences) {
+            target.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('settingsSaveError')) + '</p>';
+            return;
+        }
+        const prefs = this._preferences;
+        const bool = (key, label, fallback) => {
+            const checked = valueOf(prefs, key, key.charAt(0).toLowerCase() + key.slice(1));
+            const isChecked = checked === undefined || checked === null ? !!fallback : !!checked;
+            return '<label class="achievement-setting-row"><span>' + escapeHtml(label) + '</span><input type="checkbox" data-user-pref="' + key + '" ' + (isChecked ? 'checked ' : '') + (this._preferenceSaving ? 'disabled' : '') + '></label>';
+        };
+        const select = (key, label, value, options) => '<label class="achievement-setting-row achievement-setting-select"><span>' + escapeHtml(label) + '</span><select data-user-pref="' + key + '" ' + (this._preferenceSaving ? 'disabled' : '') + '>'
+            + options.map((option) => '<option value="' + escapeHtml(option[0]) + '" ' + (String(value ?? '') === option[0] ? 'selected' : '') + '>' + escapeHtml(option[1]) + '</option>').join('')
+            + '</select></label>';
+        const positionOptions = [
+            ['', gameText('optionDefault')], ['top-right', gameText('optionTopRight')], ['top-center', gameText('optionTopCenter')],
+            ['top-left', gameText('optionTopLeft')], ['bottom-right', gameText('optionBottomRight')],
+            ['bottom-center', gameText('optionBottomCenter')], ['bottom-left', gameText('optionBottomLeft')]
+        ];
+        const rarityOptions = [['all', gameText('optionAll')], ['rare', gameText('optionRare')], ['epic', gameText('optionEpic')], ['legendary', gameText('optionLegendary')]];
+        const groupingOptions = [['grouped', gameText('optionGrouped')], ['individual', gameText('optionIndividual')]];
+        const deviceOptions = [['all-devices', gameText('optionAllDevices')], ['originating-device', gameText('optionOriginDevice')]];
+        const slotOptions = Array.from({ length: 10 }, (_, i) => [String(i + 1), String(i + 1)]);
+        target.innerHTML = '<div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsNotifications')) + '</h3>'
+            + bool('EnableUnlockToasts', gameText('prefUnlockToasts'), true)
+            + bool('EnableMilestoneToasts', gameText('prefMilestoneToasts'), true)
+            + bool('EnableSound', gameText('prefSound'), true)
+            + bool('EnableConfetti', gameText('prefConfetti'), true)
+            + bool('MuteToastsDuringPlayback', gameText('prefMuteVideo'), false)
+            + bool('MuteToastSoundDuringPlayback', gameText('prefMuteSoundVideo'), true)
+            + select('MinimumToastRarity', gameText('prefRarity'), valueOf(prefs, 'MinimumToastRarity', 'minimumToastRarity') || 'all', rarityOptions)
+            + select('UnlockToastGrouping', gameText('prefGrouping'), valueOf(prefs, 'UnlockToastGrouping', 'unlockToastGrouping') || 'grouped', groupingOptions)
+            + select('ToastPosition', gameText('prefPosition'), valueOf(prefs, 'ToastPosition', 'toastPosition') || '', positionOptions)
+            + select('UnlockToastDeviceScope', gameText('prefDeviceScope'), valueOf(prefs, 'UnlockToastDeviceScope', 'unlockToastDeviceScope') || 'all-devices', deviceOptions)
+            + '</div><div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsPrivacy')) + '</h3>'
+            + bool('AppearInActivityFeed', gameText('prefActivity'), true)
+            + bool('HideFromCompare', gameText('prefHideCompare'), false)
+            + bool('HideFromPrestigeBoard', gameText('prefHidePrestige'), false)
+            + bool('HideFromLeaderboard', gameText('prefHideLeaderboard'), false)
+            + bool('AppearOffline', gameText('prefOffline'), false)
+            + bool('HideNowPlaying', gameText('prefHideNowPlaying'), false)
+            + bool('HideLastWatched', gameText('prefHideLastWatched'), false)
+            + '</div><div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsDisplay')) + '</h3>'
+            + bool('ShowEquippedShowcase', gameText('prefShowcase'), true)
+            + bool('AutoEquipNewUnlocks', gameText('prefAutoEquip'), true)
+            + select('EquippedBadgeSlots', gameText('prefSlots'), String(valueOf(prefs, 'EquippedBadgeSlots', 'equippedBadgeSlots') || 5), slotOptions)
+            + bool('SpoilerMode', gameText('prefSpoilers'), false)
+            + bool('ExtremeSpoilerMode', gameText('prefExtremeSpoilers'), false)
+            + '<p class="achievement-stats-note">' + escapeHtml(gameText('settingsAdminLimit')) + '</p></div>';
+        if (this._preferenceSaving) target.querySelectorAll('[data-user-pref]').forEach((control) => { control.disabled = true; });
+    }
+
+    async _savePreference(key, value, control) {
+        if (!this._preferencesLoaded || !this._preferences || this._preferenceSaving || !this._userPath) {
+            if (control) control.disabled = true;
+            return;
+        }
+        const previous = this._preferences;
+        const next = { ...previous, [key]: value };
+        this._preferences = next;
+        this._preferenceSaving = true;
+        this._setFeatureStatus('achievement-settings-status', gameText('settingsSaving'));
+        const controls = this.el.querySelectorAll('[data-user-pref]');
+        controls.forEach((item) => { item.disabled = true; });
+        try {
+            const result = await api.post(this._userPath + '/preferences', next);
+            if (valueOf(result, 'Success', 'success') === false) {
+                throw new Error(valueOf(result, 'Message', 'message') || gameText('settingsSaveError'));
+            }
+            this._preferences = next;
+            if (typeof achievementNotifications.updatePreferences === 'function') {
+                achievementNotifications.updatePreferences(next);
+            }
+            this._setFeatureStatus('achievement-settings-status', gameText('settingsSaved'));
+            if (key === 'EquippedBadgeSlots' || key === 'ShowEquippedShowcase') this._renderShowcase();
+        } catch (err) {
+            this._preferences = previous;
+            this._setFeatureStatus('achievement-settings-status', err.message || gameText('settingsSaveError'), true);
+            if (control) {
+                if (control.type === 'checkbox') control.checked = !!valueOf(previous, key, key.charAt(0).toLowerCase() + key.slice(1));
+                else control.value = String(valueOf(previous, key, key.charAt(0).toLowerCase() + key.slice(1)) ?? '');
+            }
+        } finally {
+            this._preferenceSaving = false;
+            controls.forEach((item) => { item.disabled = false; });
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
     _renderOverview() {
         const target = this.$('#achievements-overview');
         if (!target) return;
