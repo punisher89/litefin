@@ -592,6 +592,7 @@ class AchievementsPage extends Page {
 
             await this._loadLoadout();
             this._render();
+            this._applyServerUiTranslations();
         } catch (err) {
             log.warn('Achievement Badges data could not be loaded:', err);
             this._showError(err);
@@ -619,6 +620,41 @@ class AchievementsPage extends Page {
             catalog: results[2] || {},
             cosmetics: results[3] || {}
         };
+    }
+
+    _applyServerUiTranslations() {
+        const translations = this._serverTranslations;
+        if (!translations || !this.el) return;
+
+        const setText = (selector, key, prefix = '') => {
+            const element = this.el.querySelector(selector);
+            const value = translations[key];
+            if (element && typeof value === 'string' && value.trim()) {
+                element.textContent = prefix + value;
+            }
+        };
+
+        // Keep the same compact icon-led tab design while using the plugin's
+        // actual language pack for every label it provides.
+        setText('[data-game-section="overview"]', 'achievements.profile_title', '⌂ ');
+        setText('[data-game-section="badges"]', 'tabs.my_badges', '🏅 ');
+        setText('[data-game-section="quests"]', 'tabs.quests', '⚡ ');
+        setText('[data-game-section="shop"]', 'loadout.tab.shop', '🛍 ');
+        setText('[data-game-section="stats"]', 'tabs.stats', '📊 ');
+        setText('[data-achievement-tab="arsenal"]', 'loadout.tab.powerups', '⚡ ');
+        setText('[data-achievement-tab="shop"]', 'loadout.tab.shop', '🛒 ');
+        setText('[data-achievement-tab="cosmetics"]', 'loadout.tab.cosmetics', '🎨 ');
+
+        setText('#achievements-quests-section > h2', 'achievements.quests');
+        setText('#achievements-stats-section > .achievements-stats-heading h2', 'tabs.stats');
+        setText('#achievements-game-section .achievements-game-heading h2', 'loadout.tab.shop');
+        setText('#achievement-panel-arsenal .achievement-game-subhead h3', 'loadout.tab.powerups');
+        setText('#achievement-panel-shop h3:nth-of-type(1)', 'loadout.shop.powerup_refills');
+        setText('#achievement-panel-shop h3:nth-of-type(2)', 'loadout.tab.cosmetics');
+        setText('#achievement-panel-shop > p', 'loadout.intro.shop');
+        setText('#achievement-panel-cosmetics > p', 'loadout.intro.cosmetics');
+        setText('.achievements-game-balance small', 'loadout.score_balance');
+        focusManager.invalidateCache('achievements-game-center');
     }
 
     _selectMainSection(section) {
