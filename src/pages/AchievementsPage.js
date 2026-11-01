@@ -630,24 +630,24 @@ class AchievementsPage extends Page {
         }
 
         const target = this.$('#achievement-stats-content');
-        if (target) target.innerHTML = \`<p class="achievements-muted">\${escapeHtml(gameText('statsLoading'))}</p>\`;
+        if (target) target.innerHTML = `<p class="achievements-muted">${escapeHtml(gameText('statsLoading'))}</p>`;
 
         const safeGet = async (endpoint) => {
             try {
                 return await api.get(endpoint);
             } catch (err) {
-                log.warn(\`Game Center stats request failed (\${endpoint}):\`, err);
+                log.warn(`Game Center stats request failed (${endpoint}):`, err);
                 return null;
             }
         };
 
         if (!this._statsSharedPromise) {
             const sharedEndpoints = [
-                \`\${this._userPath}/watch-calendar?days=90\`,
-                \`\${this._userPath}/category-progress\`,
-                \`\${this._userPath}/records\`,
-                \`\${this._userPath}/smart-goals?limit=5\`,
-                \`\${this._userPath}/watch-clock\`
+                `${this._userPath}/watch-calendar?days=90`,
+                `${this._userPath}/category-progress`,
+                `${this._userPath}/records`,
+                `${this._userPath}/smart-goals?limit=5`,
+                `${this._userPath}/watch-clock`
             ];
             this._statsSharedPromise = Promise.all(sharedEndpoints.map(safeGet)).then((results) => ({
                 calendar: results[0] || {},
@@ -658,9 +658,9 @@ class AchievementsPage extends Page {
             }));
         }
 
-        const recapTask = safeGet(\`\${this._userPath}/recap?period=\${selected}\`);
+        const recapTask = safeGet(`${this._userPath}/recap?period=${selected}`);
         const wrappedTask = selected === 'year'
-            ? safeGet(\`\${this._userPath}/wrapped?year=\${new Date().getFullYear()}\`)
+            ? safeGet(`${this._userPath}/wrapped?year=${new Date().getFullYear()}`)
             : Promise.resolve(null);
 
         try {
@@ -672,7 +672,7 @@ class AchievementsPage extends Page {
         } catch (err) {
             if (requestId !== this._statsRequestId) return;
             log.warn('Game Center statistics could not be loaded:', err);
-            if (target) target.innerHTML = \`<p class="achievements-muted">\${escapeHtml(gameText('statsUnavailable'))}</p>\`;
+            if (target) target.innerHTML = `<p class="achievements-muted">${escapeHtml(gameText('statsUnavailable'))}</p>`;
         } finally {
             focusManager.invalidateCache('achievements-game-center');
         }
@@ -696,22 +696,22 @@ class AchievementsPage extends Page {
             { icon: '📺', label: gameText('statsEpisodes'), value: episodes },
             { icon: '📅', label: gameText('statsDays'), value: days },
             { icon: '🏆', label: gameText('statsUnlocked'), value: unlocked }
-        ].map((item) => \`
+        ].map((item) => `
             <div class="achievement-stat achievement-stats-metric">
-                <span class="achievement-stat-icon">\${item.icon}</span>
-                <span class="achievement-stat-label">\${escapeHtml(item.label)}</span>
-                <strong>\${achievementNumber(item.value)}</strong>
-            </div>\`).join('');
+                <span class="achievement-stat-icon">${item.icon}</span>
+                <span class="achievement-stat-label">${escapeHtml(item.label)}</span>
+                <strong>${achievementNumber(item.value)}</strong>
+            </div>`).join('');
 
         const renderTopList = (title, items) => {
             const rows = Array.isArray(items) ? items.slice(0, 5) : [];
-            return \`
+            return `
                 <section class="achievement-stats-card">
-                    <h3>\${escapeHtml(title)}</h3>
-                    \${rows.length ? \`<ol class="achievement-stats-list">\${rows.map((item) => \`
-                        <li><span>\${escapeHtml(valueOf(item, 'Name', 'name') || '—')}</span><strong>\${achievementNumber(valueOf(item, 'Count', 'count') || 0)}</strong></li>
-                    \`).join('')}</ol>\` : \`<p class="achievements-muted">\${escapeHtml(gameText('statsNoData'))}</p>\`}
-                </section>\`;
+                    <h3>${escapeHtml(title)}</h3>
+                    ${rows.length ? `<ol class="achievement-stats-list">${rows.map((item) => `
+                        <li><span>${escapeHtml(valueOf(item, 'Name', 'name') || '—')}</span><strong>${achievementNumber(valueOf(item, 'Count', 'count') || 0)}</strong></li>
+                    `).join('')}</ol>` : `<p class="achievements-muted">${escapeHtml(gameText('statsNoData'))}</p>`}
+                </section>`;
         };
 
         const categories = Array.isArray(data.categories) ? data.categories : [];
@@ -720,12 +720,12 @@ class AchievementsPage extends Page {
             const percent = Math.max(0, Math.min(100, Number(valueOf(item, 'Percent', 'percent') || 0)));
             const count = Number(valueOf(item, 'Unlocked', 'unlocked') || 0);
             const totalCount = Number(valueOf(item, 'Total', 'total') || 0);
-            return \`
+            return `
                 <div class="achievement-stats-category">
-                    <div><strong>\${escapeHtml(name)}</strong><span>\${count} / \${totalCount} · \${percent}%</span></div>
-                    <div class="achievement-progress"><span style="width:\${percent}%"></span></div>
-                </div>\`;
-        }).join('') : \`<p class="achievements-muted">\${escapeHtml(gameText('statsNoData'))}</p>\`;
+                    <div><strong>${escapeHtml(name)}</strong><span>${count} / ${totalCount} · ${percent}%</span></div>
+                    <div class="achievement-progress"><span style="width:${percent}%"></span></div>
+                </div>`;
+        }).join('') : `<p class="achievements-muted">${escapeHtml(gameText('statsNoData'))}</p>`;
 
         const countMap = valueOf(data.calendar, 'Counts', 'counts') || {};
         const maxCount = Math.max(1, ...Object.values(countMap).map((value) => Number(value) || 0));
@@ -735,11 +735,11 @@ class AchievementsPage extends Page {
         for (let offset = 89; offset >= 0; offset--) {
             const date = new Date(endDate);
             date.setDate(date.getDate() - offset);
-            const key = \`\${date.getFullYear()}-\${String(date.getMonth() + 1).padStart(2, '0')}-\${String(date.getDate()).padStart(2, '0')}\`;
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
             const count = Number(countMap[key] || 0);
             const level = count <= 0 ? 0 : Math.max(1, Math.min(4, Math.ceil((count / maxCount) * 4)));
             const label = date.toLocaleDateString(achievementLocale(), { day: 'numeric', month: 'short' });
-            calendarCells.push(\`<span class="achievement-calendar-cell level-\${level}" title="\${escapeHtml(label)} · \${achievementNumber(count)}"></span>\`);
+            calendarCells.push(`<span class="achievement-calendar-cell level-${level}" title="${escapeHtml(label)} · ${achievementNumber(count)}"></span>`);
         }
 
         const recordItems = [
@@ -750,9 +750,9 @@ class AchievementsPage extends Page {
             { label: gameText('statsLongest'), value: achievementNumber(valueOf(records, 'LongestItemMinutes', 'longestItemMinutes') || 0) + ' min' },
             { label: gameText('statsCombo'), value: achievementNumber(valueOf(records, 'BestComboCount', 'bestComboCount') || 0) }
         ];
-        const recordHtml = recordItems.map((item) => \`
-            <div class="achievement-stats-record"><span>\${escapeHtml(item.label)}</span><strong>\${escapeHtml(item.value)}</strong></div>
-        \`).join('');
+        const recordHtml = recordItems.map((item) => `
+            <div class="achievement-stats-record"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></div>
+        `).join('');
 
         const goals = arrayOf(data.goals, 'Goals', 'goals');
         const goalHtml = goals.length ? goals.slice(0, 5).map((item) => {
@@ -761,69 +761,69 @@ class AchievementsPage extends Page {
             const current = Number(valueOf(item, 'Current', 'current') || 0);
             const goal = Number(valueOf(item, 'Target', 'target') || 0);
             const percent = progressPercent(current, goal);
-            return \`
+            return `
                 <div class="achievement-stats-goal">
-                    <div><strong>\${escapeHtml(title)}</strong><span>\${escapeHtml(action)}</span></div>
-                    <div class="achievement-progress"><span style="width:\${percent}%"></span></div>
-                    <small>\${current} / \${goal}</small>
-                </div>\`;
-        }).join('') : \`<p class="achievements-muted">\${escapeHtml(gameText('statsNoGoals'))}</p>\`;
+                    <div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(action)}</span></div>
+                    <div class="achievement-progress"><span style="width:${percent}%"></span></div>
+                    <small>${current} / ${goal}</small>
+                </div>`;
+        }).join('') : `<p class="achievements-muted">${escapeHtml(gameText('statsNoGoals'))}</p>`;
 
         const clock = data.clock || {};
         const clockValues = Array.from({ length: 24 }, (_, hour) => Number(clock[hour] ?? clock[String(hour)] ?? 0));
         const maxClock = Math.max(1, ...clockValues);
-        const clockHtml = clockValues.map((value, hour) => \`
-            <div class="achievement-clock-hour" title="\${String(hour).padStart(2, '0')}:00 · \${achievementNumber(value)}">
-                <span style="height:\${Math.max(3, Math.round(value / maxClock * 100))}%"></span>
-                <small>\${String(hour).padStart(2, '0')}</small>
-            </div>\`).join('');
+        const clockHtml = clockValues.map((value, hour) => `
+            <div class="achievement-clock-hour" title="${String(hour).padStart(2, '0')}:00 · ${achievementNumber(value)}">
+                <span style="height:${Math.max(3, Math.round(value / maxClock * 100))}%"></span>
+                <small>${String(hour).padStart(2, '0')}</small>
+            </div>`).join('');
 
         const wrapped = data.wrapped || {};
         const hasWrapped = data.period === 'year' && !valueOf(wrapped, 'Empty', 'empty');
-        const wrappedHtml = hasWrapped ? \`
+        const wrappedHtml = hasWrapped ? `
             <section class="achievement-stats-card achievement-stats-wrapped">
-                <h3>\${escapeHtml(gameText('statsYearWrapped', { year: valueOf(wrapped, 'Year', 'year') || new Date().getFullYear() }))}</h3>
+                <h3>${escapeHtml(gameText('statsYearWrapped', { year: valueOf(wrapped, 'Year', 'year') || new Date().getFullYear() }))}</h3>
                 <div class="achievement-stats-record-grid">
-                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsActiveDays'))}</span><strong>\${achievementNumber(valueOf(wrapped, 'ActiveDays', 'activeDays') || 0)}</strong></div>
-                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsTopMonth'))}</span><strong>\${escapeHtml(valueOf(wrapped, 'TopMonth', 'topMonth') || '—')}</strong></div>
-                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsTopDay'))}</span><strong>\${escapeHtml(valueOf(wrapped, 'TopDayOfWeek', 'topDayOfWeek') || '—')}</strong></div>
-                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsBiggestDay'))}</span><strong>\${achievementNumber(valueOf(wrapped, 'BiggestDayCount', 'biggestDayCount') || 0)}</strong></div>
+                    <div class="achievement-stats-record"><span>${escapeHtml(gameText('statsActiveDays'))}</span><strong>${achievementNumber(valueOf(wrapped, 'ActiveDays', 'activeDays') || 0)}</strong></div>
+                    <div class="achievement-stats-record"><span>${escapeHtml(gameText('statsTopMonth'))}</span><strong>${escapeHtml(valueOf(wrapped, 'TopMonth', 'topMonth') || '—')}</strong></div>
+                    <div class="achievement-stats-record"><span>${escapeHtml(gameText('statsTopDay'))}</span><strong>${escapeHtml(valueOf(wrapped, 'TopDayOfWeek', 'topDayOfWeek') || '—')}</strong></div>
+                    <div class="achievement-stats-record"><span>${escapeHtml(gameText('statsBiggestDay'))}</span><strong>${achievementNumber(valueOf(wrapped, 'BiggestDayCount', 'biggestDayCount') || 0)}</strong></div>
                 </div>
-            </section>\` : '';
+            </section>` : '';
 
-        target.innerHTML = \`
-            <div class="achievement-stats-metrics">\${metricCards}</div>
-            \${wrappedHtml}
+        target.innerHTML = `
+            <div class="achievement-stats-metrics">${metricCards}</div>
+            ${wrappedHtml}
             <section class="achievement-stats-card">
-                <div class="achievement-stats-card-heading"><h3>\${escapeHtml(gameText('statsHeatmap'))}</h3><span>\${escapeHtml(gameText('statsHeatmapHint'))}</span></div>
-                <div class="achievement-calendar-grid">\${calendarCells.join('')}</div>
+                <div class="achievement-stats-card-heading"><h3>${escapeHtml(gameText('statsHeatmap'))}</h3><span>${escapeHtml(gameText('statsHeatmapHint'))}</span></div>
+                <div class="achievement-calendar-grid">${calendarCells.join('')}</div>
             </section>
             <div class="achievement-stats-columns">
                 <section class="achievement-stats-card">
-                    <h3>\${escapeHtml(gameText('statsCategories'))}</h3>
-                    \${categoryHtml}
+                    <h3>${escapeHtml(gameText('statsCategories'))}</h3>
+                    ${categoryHtml}
                 </section>
                 <section class="achievement-stats-card">
-                    <h3>\${escapeHtml(gameText('statsRecords'))}</h3>
-                    <div class="achievement-stats-record-grid">\${recordHtml}</div>
+                    <h3>${escapeHtml(gameText('statsRecords'))}</h3>
+                    <div class="achievement-stats-record-grid">${recordHtml}</div>
                 </section>
             </div>
             <div class="achievement-stats-columns">
-                \${renderTopList(gameText('statsGenres'), valueOf(recap, 'TopGenres', 'topGenres'))}
-                \${renderTopList(gameText('statsDirectors'), valueOf(recap, 'TopDirectors', 'topDirectors'))}
-                \${renderTopList(gameText('statsActors'), valueOf(recap, 'TopActors', 'topActors'))}
+                ${renderTopList(gameText('statsGenres'), valueOf(recap, 'TopGenres', 'topGenres'))}
+                ${renderTopList(gameText('statsDirectors'), valueOf(recap, 'TopDirectors', 'topDirectors'))}
+                ${renderTopList(gameText('statsActors'), valueOf(recap, 'TopActors', 'topActors'))}
             </div>
             <div class="achievement-stats-columns">
                 <section class="achievement-stats-card">
-                    <div class="achievement-stats-card-heading"><h3>\${escapeHtml(gameText('statsGoals'))}</h3><span>\${goals.length}</span></div>
-                    \${goalHtml}
+                    <div class="achievement-stats-card-heading"><h3>${escapeHtml(gameText('statsGoals'))}</h3><span>${goals.length}</span></div>
+                    ${goalHtml}
                 </section>
                 <section class="achievement-stats-card">
-                    <div class="achievement-stats-card-heading"><h3>\${escapeHtml(gameText('statsApproxClock'))}</h3></div>
-                    <p class="achievement-stats-note">\${escapeHtml(gameText('statsApproxClockHint'))}</p>
-                    <div class="achievement-clock-grid">\${clockHtml}</div>
+                    <div class="achievement-stats-card-heading"><h3>${escapeHtml(gameText('statsApproxClock'))}</h3></div>
+                    <p class="achievement-stats-note">${escapeHtml(gameText('statsApproxClockHint'))}</p>
+                    <div class="achievement-clock-grid">${clockHtml}</div>
                 </section>
-            </div>\`;
+            </div>`;
     }
 
     _selectGameTab(tab) {
