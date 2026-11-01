@@ -31,7 +31,7 @@ const GAME_TEXT = {
         prefRarity: 'Минимальная редкость уведомления', prefGrouping: 'Группировка уведомлений', prefPosition: 'Положение уведомлений', prefDeviceScope: 'На каких устройствах показывать уведомления',
         prefActivity: 'Показывать мои открытия в общей ленте', prefHideCompare: 'Скрыть мой профиль от сравнения', prefHidePrestige: 'Скрыть меня в таблице престижа', prefHideLeaderboard: 'Скрыть меня в таблице лидеров веб-клиента', prefOffline: 'Показывать меня офлайн друзьям', prefHideNowPlaying: 'Скрывать, что я сейчас смотрю', prefHideLastWatched: 'Скрывать последний просмотр',
         prefShowcase: 'Показывать витрину экипированных значков', prefAutoEquip: 'Автоматически экипировать новые значки', prefSlots: 'Количество мест в витрине', prefSpoilers: 'Скрывать описания закрытых достижений', prefExtremeSpoilers: 'Полностью скрывать закрытые достижения',
-        optionDefault: 'Стандартное положение (сверху справа)', optionAll: 'Все', optionRare: 'Редкие и выше', optionEpic: 'Эпические и выше', optionLegendary: 'Только легендарные', optionGrouped: 'Группировать', optionIndividual: 'По одному', optionAllDevices: 'На всех устройствах', optionOriginDevice: 'Только на устройстве просмотра',
+        optionDefault: 'По умолчанию сервера{position}', optionAll: 'Все', optionRare: 'Редкие и выше', optionEpic: 'Эпические и выше', optionLegendary: 'Только легендарные', optionGrouped: 'Группировать', optionIndividual: 'По одному', optionAllDevices: 'На всех устройствах', optionOriginDevice: 'Только на устройстве просмотра',
         optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.', settingsUnavailable: 'Не удалось загрузить настройки профиля.', showcaseEquipSuccess: 'Значок добавлен в витрину.', showcaseRemoveSuccess: 'Значок убран из витрины.', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
@@ -81,7 +81,7 @@ const GAME_TEXT = {
         prefRarity: 'Minimum notification rarity', prefGrouping: 'Notification grouping', prefPosition: 'Notification position', prefDeviceScope: 'Where to show notifications',
         prefActivity: 'Show my unlocks in the public activity feed', prefHideCompare: 'Hide my profile from comparisons', prefHidePrestige: 'Hide me from prestige board', prefHideLeaderboard: 'Hide me from the web client leaderboard', prefOffline: 'Appear offline to friends', prefHideNowPlaying: 'Hide what I am currently watching', prefHideLastWatched: 'Hide last watched item',
         prefShowcase: 'Show equipped badge showcase', prefAutoEquip: 'Automatically equip newly unlocked badges', prefSlots: 'Showcase slot count', prefSpoilers: 'Hide descriptions of locked achievements', prefExtremeSpoilers: 'Hide locked achievements completely',
-        optionDefault: 'Default position (top right)', optionAll: 'All', optionRare: 'Rare and above', optionEpic: 'Epic and above', optionLegendary: 'Legendary only', optionGrouped: 'Grouped', optionIndividual: 'Individual', optionAllDevices: 'All devices', optionOriginDevice: 'Unlocking device only',
+        optionDefault: 'Server default{position}', optionAll: 'All', optionRare: 'Rare and above', optionEpic: 'Epic and above', optionLegendary: 'Legendary only', optionGrouped: 'Grouped', optionIndividual: 'Individual', optionAllDevices: 'All devices', optionOriginDevice: 'Unlocking device only',
         optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.', settingsUnavailable: 'Could not load profile settings.', showcaseEquipSuccess: 'Badge added to showcase.', showcaseRemoveSuccess: 'Badge removed from showcase.', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
@@ -355,6 +355,7 @@ class AchievementsPage extends Page {
         this._activityLoading = false;
         this._preferences = null;
         this._preferencesLoaded = false;
+        this._publicConfig = {};
         this._preferenceSaving = false;
         this._showcaseBadges = null;
         this._showcaseLoading = false;
@@ -682,7 +683,7 @@ class AchievementsPage extends Page {
                     log.warn('Achievement Badges server translations unavailable; using Litefin fallbacks:', err);
                     return null;
                 });
-            const [summary, rank, badges, quests, serverTranslations, preferences] = await Promise.all([
+            const [summary, rank, badges, quests, serverTranslations, preferences, publicConfig] = await Promise.all([
                 api.get(`${userPath}/summary`),
                 api.get(`${userPath}/rank`),
                 api.get(`${userPath}?lang=${encodeURIComponent(language)}`),
@@ -691,10 +692,21 @@ class AchievementsPage extends Page {
                 api.get(`${userPath}/preferences`).catch((err) => {
                     log.warn('Achievement Badges preferences could not be loaded:', err);
                     return null;
+                }),
+                api.get('/Plugins/AchievementBadges/public-config').catch((err) => {
+                    log.warn('Achievement Badges public configuration unavailable:', err);
+                    return {};
                 })
             ]);
             this._preferences = preferences || null;
             this._preferencesLoaded = !!preferences;
+            this._publicConfig = publicConfig || {};
+            if (typeof achievementNotifications.updatePreferences === 'function' && this._preferences) {
+                achievementNotifications.updatePreferences(
+                    this._preferences,
+                    valueOf(this._publicConfig, 'DefaultToastPosition', 'defaultToastPosition') || ''
+                );
+            }
             this._serverTranslations = normalizeServerTranslations(serverTranslations);
             gameCenterServerTranslations = this._serverTranslations;
 
@@ -1721,6 +1733,15 @@ class AchievementsPage extends Page {
             return;
         }
         const prefs = this._preferences;
+        const publicConfig = this._publicConfig || {};
+        const forcePrivacy = !!valueOf(publicConfig, 'ForcePrivacyMode', 'forcePrivacyMode');
+        const hideLeaderboard = forcePrivacy || valueOf(publicConfig, 'LeaderboardEnabled', 'leaderboardEnabled') === false;
+        const hideCompare = forcePrivacy || valueOf(publicConfig, 'CompareEnabled', 'compareEnabled') === false;
+        const hideActivity = forcePrivacy || valueOf(publicConfig, 'ActivityFeedEnabled', 'activityFeedEnabled') === false;
+        const hidePrestige = forcePrivacy || valueOf(publicConfig, 'PrestigeEnabled', 'prestigeEnabled') === false;
+        const hideSpoiler = valueOf(publicConfig, 'ForceSpoilerMode', 'forceSpoilerMode') === true;
+        const hideExtremeSpoiler = valueOf(publicConfig, 'ForceExtremeSpoilerMode', 'forceExtremeSpoilerMode') === true;
+        const friendsEnabled = valueOf(publicConfig, 'FriendsEnabled', 'friendsEnabled') !== false;
         const bool = (key, label, fallback) => {
             const checked = valueOf(prefs, key, key.charAt(0).toLowerCase() + key.slice(1));
             const isChecked = checked === undefined || checked === null ? !!fallback : !!checked;
@@ -1729,8 +1750,16 @@ class AchievementsPage extends Page {
         const select = (key, label, value, options) => '<label class="achievement-setting-row achievement-setting-select"><span>' + escapeHtml(label) + '</span><select data-user-pref="' + key + '" ' + (this._preferenceSaving ? 'disabled' : '') + '>'
             + options.map((option) => '<option value="' + escapeHtml(option[0]) + '" ' + (String(value ?? '') === option[0] ? 'selected' : '') + '>' + escapeHtml(option[1]) + '</option>').join('')
             + '</select></label>';
+        const defaultPosition = String(valueOf(this._publicConfig, 'DefaultToastPosition', 'defaultToastPosition') || '').toLowerCase();
+        const positionLabels = {
+            'top-right': gameText('optionTopRight'), 'top-center': gameText('optionTopCenter'),
+            'top-left': gameText('optionTopLeft'), 'bottom-right': gameText('optionBottomRight'),
+            'bottom-center': gameText('optionBottomCenter'), 'bottom-left': gameText('optionBottomLeft')
+        };
+        const defaultPositionLabel = positionLabels[defaultPosition] ? ' (' + positionLabels[defaultPosition] + ')' : '';
         const positionOptions = [
-            ['', gameText('optionDefault')], ['top-right', gameText('optionTopRight')], ['top-center', gameText('optionTopCenter')],
+            ['', gameText('optionDefault', { position: defaultPositionLabel })],
+            ['top-right', gameText('optionTopRight')], ['top-center', gameText('optionTopCenter')],
             ['top-left', gameText('optionTopLeft')], ['bottom-right', gameText('optionBottomRight')],
             ['bottom-center', gameText('optionBottomCenter')], ['bottom-left', gameText('optionBottomLeft')]
         ];
@@ -1749,19 +1778,19 @@ class AchievementsPage extends Page {
             + select('ToastPosition', gameText('prefPosition'), valueOf(prefs, 'ToastPosition', 'toastPosition') || '', positionOptions)
             + select('UnlockToastDeviceScope', gameText('prefDeviceScope'), valueOf(prefs, 'UnlockToastDeviceScope', 'unlockToastDeviceScope') || 'all-devices', deviceOptions)
             + '</div><div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsPrivacy')) + '</h3>'
-            + bool('AppearInActivityFeed', gameText('prefActivity'), true)
-            + bool('HideFromCompare', gameText('prefHideCompare'), false)
-            + bool('HideFromPrestigeBoard', gameText('prefHidePrestige'), false)
-            + bool('HideFromLeaderboard', gameText('prefHideLeaderboard'), false)
-            + bool('AppearOffline', gameText('prefOffline'), false)
-            + bool('HideNowPlaying', gameText('prefHideNowPlaying'), false)
-            + bool('HideLastWatched', gameText('prefHideLastWatched'), false)
+            + (hideActivity ? '' : bool('AppearInActivityFeed', gameText('prefActivity'), true))
+            + (hideCompare ? '' : bool('HideFromCompare', gameText('prefHideCompare'), false))
+            + (hidePrestige ? '' : bool('HideFromPrestigeBoard', gameText('prefHidePrestige'), false))
+            + (hideLeaderboard ? '' : bool('HideFromLeaderboard', gameText('prefHideLeaderboard'), false))
+            + (friendsEnabled ? bool('AppearOffline', gameText('prefOffline'), false)
+                + bool('HideNowPlaying', gameText('prefHideNowPlaying'), false)
+                + bool('HideLastWatched', gameText('prefHideLastWatched'), false) : '')
             + '</div><div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsDisplay')) + '</h3>'
             + bool('ShowEquippedShowcase', gameText('prefShowcase'), true)
             + bool('AutoEquipNewUnlocks', gameText('prefAutoEquip'), true)
             + select('EquippedBadgeSlots', gameText('prefSlots'), String(valueOf(prefs, 'EquippedBadgeSlots', 'equippedBadgeSlots') || 5), slotOptions)
-            + bool('SpoilerMode', gameText('prefSpoilers'), false)
-            + bool('ExtremeSpoilerMode', gameText('prefExtremeSpoilers'), false)
+            + (hideSpoiler ? '' : bool('SpoilerMode', gameText('prefSpoilers'), false))
+            + (hideExtremeSpoiler ? '' : bool('ExtremeSpoilerMode', gameText('prefExtremeSpoilers'), false))
             + '<p class="achievement-stats-note">' + escapeHtml(gameText('settingsAdminLimit')) + '</p></div>'
             + '<div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsExtras')) + '</h3>'
             + bool('EnableCoWatchBonus', gameText('prefCoWatch'), true)
@@ -1788,7 +1817,10 @@ class AchievementsPage extends Page {
             }
             this._preferences = next;
             if (typeof achievementNotifications.updatePreferences === 'function') {
-                achievementNotifications.updatePreferences(next);
+                achievementNotifications.updatePreferences(
+                    next,
+                    valueOf(this._publicConfig, 'DefaultToastPosition', 'defaultToastPosition') || ''
+                );
             }
             this._setFeatureStatus('achievement-settings-status', gameText('settingsSaved'));
             if (key === 'EquippedBadgeSlots' || key === 'ShowEquippedShowcase') this._renderShowcase();
