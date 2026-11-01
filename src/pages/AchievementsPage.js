@@ -25,7 +25,7 @@ const GAME_TEXT = {
         challengesIntro: 'Сезонные и ограниченные по времени испытания сервера.', challengesLoading: 'Загружаем испытания…', challengesEmpty: 'Сейчас нет доступных испытаний.', challengesUnavailable: 'Испытания недоступны или скрыты настройками сервера.', challengeActive: 'Идёт', challengeUpcoming: 'Скоро', challengeEnded: 'Завершено', challengeCompleted: 'Выполнено', challengePeriod: 'Период',
         prestigeIntro: 'Начни новый цикл достижений и получи постоянный бонус к очкам.', prestigeLevel: 'Уровень престижа', prestigeLifetime: 'Очков за всё время', prestigeScore: 'Очки текущего цикла', prestigeRequired: 'Для престижа требуется 12 000 очков текущего цикла.', prestigeReady: 'Условие выполнено', prestigeLocked: 'Пока рано для престижа', prestigeReset: 'Перейти к престижу', prestigeConfirmTitle: 'Подтвердить престиж?', prestigeConfirm: 'Да, начать престиж', prestigeCancel: 'Отмена', prestigeWarning: 'Будут сброшены текущие достижения, прогресс, счётчики просмотров и экипированные значки витрины. Уровень престижа, накопленные очки за всё время и банк очков сохранятся. Купленная косметика профиля останется. Это действие нельзя отменить.', prestigeSuccess: 'Престиж успешно повышен.', prestigeUnavailable: 'Не удалось выполнить престиж.',
         settingsIntro: 'Уведомления, приватность и отображение достижений. Настройки сохраняются в профиле Jellyfin.',
-        settingsNotifications: 'Уведомления', settingsPrivacy: 'Приватность', settingsDisplay: 'Отображение',
+        settingsNotifications: 'Уведомления', settingsPrivacy: 'Приватность', settingsDisplay: 'Отображение', settingsExtras: 'Игровые возможности', prefCoWatch: 'Бонус за совместный просмотр', prefCoWatchDesc: 'Получай дополнительные очки, когда другой пользователь смотрит тот же материал в течение часа.',
         settingsSaved: 'Настройки сохранены.', settingsSaving: 'Сохраняем…', settingsSaveError: 'Не удалось сохранить настройки.',
         prefUnlockToasts: 'Уведомления о новых достижениях', prefMilestoneToasts: 'Уведомления о рубежах прогресса', prefSound: 'Звук уведомлений', prefConfetti: 'Эффект конфетти', prefMuteVideo: 'Скрывать всплывающие уведомления во время просмотра', prefMuteSoundVideo: 'Отключать звук уведомлений во время просмотра',
         prefRarity: 'Минимальная редкость уведомления', prefGrouping: 'Группировка уведомлений', prefPosition: 'Положение уведомлений', prefDeviceScope: 'На каких устройствах показывать уведомления',
@@ -75,7 +75,7 @@ const GAME_TEXT = {
         challengesIntro: 'Seasonal and time-limited challenges on this server.', challengesLoading: 'Loading challenges…', challengesEmpty: 'There are no available challenges right now.', challengesUnavailable: 'Challenges are unavailable or hidden by server settings.', challengeActive: 'In progress', challengeUpcoming: 'Upcoming', challengeEnded: 'Ended', challengeCompleted: 'Completed', challengePeriod: 'Period',
         prestigeIntro: 'Start a new achievement cycle and gain a permanent score bonus.', prestigeLevel: 'Prestige level', prestigeLifetime: 'Lifetime score', prestigeScore: 'Current cycle score', prestigeRequired: 'Prestige requires 12,000 score in the current cycle.', prestigeReady: 'Requirement reached', prestigeLocked: 'Prestige not available yet', prestigeReset: 'Start prestige', prestigeConfirmTitle: 'Confirm prestige?', prestigeConfirm: 'Yes, prestige now', prestigeCancel: 'Cancel', prestigeWarning: 'Your current achievements, progress, watch counters and equipped showcase badges will be reset. Prestige level, lifetime score and score bank will remain. Purchased profile cosmetics will stay owned. This action cannot be undone.', prestigeSuccess: 'Prestige increased successfully.', prestigeUnavailable: 'Prestige could not be completed.',
         settingsIntro: 'Notifications, privacy and achievement display. Settings are saved to your Jellyfin profile.',
-        settingsNotifications: 'Notifications', settingsPrivacy: 'Privacy', settingsDisplay: 'Display',
+        settingsNotifications: 'Notifications', settingsPrivacy: 'Privacy', settingsDisplay: 'Display', settingsExtras: 'Gameplay options', prefCoWatch: 'Co-watch bonus', prefCoWatchDesc: 'Earn bonus score when another user watches the same item within an hour.',
         settingsSaved: 'Settings saved.', settingsSaving: 'Saving…', settingsSaveError: 'Could not save settings.',
         prefUnlockToasts: 'New achievement notifications', prefMilestoneToasts: 'Progress milestone notifications', prefSound: 'Notification sound', prefConfetti: 'Confetti effect', prefMuteVideo: 'Hide visual notifications during playback', prefMuteSoundVideo: 'Mute notification sound during playback',
         prefRarity: 'Minimum notification rarity', prefGrouping: 'Notification grouping', prefPosition: 'Notification position', prefDeviceScope: 'Where to show notifications',
@@ -1762,7 +1762,10 @@ class AchievementsPage extends Page {
             + select('EquippedBadgeSlots', gameText('prefSlots'), String(valueOf(prefs, 'EquippedBadgeSlots', 'equippedBadgeSlots') || 5), slotOptions)
             + bool('SpoilerMode', gameText('prefSpoilers'), false)
             + bool('ExtremeSpoilerMode', gameText('prefExtremeSpoilers'), false)
-            + '<p class="achievement-stats-note">' + escapeHtml(gameText('settingsAdminLimit')) + '</p></div>';
+            + '<p class="achievement-stats-note">' + escapeHtml(gameText('settingsAdminLimit')) + '</p></div>'
+            + '<div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsExtras')) + '</h3>'
+            + bool('EnableCoWatchBonus', gameText('prefCoWatch') + ' — ' + gameText('prefCoWatchDesc'), true)
+            + '</div>';
         if (this._preferenceSaving) target.querySelectorAll('[data-user-pref]').forEach((control) => { control.disabled = true; });
     }
 
