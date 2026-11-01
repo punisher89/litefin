@@ -94,14 +94,24 @@ const GAME_TEXT = {
     }
 };
 
+let gameCenterServerTranslations = null;
+
+function normalizeServerTranslations(value) {
+    if (typeof value === 'string') {
+        try { value = JSON.parse(value); } catch (_) { return null; }
+    }
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
 function gameText(key, replacements = {}) {
     const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     const dictionary = language.startsWith('ru') ? GAME_TEXT.ru : GAME_TEXT.en;
     let text = dictionary[key] || GAME_TEXT.en[key] || key;
     Object.keys(replacements).forEach((name) => {
-        text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(replacements[name]));
+        text = text.replace(new RegExp('\\{' + name + '\\}', 'g'), String(replacements[name]));
     });
     return text;
+}
 }
 
 function arrayOf(object, ...keys) {
@@ -196,9 +206,12 @@ function badgeIcon(badge) {
     return '🏆';
 }
 
-function localizedBadgeValue(value, kind) {
+function localizedBadgeValue(value, kind, serverTranslations = null) {
     const raw = String(value || '').trim();
     if (!raw) return '';
+    const serverKey = kind === 'rarity' ? 'rarity.' + raw.toLowerCase() : 'category.' + raw;
+    const serverValue = serverTranslations && serverTranslations[serverKey];
+    if (typeof serverValue === 'string' && serverValue.trim()) return serverValue;
     const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     if (!language.startsWith('ru')) return raw;
 
@@ -217,45 +230,25 @@ function localizedBadgeValue(value, kind) {
             watchtime: 'Время просмотра', 'watch time': 'Время просмотра',
             playback: 'Просмотр', streak: 'Серии просмотров',
             social: 'Социальные', collection: 'Коллекции',
-            'getting started': 'Начало пути',
-            binge: 'Марафоны',
-            'night watching': 'Ночные просмотры',
-            'morning watching': 'Утренние просмотры',
-            'weekend watching': 'Просмотры в выходные',
-            exploration: 'Исследование',
-            streaks: 'Серии просмотров',
-            'episode marathons': 'Марафоны эпизодов',
-            'film marathons': 'Киномарафоны',
-            'best streaks': 'Лучшие серии просмотров',
-            eras: 'Эпохи',
-            world: 'Мир',
-            languages: 'Языки',
-            genres: 'Жанры',
-            runtime: 'Длительность',
-            'total time': 'Общее время',
-            holidays: 'Праздники',
-            rewatch: 'Повторные просмотры',
-            'library completion': 'Завершение библиотек',
-            discography: 'Дискография',
-            loyalty: 'Преданность',
-            people: 'Люди',
-            hidden: 'Скрытые',
-            'genre specialist': 'Знаток жанров',
-            prestige: 'Престиж',
-            'score economy': 'Экономика очков',
-            combos: 'Комбинации',
-            meta: 'Особые достижения',
-            decades: 'Десятилетия',
-            weekdays: 'Дни недели',
-            endurance: 'Выносливость',
-            'afternoon watching': 'Дневные просмотры',
-            'prime time': 'Прайм-тайм',
-            anime: 'Аниме',
-            'studio specialist': 'Знаток студий',
+            'getting started': 'Начало пути', binge: 'Марафоны',
+            'night watching': 'Ночные просмотры', 'morning watching': 'Утренние просмотры',
+            'weekend watching': 'Просмотры в выходные', exploration: 'Исследование',
+            streaks: 'Серии просмотров', 'episode marathons': 'Марафоны эпизодов',
+            'film marathons': 'Киномарафоны', 'best streaks': 'Лучшие серии просмотров',
+            eras: 'Эпохи', world: 'Мир', languages: 'Языки', genres: 'Жанры',
+            runtime: 'Длительность', 'total time': 'Общее время', holidays: 'Праздники',
+            rewatch: 'Повторные просмотры', 'library completion': 'Завершение библиотек',
+            discography: 'Дискография', loyalty: 'Преданность', people: 'Люди',
+            hidden: 'Скрытые', 'genre specialist': 'Знаток жанров', prestige: 'Престиж',
+            'score economy': 'Экономика очков', combos: 'Комбинации', meta: 'Особые достижения',
+            decades: 'Десятилетия', weekdays: 'Дни недели', endurance: 'Выносливость',
+            'afternoon watching': 'Дневные просмотры', 'prime time': 'Прайм-тайм',
+            anime: 'Аниме', 'studio specialist': 'Знаток студий',
             'pilot vs completer': 'Пилот или финал'
         }
     };
-    return dictionaries[kind]?.[key] || raw;
+    return dictionaries[kind] && dictionaries[kind][key] ? dictionaries[kind][key] : raw;
+}
 }
 
 function achievementLocale() {
@@ -306,6 +299,7 @@ class AchievementsPage extends Page {
         this._statsCache = Object.create(null);
         this._statsSharedPromise = null;
         this._statsRequestId = 0;
+        this._serverTranslations = null;
     }
 
     render() {
@@ -550,12 +544,21 @@ class AchievementsPage extends Page {
             const userPath = `/Plugins/AchievementBadges/users/${encodeURIComponent(userId)}`;
             this._userId = userId;
             this._userPath = userPath;
-            const [summary, rank, badges, quests] = await Promise.all([
+            const translationsTask = language === 'ru'
+                ? Promise.resolve(null)
+                : api.get(`/Plugins/AchievementBadges/translations/${encodeURIComponent(language)}`).catch((err) => {
+                    log.warn('Achievement Badges server translations unavailable; using Litefin fallbacks:', err);
+                    return null;
+                });
+            const [summary, rank, badges, quests, serverTranslations] = await Promise.all([
                 api.get(`${userPath}/summary`),
                 api.get(`${userPath}/rank`),
                 api.get(`${userPath}?lang=${encodeURIComponent(language)}`),
-                api.get(`${userPath}/quests`)
+                api.get(`${userPath}/quests`),
+                translationsTask
             ]);
+            this._serverTranslations = normalizeServerTranslations(serverTranslations);
+            gameCenterServerTranslations = this._serverTranslations;
 
             this._data = {
                 summary: summary || {},
@@ -716,7 +719,7 @@ class AchievementsPage extends Page {
 
         const categories = Array.isArray(data.categories) ? data.categories : [];
         const categoryHtml = categories.length ? categories.map((item) => {
-            const name = localizedBadgeValue(valueOf(item, 'Category', 'category') || 'General', 'category');
+            const name = localizedBadgeValue(valueOf(item, 'Category', 'category') || 'General', 'category', this._serverTranslations);
             const percent = Math.max(0, Math.min(100, Number(valueOf(item, 'Percent', 'percent') || 0)));
             const count = Number(valueOf(item, 'Unlocked', 'unlocked') || 0);
             const totalCount = Number(valueOf(item, 'Total', 'total') || 0);
@@ -876,8 +879,8 @@ class AchievementsPage extends Page {
         }
         grid.innerHTML = inventory.map((item) => {
             const type = String(valueOf(item, 'Type', 'type') || '');
-            const localizedItem = localizeAchievementPowerUp(item, language);
-            const name = valueOf(localizedItem, 'DisplayName', 'displayName') || localizeAchievementPowerUpType(type, language) || type;
+            const localizedItem = localizeAchievementPowerUp(item, language, this._serverTranslations);
+            const name = valueOf(localizedItem, 'DisplayName', 'displayName') || localizeAchievementPowerUpType(type, language, this._serverTranslations) || type;
             const count = Number(valueOf(item, 'Count', 'count') || 0);
             const active = !!valueOf(item, 'Active', 'active');
             const activeUntil = valueOf(item, 'ActiveUntil', 'activeUntil');
@@ -911,7 +914,7 @@ class AchievementsPage extends Page {
         const language = i18n.currentLang || document.documentElement.lang || 'en';
         const renderItem = (item, isCosmetic) => {
             const id = String(valueOf(item, 'Id', 'id') || '');
-            const localizedItem = localizeAchievementCatalogItem(item, language);
+            const localizedItem = localizeAchievementCatalogItem(item, language, this._serverTranslations);
             const name = valueOf(localizedItem, 'DisplayName', 'displayName') || id;
             const description = valueOf(localizedItem, 'Description', 'description') || '';
             const price = Number(valueOf(item, 'PriceScore', 'priceScore') || 0);
@@ -959,7 +962,7 @@ class AchievementsPage extends Page {
         }
         target.innerHTML = items.map((item) => {
             const id = String(valueOf(item, 'Id', 'id') || '');
-            const localizedItem = localizeAchievementCatalogItem(item, language);
+            const localizedItem = localizeAchievementCatalogItem(item, language, this._serverTranslations);
             const name = valueOf(localizedItem, 'DisplayName', 'displayName') || id;
             const kind = String(valueOf(item, 'Kind', 'kind') || '');
             const equippedId = valueOf(equipped, cosmeticEquipField(kind), cosmeticEquipField(kind).charAt(0).toLowerCase() + cosmeticEquipField(kind).slice(1));
@@ -1182,8 +1185,8 @@ class AchievementsPage extends Page {
         const total = Number(valueOf(summary, 'Total', 'total') || this._data.badges.length);
         const percent = Number(valueOf(summary, 'Percentage', 'percentage') || 0);
         const language = i18n.currentLang || document.documentElement.lang || 'en';
-        const rankName = localizeAchievementRank(valueOf(tier, 'Name', 'name') || '—', language);
-        const nextName = localizeAchievementRank(valueOf(nextTier, 'Name', 'name'), language);
+        const rankName = localizeAchievementRank(valueOf(tier, 'Name', 'name') || '—', language, this._serverTranslations);
+        const nextName = localizeAchievementRank(valueOf(nextTier, 'Name', 'name'), language, this._serverTranslations);
         const rankProgress = Math.max(0, Math.min(100, Number(valueOf(rank, 'ProgressToNext', 'progressToNext') || 0)));
         const streak = Number(valueOf(summary, 'CurrentWatchStreak', 'currentWatchStreak') || 0);
         const bestStreak = Number(valueOf(summary, 'BestWatchStreak', 'bestWatchStreak') || 0);
@@ -1246,7 +1249,7 @@ class AchievementsPage extends Page {
         const renderList = (items) => {
             if (!Array.isArray(items) || !items.length) return `<p class="achievements-muted">${escapeHtml(i18n.t('AchievementNoQuests'))}</p>`;
             return items.map((quest) => {
-                const localizedQuest = localizeAchievementQuest(quest, language);
+                const localizedQuest = localizeAchievementQuest(quest, language, this._serverTranslations);
                 const title = valueOf(localizedQuest, 'Title', 'title') || '';
                 const description = valueOf(localizedQuest, 'Description', 'description') || '';
                 const current = Number(valueOf(quest, 'Current', 'current') || 0);
@@ -1344,8 +1347,8 @@ class AchievementsPage extends Page {
             const category = valueOf(badge, 'Category', 'category') || '';
             const rarityRaw = valueOf(badge, 'Rarity', 'rarity') || 'Common';
             const rarity = String(rarityRaw).toLowerCase().replace(/[^a-z0-9-]/g, '');
-            const rarityLabel = localizedBadgeValue(rarityRaw, 'rarity');
-            const categoryLabel = localizedBadgeValue(category, 'category');
+            const rarityLabel = localizedBadgeValue(rarityRaw, 'rarity', this._serverTranslations);
+            const categoryLabel = localizedBadgeValue(category, 'category', this._serverTranslations);
             const current = Number(valueOf(badge, 'CurrentValue', 'currentValue') || 0);
             const goal = Number(valueOf(badge, 'TargetValue', 'targetValue') || 0);
             const unlocked = !!valueOf(badge, 'Unlocked', 'unlocked');
