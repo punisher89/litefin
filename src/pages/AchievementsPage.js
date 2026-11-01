@@ -1586,6 +1586,7 @@ class AchievementsPage extends Page {
     _render() {
         if (!this._data) return;
         this._renderOverview();
+        this._renderOverviewShowcase();
         this._renderQuests();
         this._renderBadges();
         this._renderLoadout();
