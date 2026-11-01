@@ -40,7 +40,7 @@ const GAME_TEXT = {
         giftIntro: 'Передай часть своих очков другому пользователю этого Jellyfin-сервера.',
         noCosmetics: 'Пока нет косметических предметов. Загляни в магазин.',
         buy: 'Купить', owned: 'Уже куплено', equipped: 'Установлено', equip: 'Применить', use: 'Активировать',
-        active: 'Активно', quantity: 'Количество', price: 'Цена', score: 'очков',
+        active: 'Активно', quantity: 'Количество', price: 'Цена', score: 'очков', activating: 'Активируем…', purchasing: 'Покупаем…', powerupReady: 'Уже заряжено: следующий просмотр даст ×2', powerupAutomatic: 'Срабатывает автоматически при пропуске дня.', powerupFull: 'Инвентарь заполнен',
         automatic: 'Срабатывает автоматически, когда это необходимо.',
         recipient: 'Получатель', chooseUser: 'Выбери пользователя', amount: 'Сколько очков передать',
         sendGift: 'Передать очки', usersLoading: 'Загружаем список пользователей…', noUsers: 'Нет доступных получателей.',
@@ -90,7 +90,7 @@ const GAME_TEXT = {
         giftIntro: 'Send some of your score to another user on this Jellyfin server.',
         noCosmetics: 'No cosmetics yet. Visit the shop.',
         buy: 'Buy', owned: 'Owned', equipped: 'Equipped', equip: 'Equip', use: 'Activate',
-        active: 'Active', quantity: 'Quantity', price: 'Price', score: 'score',
+        active: 'Active', quantity: 'Quantity', price: 'Price', score: 'score', activating: 'Activating…', purchasing: 'Purchasing…', powerupReady: 'Primed: your next watch counts twice', powerupAutomatic: 'Automatically protects your streak after a missed day.', powerupFull: 'Inventory full',
         automatic: 'Consumed automatically when needed.',
         recipient: 'Recipient', chooseUser: 'Choose a user', amount: 'Score amount',
         sendGift: 'Send score', usersLoading: 'Loading users…', noUsers: 'No recipients available.',
@@ -218,6 +218,21 @@ function valueOf(object, ...keys) {
         if (object[key] !== undefined && object[key] !== null) return object[key];
     }
     return undefined;
+}
+
+function normalizePowerUpType(value) {
+    const known = ['XpBoost', 'DoubleCredit', 'StreakFreeze'];
+    if (typeof value === 'number' && Number.isInteger(value)) return known[value] || '';
+    const raw = String(value === undefined || value === null ? '' : value).trim();
+    return known.find((type) => type.toLowerCase() === raw.toLowerCase()) || raw;
+}
+
+function achievementErrorMessage(error, fallback = '') {
+    const body = error && (error.response?.data || error.response?.body || error.data || error.body);
+    return valueOf(body, 'Message', 'message')
+        || valueOf(error, 'Message', 'message')
+        || (typeof error === 'string' ? error : (error && error.message))
+        || fallback;
 }
 
 function escapeHtml(value) {
@@ -1209,6 +1224,7 @@ class AchievementsPage extends Page {
         const powerups = arrayOf(this._loadout.catalog, 'PowerUps', 'powerUps', 'powerups');
         const cosmetics = arrayOf(this._loadout.catalog, 'Cosmetics', 'cosmetics');
         const owned = new Set(arrayOf(this._loadout.cosmetics, 'Owned', 'owned').map(String));
+        const inventory = arrayOf(this._loadout.powerups, 'Inventory', 'inventory');
         const score = Number(valueOf(this._loadout.bank, 'ScoreBank', 'scoreBank') ?? valueOf(this._loadout.powerups, 'ScoreBank', 'scoreBank') ?? 0);
         const language = i18n.currentLang || document.documentElement.lang || 'en';
         const renderItem = (item, isCosmetic) => {
@@ -1226,12 +1242,30 @@ class AchievementsPage extends Page {
             const previewColor = typeof preview === 'string' && /^#[0-9a-f]{3,8}$/i.test(preview) ? preview : '';
             const previewGlyph = previewColor ? '✦' : (preview || (isCosmetic ? '🎨' : '⚡'));
             const rawKind = valueOf(item, 'Kind', 'kind') || '';
-            const kind = isCosmetic ? cosmeticKindLabel(rawKind) : localizeAchievementPowerUpType(valueOf(item, 'Type', 'type') || '', language);
-            const button = isOwned
+            const type = isCosmetic ? '' : normalizePowerUpType(valueOf(item, 'Type', 'type'));
+            const kind = isCosmetic ? cosmeticKindLabel(rawKind) : localizeAchievementPowerUpType(type, language, this._serverTranslations);
+            const inventoryItem = type ? inventory.find((entry) => normalizePowerUpType(valueOf(entry, 'Type', 'type')) === type) : null;
+            const inventoryCount = Number(valueOf(inventoryItem, 'Count', 'count') || 0);
+            const powerupActive = !!valueOf(inventoryItem, 'Active', 'active');
+            const isDoubleCreditPrimed = type === 'DoubleCredit' && powerupActive;
+            const isAutomatic = type === 'StreakFreeze';
+            const bundleSize = Math.max(1, Number(valueOf(item, 'BundleSize', 'bundleSize') || 1));
+            const inventoryCap = isAutomatic ? 1 : 20;
+            const inventoryFull = !!type && inventoryCount + bundleSize > inventoryCap;
+            const purchaseButton = isOwned
                 ? `<span class="achievement-owned-label">✓ ${escapeHtml(gameText('owned'))}</span>`
                 : isMilestone
                     ? `<span class="achievement-owned-label">${escapeHtml(gameText('milestone'))}: ${achievementNumber(milestone)} ⭐</span>`
-                    : `<button class="achievement-action-button focusable${!affordable ? ' is-unaffordable-button' : ''}" type="button" data-achievement-buy="${escapeHtml(id)}" data-achievement-name="${escapeHtml(name)}" data-achievement-price="${price}" data-achievement-missing="${missingScore}" aria-label="${escapeHtml(affordable ? gameText('buy') : gameText('needMoreScore', { amount: achievementNumber(missingScore) }))}" tabindex="0">${escapeHtml(affordable ? gameText('buy') : gameText('needMoreScoreShort', { amount: achievementNumber(missingScore) }))}</button>`;
+                    : inventoryFull
+                        ? `<span class="achievement-owned-label">${escapeHtml(gameText('powerupFull'))}</span>`
+                        : `<button class="achievement-action-button focusable${!affordable ? ' is-unaffordable-button' : ''}" type="button" data-achievement-buy="${escapeHtml(id)}" data-achievement-name="${escapeHtml(name)}" data-achievement-price="${price}" data-achievement-missing="${missingScore}" aria-label="${escapeHtml(affordable ? gameText('buy') : gameText('needMoreScore', { amount: achievementNumber(missingScore) }))}" tabindex="0">${escapeHtml(affordable ? gameText('buy') : gameText('needMoreScoreShort', { amount: achievementNumber(missingScore) }))}</button>`;
+            const activationButton = !isCosmetic && inventoryCount > 0 && !isAutomatic && !isDoubleCreditPrimed
+                ? `<button class="achievement-action-button achievement-shop-use focusable" type="button" data-achievement-use="${escapeHtml(type)}" tabindex="0">⚡ ${escapeHtml(gameText('use'))}</button>`
+                : isDoubleCreditPrimed
+                    ? `<span class="achievement-owned-label is-equipped">✓ ${escapeHtml(gameText('powerupReady'))}</span>`
+                    : isAutomatic && inventoryCount > 0
+                        ? `<span class="achievement-owned-label">${escapeHtml(gameText('powerupAutomatic'))}</span>`
+                        : '';
             return `
                 <article class="achievement-game-card achievement-shop-card ${!affordable && !isOwned && !isMilestone ? 'is-unaffordable' : ''}">
                     <div class="achievement-game-card-icon" ${previewColor ? `style="color:${previewColor}"` : ''}>${escapeHtml(previewGlyph)}</div>
@@ -1239,14 +1273,17 @@ class AchievementsPage extends Page {
                         <strong>${escapeHtml(name)}</strong>
                         <small>${escapeHtml(kind)}</small>
                         <p>${escapeHtml(description)}</p>
-                        <div class="achievement-game-card-foot"><span class="achievement-shop-price">${achievementNumber(price)} ⭐</span>${button}</div>
+                        ${!isCosmetic ? `<small class="achievement-shop-stock">${escapeHtml(gameText('inventory'))}: <b>${inventoryCount}</b></small>` : ''}
+                        <div class="achievement-game-card-foot achievement-shop-actions">
+                            <span class="achievement-shop-price">${achievementNumber(price)} ⭐</span>
+                            <div class="achievement-shop-action-buttons">${purchaseButton}${activationButton}</div>
+                        </div>
                     </div>
                 </article>`;
         };
         powerupsTarget.innerHTML = powerups.length ? powerups.map((item) => renderItem(item, false)).join('') : `<p class="achievements-muted">${escapeHtml(gameText('arsenalEmpty'))}</p>`;
         cosmeticsTarget.innerHTML = cosmetics.length ? cosmetics.map((item) => renderItem(item, true)).join('') : `<p class="achievements-muted">${escapeHtml(gameText('noCosmetics'))}</p>`;
     }
-
     _renderCosmetics() {
         const target = this.$('#achievement-cosmetics-grid');
         if (!target) return;
@@ -1335,58 +1372,140 @@ class AchievementsPage extends Page {
     }
 
     async _buyShopItem(itemId, button) {
-        if (!itemId || !this._userPath) return;
+        if (!itemId || !this._userPath || !button) return;
         const missingScore = Number(button.getAttribute('data-achievement-missing') || 0);
         if (missingScore > 0) {
             this._setGameStatus(gameText('needMoreScore', { amount: achievementNumber(missingScore) }), true);
             return;
         }
-        // Do not use window.confirm here: native confirmation dialogs are
-        // unreliable on webOS TV browsers and can swallow Magic Remote input.
-        // A single explicit BUY action performs the purchase.
         if (button.dataset.purchasePending === 'true') return;
+        const originalLabel = button.textContent;
         button.dataset.purchasePending = 'true';
         button.disabled = true;
-        this._setGameStatus(gameText('loadingGame'));
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = gameText('purchasing');
+        this._setGameStatus(gameText('purchasing'));
         try {
             const result = await api.post(`${this._userPath}/shop/purchase`, { ItemId: itemId });
             if (valueOf(result, 'Success', 'success') === false) {
                 throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
             }
-            await this._loadLoadout();
+
+            // The purchase response already contains the new balance and the
+            // resulting power-up quantity. Update local state instead of
+            // issuing four more GET requests just to repaint the shop.
+            const catalogPowerUps = arrayOf(this._loadout && this._loadout.catalog, 'PowerUps', 'powerUps', 'powerups');
+            const purchasedPowerUp = catalogPowerUps.find((item) => String(valueOf(item, 'Id', 'id') || '') === String(itemId));
+            const currentBalance = Number(valueOf(this._loadout && this._loadout.bank, 'ScoreBank', 'scoreBank') ?? valueOf(this._loadout && this._loadout.powerups, 'ScoreBank', 'scoreBank') ?? 0);
+            const price = Number(valueOf(purchasedPowerUp, 'PriceScore', 'priceScore') ?? button.getAttribute('data-achievement-price') ?? 0);
+            const balance = Number(valueOf(result, 'ScoreBalanceAfter', 'scoreBalanceAfter') ?? Math.max(0, currentBalance - price));
+            this._loadout.bank = { ...(this._loadout.bank || {}), ScoreBank: balance };
+            this._loadout.powerups = { ...(this._loadout.powerups || {}), ScoreBank: balance };
+
+            if (purchasedPowerUp) {
+                const type = normalizePowerUpType(valueOf(purchasedPowerUp, 'Type', 'type'));
+                const inventory = arrayOf(this._loadout.powerups, 'Inventory', 'inventory').map((entry) => ({ ...entry }));
+                const index = inventory.findIndex((entry) => normalizePowerUpType(valueOf(entry, 'Type', 'type')) === type);
+                const existing = index >= 0 ? inventory[index] : null;
+                const oldCount = Number(valueOf(existing, 'Count', 'count') || 0);
+                const newCount = Number(valueOf(result, 'PowerUpInventoryAfter', 'powerUpInventoryAfter') ?? (oldCount + Math.max(1, Number(valueOf(purchasedPowerUp, 'BundleSize', 'bundleSize') || 1))));
+                const localized = localizeAchievementCatalogItem(purchasedPowerUp, i18n.currentLang || document.documentElement.lang || 'en', this._serverTranslations);
+                const updatedEntry = {
+                    ...(existing || {}),
+                    Type: type,
+                    DisplayName: valueOf(localized, 'DisplayName', 'displayName') || type,
+                    Description: valueOf(localized, 'Description', 'description') || '',
+                    Count: newCount
+                };
+                if (index >= 0) inventory[index] = updatedEntry;
+                else inventory.push(updatedEntry);
+                this._loadout.powerups = { ...this._loadout.powerups, Inventory: inventory };
+            } else {
+                const ownedId = valueOf(result, 'OwnedCosmeticId', 'ownedCosmeticId');
+                if (ownedId) {
+                    const owned = arrayOf(this._loadout.cosmetics, 'Owned', 'owned').map(String);
+                    if (!owned.includes(String(ownedId))) owned.push(String(ownedId));
+                    this._loadout.cosmetics = { ...(this._loadout.cosmetics || {}), Owned: owned, ScoreBank: balance };
+                }
+            }
+
             this._renderLoadout();
             this._setGameStatus(gameText('purchaseOk'));
+            focusManager.invalidateCache('achievements-game-center');
         } catch (err) {
             log.warn('Achievement Badges shop purchase failed:', err);
-            const reason = localizeAchievementMessage(err && err.message, i18n.currentLang || document.documentElement.lang || 'en');
+            const reason = localizeAchievementMessage(achievementErrorMessage(err, gameText('actionFailed')), i18n.currentLang || document.documentElement.lang || 'en');
             this._setGameStatus(reason || gameText('actionFailed'), true);
-            button.disabled = false;
-            delete button.dataset.purchasePending;
+        } finally {
+            if (this.el && this.el.contains(button)) {
+                button.disabled = false;
+                button.textContent = originalLabel;
+                button.removeAttribute('aria-busy');
+                delete button.dataset.purchasePending;
+            }
         }
     }
 
     async _usePowerUp(type, button) {
-        if (!type || !this._userPath) return;
-        const item = arrayOf(this._loadout && this._loadout.powerups, 'Inventory', 'inventory').find((entry) => String(valueOf(entry, 'Type', 'type')) === type);
-        const localizedItem = item
-            ? localizeAchievementPowerUp(item, i18n.currentLang || document.documentElement.lang || 'en')
-            : null;
-        const name = localizedItem ? valueOf(localizedItem, 'DisplayName', 'displayName') : type;
-        if (!window.confirm(gameText('confirmUse', { name }))) return;
+        type = normalizePowerUpType(type);
+        if (!type || !this._userPath || !button || button.dataset.usePending === 'true') return;
+        const item = arrayOf(this._loadout && this._loadout.powerups, 'Inventory', 'inventory').find((entry) => normalizePowerUpType(valueOf(entry, 'Type', 'type')) === type);
+        const count = Number(valueOf(item, 'Count', 'count') || 0);
+        if (count <= 0) {
+            this._setGameStatus(gameText('arsenalEmpty'), true);
+            return;
+        }
+        if (type === 'StreakFreeze') {
+            this._setGameStatus(gameText('powerupAutomatic'));
+            return;
+        }
+        if (type === 'DoubleCredit' && !!valueOf(item, 'Active', 'active')) {
+            this._setGameStatus(gameText('powerupReady'));
+            return;
+        }
+
+        // A click is the confirmation on TV: native confirm() can steal
+        // Magic Remote focus and make the power-up appear unresponsive.
+        const originalLabel = button.textContent;
+        button.dataset.usePending = 'true';
         button.disabled = true;
-        this._setGameStatus(gameText('loadingGame'));
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = gameText('activating');
+        this._setGameStatus(gameText('activating'));
         try {
-            await api.post(`${this._userPath}/powerups/use/${encodeURIComponent(type)}`, {});
-            await this._loadLoadout();
-            this._renderLoadout();
-            this._setGameStatus(gameText('useOk'));
+            const result = await api.post(`${this._userPath}/powerups/use/${encodeURIComponent(type)}`, {});
+            if (valueOf(result, 'Success', 'success') === false) {
+                throw new Error(valueOf(result, 'Message', 'message') || gameText('actionFailed'));
+            }
+            const updatedInventory = valueOf(result, 'Inventory', 'inventory');
+            if (Array.isArray(updatedInventory)) {
+                this._loadout.powerups = {
+                    ...(this._loadout.powerups || {}),
+                    Inventory: updatedInventory,
+                    ActiveXpBoostUntil: valueOf(result, 'ActiveXpBoostUntil', 'activeXpBoostUntil') ?? valueOf(this._loadout.powerups, 'ActiveXpBoostUntil', 'activeXpBoostUntil'),
+                    DoubleCreditPending: valueOf(result, 'DoubleCreditPending', 'doubleCreditPending') ?? valueOf(this._loadout.powerups, 'DoubleCreditPending', 'doubleCreditPending')
+                };
+            } else {
+                this._loadout.powerups = await api.get(`${this._userPath}/powerups`);
+            }
+            this._renderArsenal();
+            this._renderShop();
+            const message = valueOf(result, 'Message', 'message') || gameText('useOk');
+            this._setGameStatus(localizeAchievementMessage(message, i18n.currentLang || document.documentElement.lang || 'en'));
+            focusManager.invalidateCache('achievements-game-center');
         } catch (err) {
             log.warn('Achievement Badges power-up activation failed:', err);
-            this._setGameStatus(gameText('actionFailed'), true);
-            button.disabled = false;
+            const reason = localizeAchievementMessage(achievementErrorMessage(err, gameText('actionFailed')), i18n.currentLang || document.documentElement.lang || 'en');
+            this._setGameStatus(reason || gameText('actionFailed'), true);
+        } finally {
+            if (this.el && this.el.contains(button)) {
+                button.disabled = false;
+                button.textContent = originalLabel;
+                button.removeAttribute('aria-busy');
+                delete button.dataset.usePending;
+            }
         }
     }
-
     async _equipCosmetic(cosmeticId, button) {
         if (!cosmeticId || !this._userPath || !button) return;
         // Native confirm dialogs can swallow Magic Remote input on webOS.

@@ -2596,3 +2596,27 @@
 @media (prefers-reduced-motion:reduce) {
     .achievements-page * { scroll-behavior:auto !important; animation:none !important; }
 }
+
+/* Game Center shop interaction polish: immediate stock feedback and larger TV hit targets. */
+.achievement-shop-stock { display:block; margin-top:8px; color:#c7bfdc; font-size:11px; }
+.achievement-shop-stock b { color:#f0cf7c; font-variant-numeric:tabular-nums; }
+.achievement-shop-actions { align-items:center; flex-wrap:wrap; gap:10px; }
+.achievement-shop-action-buttons { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px; min-width:0; }
+.achievement-shop-action-buttons .achievement-action-button { min-width:104px; min-height:42px; padding:9px 14px; }
+.achievement-shop-action-buttons .achievement-shop-use { border-color:rgba(112,214,154,.38); background:rgba(52,145,100,.17); }
+.achievement-shop-action-buttons .achievement-shop-use:hover,
+.achievement-shop-action-buttons .achievement-shop-use:focus-visible { border-color:rgba(125,235,173,.85); background:rgba(52,145,100,.28); }
+.achievement-action-button[aria-busy="true"] { opacity:.78; cursor:progress; }
+.achievement-page .achievement-action-button:active,
+.achievements-page .achievement-action-button:active { transform:scale(.98); }
+.achievements-page .achievement-game-card { transition:border-color 90ms ease,background-color 90ms ease; }
+.achievements-page .achievement-action-button { transition:background-color 90ms ease,border-color 90ms ease,transform 70ms ease,opacity 90ms ease; }
+@media (max-width:760px) {
+    .achievement-shop-actions { align-items:flex-start; flex-direction:column; }
+    .achievement-shop-action-buttons { width:100%; justify-content:flex-start; }
+    .achievement-shop-action-buttons .achievement-action-button { flex:1 1 auto; }
+}
+@media (prefers-reduced-motion:reduce) {
+    .achievements-page .achievement-game-card,
+    .achievements-page .achievement-action-button { transition:none !important; transform:none !important; }
+}
