@@ -381,17 +381,32 @@ function serverTranslation(translations, key) {
     return typeof value === 'string' && value.trim() ? value : '';
 }
 
-export function localizeAchievementBadge(badge, language = '') {
+export function localizeAchievementBadge(badge, language = '', serverTranslations = null) {
     if (!badge || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return badge;
 
     // Custom badges are authored on the Jellyfin server. Keep their exact
-    // Name/Description: only the server administrator can supply the right
-    // translation, and generic pattern matching could corrupt their wording.
+    // wording unless the server explicitly supplies a translation key.
     const category = String(badge.Category || badge.category || '').trim().toLowerCase();
     const id = String(badge.Id || badge.id || '').trim().toLowerCase();
     if (category === 'custom' || /^[0-9a-f]{32}$/.test(id)) return badge;
-    const title = RUSSIAN_TITLES[id];
-    const description = localizedDescription(badge.Description || badge.description || '');
+
+    const currentTitle = String(badge.Title || badge.title || '');
+    const currentDescription = String(badge.Description || badge.description || '');
+    const hasCyrillic = (value) => /[А-Яа-яЁё]/.test(String(value || ''));
+
+    // The plugin's ?lang=ru badge endpoint is authoritative. If it already
+    // returned Russian text, never overwrite it with Litefin's bundled copy.
+    // Flat server packs may also provide explicit per-badge keys.
+    const serverTitle = serverTranslation(serverTranslations, 'badge.' + id + '.title')
+        || serverTranslation(serverTranslations, 'badges.' + id + '.title');
+    const serverDescription = serverTranslation(serverTranslations, 'badge.' + id + '.description')
+        || serverTranslation(serverTranslations, 'badges.' + id + '.description');
+
+    const title = serverTitle || (hasCyrillic(currentTitle) ? currentTitle : RUSSIAN_TITLES[id]);
+    const description = serverDescription || (hasCyrillic(currentDescription)
+        ? currentDescription
+        : localizedDescription(currentDescription));
+
     if (!title && !description) return badge;
     return {
         ...badge,
