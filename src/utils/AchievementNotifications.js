@@ -55,6 +55,13 @@ class AchievementNotifications {
         this._lastWarningAt = 0;
     }
 
+    updatePreferences(prefs) {
+        if (!prefs || typeof prefs !== 'object') return;
+        this._prefs = { ...prefs };
+        this._prefsFetchedAt = Date.now();
+        this._applyToastPosition(this._prefs);
+    }
+
     init() {
         const userId = api.userId;
         if (!userId || !api.accessToken) return;
@@ -152,6 +159,7 @@ class AchievementNotifications {
                     .get('Plugins/AchievementBadges/users/' + this._userId + '/preferences')
                     .catch(() => null);
                 this._prefsFetchedAt = now;
+                this._applyToastPosition(this._prefs || {});
             }
 
             if (!this._features || now - this._featuresFetchedAt > PREFS_TTL_MS) {
@@ -291,11 +299,41 @@ class AchievementNotifications {
             container.setAttribute('aria-live', 'polite');
             (document.body || document.documentElement).appendChild(container);
         }
+        this._applyToastPosition(this._prefs || {});
         return container;
+    }
+
+    _applyToastPosition(prefs = {}) {
+        const container = document.getElementById('litefin-achievement-toast-container');
+        if (!container) return;
+        const position = String(prefs.ToastPosition || prefs.toastPosition || '').toLowerCase();
+        container.style.top = '';
+        container.style.right = '';
+        container.style.bottom = '';
+        container.style.left = '';
+        container.style.transform = '';
+        container.style.alignItems = 'flex-end';
+        const positions = {
+            'top-right': { top: 'clamp(18px,3vh,34px)', right: 'clamp(18px,2.5vw,38px)', align: 'flex-end' },
+            'top-center': { top: 'clamp(18px,3vh,34px)', left: '50%', transform: 'translateX(-50%)', align: 'center' },
+            'top-left': { top: 'clamp(18px,3vh,34px)', left: 'clamp(18px,2.5vw,38px)', align: 'flex-start' },
+            'bottom-right': { bottom: 'clamp(18px,3vh,34px)', right: 'clamp(18px,2.5vw,38px)', align: 'flex-end' },
+            'bottom-center': { bottom: 'clamp(18px,3vh,34px)', left: '50%', transform: 'translateX(-50%)', align: 'center' },
+            'bottom-left': { bottom: 'clamp(18px,3vh,34px)', left: 'clamp(18px,2.5vw,38px)', align: 'flex-start' }
+        };
+        const selected = positions[position];
+        if (!selected) return; // Empty = follow the server's default placement.
+        if (selected.top) container.style.top = selected.top;
+        if (selected.bottom) container.style.bottom = selected.bottom;
+        if (selected.left) container.style.left = selected.left;
+        if (selected.right) container.style.right = selected.right;
+        if (selected.transform) container.style.transform = selected.transform;
+        container.style.alignItems = selected.align;
     }
 
     _renderToast(payload, prefs) {
         const container = this._getContainer();
+        this._applyToastPosition(prefs || {});
         const isMilestone = typeof payload.milestone === 'number';
         const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || i18n.currentLang || '');
         const copyText = (ru, en) => russian ? ru : en;
