@@ -32,7 +32,7 @@ const GAME_TEXT = {
         prefActivity: 'Показывать мои открытия в общей ленте', prefHideCompare: 'Скрыть мой профиль от сравнения', prefHidePrestige: 'Скрыть меня в таблице престижа', prefHideLeaderboard: 'Скрыть меня в таблице лидеров веб-клиента', prefOffline: 'Показывать меня офлайн друзьям', prefHideNowPlaying: 'Скрывать, что я сейчас смотрю', prefHideLastWatched: 'Скрывать последний просмотр',
         prefShowcase: 'Показывать витрину экипированных значков', prefAutoEquip: 'Автоматически экипировать новые значки', prefSlots: 'Количество мест в витрине', prefSpoilers: 'Скрывать описания закрытых достижений', prefExtremeSpoilers: 'Полностью скрывать закрытые достижения',
         optionDefault: 'По умолчанию (как на сервере)', optionAll: 'Все', optionRare: 'Редкие и выше', optionEpic: 'Эпические и выше', optionLegendary: 'Только легендарные', optionGrouped: 'Группировать', optionIndividual: 'По одному', optionAllDevices: 'На всех устройствах', optionOriginDevice: 'Только на устройстве просмотра',
-        optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.' eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.', settingsUnavailable: 'Не удалось загрузить настройки профиля.', showcaseEquipSuccess: 'Значок добавлен в витрину.', showcaseRemoveSuccess: 'Значок убран из витрины.', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -82,7 +82,7 @@ const GAME_TEXT = {
         prefActivity: 'Show my unlocks in the public activity feed', prefHideCompare: 'Hide my profile from comparisons', prefHidePrestige: 'Hide me from prestige board', prefHideLeaderboard: 'Hide me from the web client leaderboard', prefOffline: 'Appear offline to friends', prefHideNowPlaying: 'Hide what I am currently watching', prefHideLastWatched: 'Hide last watched item',
         prefShowcase: 'Show equipped badge showcase', prefAutoEquip: 'Automatically equip newly unlocked badges', prefSlots: 'Showcase slot count', prefSpoilers: 'Hide descriptions of locked achievements', prefExtremeSpoilers: 'Hide locked achievements completely',
         optionDefault: 'Default (follow server)', optionAll: 'All', optionRare: 'Rare and above', optionEpic: 'Epic and above', optionLegendary: 'Legendary only', optionGrouped: 'Grouped', optionIndividual: 'Individual', optionAllDevices: 'All devices', optionOriginDevice: 'Unlocking device only',
-        optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.' eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.', settingsUnavailable: 'Could not load profile settings.', showcaseEquipSuccess: 'Badge added to showcase.', showcaseRemoveSuccess: 'Badge removed from showcase.', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -1536,7 +1536,7 @@ class AchievementsPage extends Page {
             this._showcaseBadges = Array.isArray(result) ? result : null;
             if (!this._showcaseBadges) await this._loadShowcase(true);
             else this._renderShowcase();
-            this._setFeatureStatus('achievement-showcase-status', 'Badge equipped.');
+            this._setFeatureStatus('achievement-showcase-status', gameText('showcaseEquipSuccess'));
         } catch (err) {
             log.warn('Achievement badge could not be added to showcase:', err);
             this._setFeatureStatus('achievement-showcase-status', localizeAchievementMessage(err.message || gameText('actionFailed'), i18n.currentLang || document.documentElement.lang || 'en'), true);
@@ -1554,7 +1554,7 @@ class AchievementsPage extends Page {
             this._showcaseBadges = Array.isArray(result) ? result : null;
             if (!this._showcaseBadges) await this._loadShowcase(true);
             else this._renderShowcase();
-            this._setFeatureStatus('achievement-showcase-status', 'Badge unequipped.');
+            this._setFeatureStatus('achievement-showcase-status', gameText('showcaseRemoveSuccess'));
         } catch (err) {
             log.warn('Achievement badge could not be removed from showcase:', err);
             this._setFeatureStatus('achievement-showcase-status', localizeAchievementMessage(err.message || gameText('actionFailed'), i18n.currentLang || document.documentElement.lang || 'en'), true);
@@ -1711,7 +1711,7 @@ class AchievementsPage extends Page {
         const target = this.$('#achievement-settings-content');
         if (!target) return;
         if (!this._preferencesLoaded || !this._preferences) {
-            target.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('settingsSaveError')) + '</p>';
+            target.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('settingsUnavailable')) + '</p>';
             return;
         }
         const prefs = this._preferences;
