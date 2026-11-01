@@ -376,6 +376,11 @@ function localizedDescription(raw) {
     return text;
 }
 
+function serverTranslation(translations, key) {
+    const value = translations && translations[key];
+    return typeof value === 'string' && value.trim() ? value : '';
+}
+
 export function localizeAchievementBadge(badge, language = '') {
     if (!badge || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return badge;
 
@@ -513,32 +518,53 @@ const RUSSIAN_POWERUPS = {
     streakfreeze: ['Заморозка серии', 'Автоматически защитит серию просмотров, если пропустить один день. В запасе может быть только одна.']
 };
 
-export function localizeAchievementRank(name, language = '') {
+export function localizeAchievementRank(name, language = '', serverTranslations = null) {
+    const raw = String(name || '').trim();
+    if (!raw) return name;
+    const server = serverTranslation(serverTranslations, 'rank.' + raw.toLowerCase());
+    if (server) return server;
     if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return name;
-    const key = String(name || '').trim();
-    return RUSSIAN_RANKS[key] || name;
+    return RUSSIAN_RANKS[raw] || name;
+}
 }
 
-export function localizeAchievementQuest(quest, language = '') {
-    if (!quest || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return quest;
+export function localizeAchievementQuest(quest, language = '', serverTranslations = null) {
+    if (!quest) return quest;
     const id = String(quest.Id || quest.id || '').trim().toLowerCase();
+    const serverTitle = serverTranslation(serverTranslations, 'quest.' + id + '.title');
+    const serverDescription = serverTranslation(serverTranslations, 'quest.' + id + '.desc');
+    if (serverTitle || serverDescription) {
+        return {
+            ...quest,
+            Title: serverTitle || quest.Title || quest.title,
+            Description: serverDescription || quest.Description || quest.description
+        };
+    }
+    if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return quest;
     const localized = RUSSIAN_QUESTS[id];
-
-    // Only known stock quest IDs belong to the local fallback catalogue.
-    // Unknown IDs are admin-authored server content and remain untouched.
     if (!localized) return quest;
     const originalDescription = quest.Description || quest.description || '';
-    const description = localized.description || originalDescription;
     return {
         ...quest,
-        Title: localized?.title || quest.Title || quest.title,
-        Description: description || originalDescription
+        Title: localized.title || quest.Title || quest.title,
+        Description: localized.description || originalDescription
     };
 }
+}
 
-export function localizeAchievementCatalogItem(item, language = '') {
-    if (!item || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return item;
+export function localizeAchievementCatalogItem(item, language = '', serverTranslations = null) {
+    if (!item) return item;
     const id = String(item.Id || item.id || '').trim().toLowerCase();
+    const serverName = serverTranslation(serverTranslations, 'cat.' + id + '.name');
+    const serverDescription = serverTranslation(serverTranslations, 'cat.' + id + '.desc');
+    if (serverName || serverDescription) {
+        return {
+            ...item,
+            DisplayName: serverName || item.DisplayName || item.displayName,
+            Description: serverDescription || item.Description || item.description
+        };
+    }
+    if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return item;
     const localized = RUSSIAN_CATALOG_ITEMS[id];
     if (!localized) return item;
     return {
@@ -547,23 +573,44 @@ export function localizeAchievementCatalogItem(item, language = '') {
         Description: localized[1]
     };
 }
+}
 
-export function localizeAchievementPowerUp(item, language = '') {
-    if (!item || !/^ru(?:[-_]|$)/i.test(String(language || ''))) return item;
-    const type = String(item.Type || item.type || '').toLowerCase().replace(/[^a-z]/g, '');
+export function localizeAchievementPowerUp(item, language = '', serverTranslations = null) {
+    if (!item) return item;
+    const fromCatalog = localizeAchievementCatalogItem(item, language, serverTranslations);
+    if (fromCatalog !== item) return fromCatalog;
+    const rawType = String(item.Type || item.type || '').trim();
+    const type = rawType.toLowerCase().replace(/[^a-z]/g, '');
+    const serverName = serverTranslation(serverTranslations, 'pu.' + type + '.name')
+        || serverTranslation(serverTranslations, 'powerup.' + rawType);
+    const serverDescription = serverTranslation(serverTranslations, 'pu.' + type + '.desc');
+    if (serverName || serverDescription) {
+        return {
+            ...item,
+            DisplayName: serverName || item.DisplayName || item.displayName,
+            Description: serverDescription || item.Description || item.description
+        };
+    }
+    if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return item;
     const localized = RUSSIAN_POWERUPS[type];
-    if (!localized) return localizeAchievementCatalogItem(item, language);
+    if (!localized) return item;
     return {
         ...item,
         DisplayName: localized[0],
         Description: localized[1]
     };
 }
+}
 
-export function localizeAchievementPowerUpType(type, language = '') {
+export function localizeAchievementPowerUpType(type, language = '', serverTranslations = null) {
+    const rawType = String(type || '').trim();
+    const key = rawType.toLowerCase().replace(/[^a-z]/g, '');
+    const server = serverTranslation(serverTranslations, 'pu.' + key + '.name')
+        || serverTranslation(serverTranslations, 'powerup.' + rawType);
+    if (server) return server;
     if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return type;
-    const key = String(type || '').toLowerCase().replace(/[^a-z]/g, '');
     return RUSSIAN_POWERUPS[key]?.[0] || type;
+}
 }
 
 export function localizeAchievementMessage(message, language = '') {
