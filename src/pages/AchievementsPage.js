@@ -96,6 +96,29 @@ const GAME_TEXT = {
 
 let gameCenterServerTranslations = null;
 
+const GAME_TEXT_SERVER_KEYS = {
+    badgesTab: 'tabs.my_badges',
+    questsTab: 'tabs.quests',
+    shopTab: 'loadout.tab.shop',
+    statsTab: 'tabs.stats',
+    arsenal: 'loadout.tab.powerups',
+    shop: 'loadout.tab.shop',
+    cosmetics: 'loadout.tab.cosmetics',
+    scoreBank: 'loadout.score_balance',
+    buy: 'loadout.shop.buy',
+    owned: 'loadout.shop.owned_stripe',
+    equipped: 'loadout.cos.equipped',
+    equip: 'loadout.cos.equip',
+    use: 'loadout.pu.use',
+    active: 'loadout.pu.active',
+    price: 'loadout.shop.score',
+    inventory: 'loadout.pu.owned',
+    shopPowerups: 'loadout.shop.powerup_refills',
+    noCosmetics: 'loadout.cos.empty',
+    cosmeticsIntro: 'loadout.intro.cosmetics',
+    shopIntro: 'loadout.intro.shop'
+};
+
 function normalizeServerTranslations(value) {
     if (typeof value === 'string') {
         try { value = JSON.parse(value); } catch (_) { return null; }
@@ -106,12 +129,13 @@ function normalizeServerTranslations(value) {
 function gameText(key, replacements = {}) {
     const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     const dictionary = language.startsWith('ru') ? GAME_TEXT.ru : GAME_TEXT.en;
-    let text = dictionary[key] || GAME_TEXT.en[key] || key;
+    const serverKey = GAME_TEXT_SERVER_KEYS[key];
+    const serverValue = serverKey && gameCenterServerTranslations ? gameCenterServerTranslations[serverKey] : '';
+    let text = (typeof serverValue === 'string' && serverValue.trim()) ? serverValue : (dictionary[key] || GAME_TEXT.en[key] || key);
     Object.keys(replacements).forEach((name) => {
         text = text.replace(new RegExp('\\{' + name + '\\}', 'g'), String(replacements[name]));
     });
     return text;
-}
 }
 
 function arrayOf(object, ...keys) {
@@ -248,7 +272,6 @@ function localizedBadgeValue(value, kind, serverTranslations = null) {
         }
     };
     return dictionaries[kind] && dictionaries[kind][key] ? dictionaries[kind][key] : raw;
-}
 }
 
 function achievementLocale() {
