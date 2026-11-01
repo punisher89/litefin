@@ -779,7 +779,7 @@ class AchievementsPage extends Page {
             const date = achievementDate(valueOf(entry, 'At', 'at'));
             return `
                 <article class="achievement-activity-item">
-                    <span class="achievement-activity-icon">${badgeIcon({ Icon: valueOf(entry, 'Icon', 'icon'), Category: valueOf(entry, 'Category', 'category') })}</span>
+                    <span class="achievement-activity-icon">${escapeHtml(badgeIcon({ Icon: valueOf(entry, 'Icon', 'icon'), Category: valueOf(entry, 'Category', 'category') }))}</span>
                     <div class="achievement-activity-body">
                         <strong>${escapeHtml(title)}</strong>
                         <span>${escapeHtml(userName)} · ${escapeHtml(date)}</span>
