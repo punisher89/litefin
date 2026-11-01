@@ -46,6 +46,8 @@ class AchievementNotifications {
         this._prefs = null;
         this._prefsFetchedAt = 0;
         this._defaultToastPosition = '';
+        this._publicConfig = null;
+        this._publicConfigFetchedAt = 0;
         this._features = null;
         this._featuresFetchedAt = 0;
         this._seen = new Set();
@@ -136,6 +138,8 @@ class AchievementNotifications {
         this._prefs = null;
         this._prefsFetchedAt = 0;
         this._defaultToastPosition = '';
+        this._publicConfig = null;
+        this._publicConfigFetchedAt = 0;
         this._features = null;
         this._featuresFetchedAt = 0;
         this._seen.clear();
@@ -163,6 +167,15 @@ class AchievementNotifications {
                     .get('Plugins/AchievementBadges/users/' + this._userId + '/preferences')
                     .catch(() => null);
                 this._prefsFetchedAt = now;
+                this._applyToastPosition(this._prefs || {});
+            }
+
+            if (!this._publicConfig || now - this._publicConfigFetchedAt > PREFS_TTL_MS) {
+                this._publicConfig = await api.get('Plugins/AchievementBadges/public-config').catch(() => null);
+                this._publicConfigFetchedAt = now;
+                this._defaultToastPosition = String(
+                    this._publicConfig && (this._publicConfig.DefaultToastPosition || this._publicConfig.defaultToastPosition) || ''
+                ).toLowerCase();
                 this._applyToastPosition(this._prefs || {});
             }
 
