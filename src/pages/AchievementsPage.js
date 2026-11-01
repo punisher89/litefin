@@ -250,7 +250,7 @@ function localizedBadgeValue(value, kind, serverTranslations = null) {
             movie: 'Фильмы', movies: 'Фильмы', film: 'Фильмы', films: 'Фильмы',
             series: 'Сериалы', tv: 'Телевидение', episode: 'Сериалы',
             music: 'Музыка', book: 'Книги', books: 'Книги',
-            game: 'Игры', games: 'Игры', general: 'Общие',
+            game: 'Игры', games: 'Игры', general: 'Общие', custom: 'Пользовательские',
             watchtime: 'Время просмотра', 'watch time': 'Время просмотра',
             playback: 'Просмотр', streak: 'Серии просмотров',
             social: 'Социальные', collection: 'Коллекции',
