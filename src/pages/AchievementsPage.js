@@ -269,7 +269,6 @@ function localizedBadgeValue(value, kind, serverTranslations = null) {
     const serverValue = language.startsWith('ru') && typeof candidateServerValue === 'string' && !/[А-Яа-яЁё]/.test(candidateServerValue)
         ? '' : candidateServerValue;
     if (typeof serverValue === 'string' && serverValue.trim()) return serverValue;
-    const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     if (!language.startsWith('ru')) return raw;
 
     const key = raw.toLowerCase().replace(/[_-]+/g, ' ').trim();
