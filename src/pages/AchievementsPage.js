@@ -2007,7 +2007,7 @@ class AchievementsPage extends Page {
 
         const visible = badges.slice(0, this._visibleBadgeCount);
         grid.innerHTML = visible.map((badge) => {
-            const localizedBadge = localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang);
+            const localizedBadge = localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang, this._serverTranslations);
             const title = valueOf(localizedBadge, 'Title', 'title') || '';
             const description = valueOf(localizedBadge, 'Description', 'description') || '';
             const category = valueOf(badge, 'Category', 'category') || '';
