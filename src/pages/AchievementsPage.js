@@ -323,6 +323,7 @@ class AchievementsPage extends Page {
         this._statsSharedPromise = null;
         this._statsRequestId = 0;
         this._serverTranslations = null;
+        gameCenterServerTranslations = null;
     }
 
     render() {
