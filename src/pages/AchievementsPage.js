@@ -32,7 +32,7 @@ const GAME_TEXT = {
         prefActivity: 'Показывать мои открытия в общей ленте', prefHideCompare: 'Скрыть мой профиль от сравнения', prefHidePrestige: 'Скрыть меня в таблице престижа', prefHideLeaderboard: 'Скрыть мой профиль из рейтингов веб-клиента', prefOffline: 'Показывать меня офлайн друзьям', prefHideNowPlaying: 'Скрывать, что я сейчас смотрю', prefHideLastWatched: 'Скрывать последний просмотр',
         prefShowcase: 'Показывать витрину экипированных значков', prefAutoEquip: 'Автоматически экипировать новые значки', prefSlots: 'Количество мест в витрине', prefSpoilers: 'Скрывать описания закрытых достижений', prefExtremeSpoilers: 'Полностью скрывать закрытые достижения',
         optionDefault: 'По умолчанию сервера{position}', optionAll: 'Все', optionRare: 'Редкие и выше', optionEpic: 'Эпические и выше', optionLegendary: 'Только легендарные', optionGrouped: 'Группировать', optionIndividual: 'По одному', optionAllDevices: 'На всех устройствах', optionOriginDevice: 'Только на устройстве просмотра',
-        optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.', settingsUnavailable: 'Не удалось загрузить настройки профиля.', showcaseEquipSuccess: 'Значок добавлен в витрину.', showcaseRemoveSuccess: 'Значок убран из витрины.', overviewProfileTitle: 'Твой игровой профиль', overviewProfileSubtitle: 'Собирай награды за просмотр и активность', overviewAwards: 'Получено наград', overviewQuests: 'Заданий выполнено', overviewStreak: 'Серия активности', overviewScore: 'Очки', overviewDays: 'дней', overviewRecent: 'Недавно полученные', overviewGoal: 'Ближайшая цель', overviewNoRecent: 'Новые награды появятся здесь после разблокировки.', overviewNoGoal: 'Сейчас нет незавершённых заданий. Отличная работа!', overviewUnlocked: 'Получено', overviewBestStreak: 'Лучшая серия', overviewQuestTotal: '{count} всего', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.', settingsUnavailable: 'Не удалось загрузить настройки профиля.', showcaseEquipSuccess: 'Значок добавлен в витрину.', showcaseRemoveSuccess: 'Значок убран из витрины.', overviewProfileTitle: 'Твой игровой профиль', overviewProfileSubtitle: 'Собирай награды за просмотр и активность', overviewAwards: 'Получено наград', overviewQuests: 'Заданий выполнено', overviewStreak: 'Серия активности', overviewScore: 'Очки', overviewDays: 'дней', overviewRecent: 'Недавно полученные', overviewShowcase: 'Значки в витрине профиля', overviewShowcaseLoading: 'Загружаем установленные значки…', overviewShowcaseEmpty: 'Витрина пока пуста. Добавь открытые достижения на вкладке «Витрина».', overviewManageShowcase: 'Настроить витрину', overviewSignature: 'Главный значок', overviewGoal: 'Ближайшая цель', overviewNoRecent: 'Новые награды появятся здесь после разблокировки.', overviewNoGoal: 'Сейчас нет незавершённых заданий. Отличная работа!', overviewUnlocked: 'Получено', overviewBestStreak: 'Лучшая серия', overviewQuestTotal: '{count} всего', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -82,7 +82,7 @@ const GAME_TEXT = {
         prefActivity: 'Show my unlocks in the public activity feed', prefHideCompare: 'Hide my profile from comparisons', prefHidePrestige: 'Hide me from prestige board', prefHideLeaderboard: 'Hide my profile from web-client leaderboards', prefOffline: 'Appear offline to friends', prefHideNowPlaying: 'Hide what I am currently watching', prefHideLastWatched: 'Hide last watched item',
         prefShowcase: 'Show equipped badge showcase', prefAutoEquip: 'Automatically equip newly unlocked badges', prefSlots: 'Showcase slot count', prefSpoilers: 'Hide descriptions of locked achievements', prefExtremeSpoilers: 'Hide locked achievements completely',
         optionDefault: 'Server default{position}', optionAll: 'All', optionRare: 'Rare and above', optionEpic: 'Epic and above', optionLegendary: 'Legendary only', optionGrouped: 'Grouped', optionIndividual: 'Individual', optionAllDevices: 'All devices', optionOriginDevice: 'Unlocking device only',
-        optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.', settingsUnavailable: 'Could not load profile settings.', showcaseEquipSuccess: 'Badge added to showcase.', showcaseRemoveSuccess: 'Badge removed from showcase.', overviewProfileTitle: 'Your gaming profile', overviewProfileSubtitle: 'Earn rewards as you watch and explore your library', overviewAwards: 'Awards earned', overviewQuests: 'Quests completed', overviewStreak: 'Activity streak', overviewScore: 'Score', overviewDays: 'days', overviewRecent: 'Recently unlocked', overviewGoal: 'Next goal', overviewNoRecent: 'New rewards will appear here when you unlock them.', overviewNoGoal: 'No unfinished quests right now. Great work!', overviewUnlocked: 'Unlocked', overviewBestStreak: 'Best streak', overviewQuestTotal: '{count} total', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.', settingsUnavailable: 'Could not load profile settings.', showcaseEquipSuccess: 'Badge added to showcase.', showcaseRemoveSuccess: 'Badge removed from showcase.', overviewProfileTitle: 'Your gaming profile', overviewProfileSubtitle: 'Earn rewards as you watch and explore your library', overviewAwards: 'Awards earned', overviewQuests: 'Quests completed', overviewStreak: 'Activity streak', overviewScore: 'Score', overviewDays: 'days', overviewRecent: 'Recently unlocked', overviewShowcase: 'Profile showcase', overviewShowcaseLoading: 'Loading equipped badges…', overviewShowcaseEmpty: 'Your showcase is empty. Add unlocked achievements in the Showcase tab.', overviewManageShowcase: 'Manage showcase', overviewSignature: 'Signature badge', overviewGoal: 'Next goal', overviewNoRecent: 'New rewards will appear here when you unlock them.', overviewNoGoal: 'No unfinished quests right now. Great work!', overviewUnlocked: 'Unlocked', overviewBestStreak: 'Best streak', overviewQuestTotal: '{count} total', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -632,7 +632,9 @@ class AchievementsPage extends Page {
             const button = target.closest('button');
             if (!button || !this.el.contains(button)) return;
 
-            if (button.hasAttribute('data-achievement-tab')) {
+            if (button.hasAttribute('data-overview-showcase-open')) {
+                this._selectMainSection('showcase');
+            } else if (button.hasAttribute('data-achievement-tab')) {
                 this._selectGameTab(button.getAttribute('data-achievement-tab'));
             } else if (button.hasAttribute('data-achievement-reroll')) {
                 this._rerollQuests(button.getAttribute('data-achievement-reroll'), button);
@@ -741,10 +743,10 @@ class AchievementsPage extends Page {
             await this._loadLoadout();
             this._render();
             this._applyServerUiTranslations();
+            this._loadShowcase(force);
             const activeSection = this.el.querySelector('[data-game-section].active')?.getAttribute('data-game-section');
             if (force && activeSection === 'stats') this._loadStats(this._statsPeriod);
             if (force && activeSection === 'activity') this._loadActivity(false);
-            if (force && activeSection === 'showcase') this._loadShowcase(true);
             if (force && activeSection === 'challenges') this._loadChallenges(true);
         } catch (err) {
             log.warn('Achievement Badges data could not be loaded:', err);
@@ -1607,6 +1609,7 @@ class AchievementsPage extends Page {
         if (!this._userPath || this._showcaseLoading) return;
         if (!force && Array.isArray(this._showcaseBadges)) {
             this._renderShowcase();
+            this._renderOverviewShowcase();
             return;
         }
         this._showcaseLoading = true;
@@ -1617,10 +1620,12 @@ class AchievementsPage extends Page {
             const result = await api.get(this._userPath + '/equipped?lang=' + lang);
             this._showcaseBadges = Array.isArray(result) ? result : [];
             this._renderShowcase();
+            this._renderOverviewShowcase();
         } catch (err) {
             log.warn('Achievement Badges showcase could not be loaded:', err);
             this._showcaseBadges = [];
             if (equipped) equipped.innerHTML = '<p class="achievements-muted">' + escapeHtml(gameText('showcaseUnavailable')) + '</p>';
+            this._renderOverviewShowcase();
             this._setFeatureStatus('achievement-showcase-status', gameText('showcaseUnavailable'), true);
         } finally {
             this._showcaseLoading = false;
@@ -1628,6 +1633,38 @@ class AchievementsPage extends Page {
         }
     }
 
+    _renderOverviewShowcase() {
+        const list = this.$('#achievement-overview-showcase-list');
+        const countNode = this.$('#achievement-overview-showcase-count');
+        if (!list) return;
+        if (!Array.isArray(this._showcaseBadges)) {
+            list.innerHTML = '<p class="achievements-muted achievement-overview-empty">' + escapeHtml(gameText('overviewShowcaseLoading')) + '</p>';
+            if (countNode) countNode.textContent = '—';
+            return;
+        }
+
+        const badges = this._showcaseBadges;
+        if (countNode) countNode.textContent = String(badges.length);
+        if (!badges.length) {
+            list.innerHTML = '<p class="achievements-muted achievement-overview-empty">' + escapeHtml(gameText('overviewShowcaseEmpty')) + '</p>';
+            return;
+        }
+
+        const language = i18n.currentLang || document.documentElement.lang || 'en';
+        list.innerHTML = badges.map((badge, index) => {
+            const localized = localizeAchievementBadge(badge, language, this._serverTranslations);
+            const title = valueOf(localized, 'Title', 'title') || valueOf(badge, 'Id', 'id') || '';
+            const description = valueOf(localized, 'Description', 'description') || '';
+            const rarity = localizedBadgeValue(valueOf(badge, 'Rarity', 'rarity') || '', 'rarity', this._serverTranslations);
+            return '<article class="achievement-profile-showcase-card' + (index === 0 ? ' is-signature' : '') + '">' +
+                '<span class="achievement-profile-showcase-icon" aria-hidden="true">' + badgeIcon(badge) + '</span>' +
+                '<span class="achievement-profile-showcase-copy"><strong>' + escapeHtml(title) + '</strong>' +
+                (rarity ? '<small>' + escapeHtml(index === 0 ? gameText('overviewSignature') + ' · ' + rarity : rarity) + '</small>' : '') +
+                (description ? '<span>' + escapeHtml(description) + '</span>' : '') +
+                '</span></article>';
+        }).join('');
+        focusManager.invalidateCache('achievements-game-center');
+    }
     _renderShowcase() {
         const equippedTarget = this.$('#achievement-showcase-equipped');
         const availableTarget = this.$('#achievement-showcase-available');
@@ -2060,7 +2097,13 @@ class AchievementsPage extends Page {
             "<div class=\"achievement-overview-lower\">",
             "<section class=\"achievement-overview-panel achievement-recent-panel\"><div class=\"achievement-overview-panel-heading\"><h3>" + escapeHtml(gameText("overviewRecent")) + "</h3><span>" + recent.length + "</span></div><div class=\"achievement-recent-grid\">" + recentHtml + "</div></section>",
             "<section class=\"achievement-overview-panel achievement-goal-panel\"><div class=\"achievement-overview-panel-heading\"><h3>" + escapeHtml(gameText("overviewGoal")) + "</h3><span class=\"achievement-goal-status\">" + (nextGoal ? nextGoal.percent + "%" : "✓") + "</span></div>" + goalHtml + "</section>",
-            "</div></div>"
+            "</div>",
+            "<section class=\"achievement-overview-panel achievement-profile-showcase-panel\" aria-label=\"" + escapeHtml(gameText("overviewShowcase")) + "\">",
+            "<div class=\"achievement-profile-showcase-heading\"><div class=\"achievement-overview-panel-heading\"><h3>" + escapeHtml(gameText("overviewShowcase")) + "</h3><span id=\"achievement-overview-showcase-count\">—</span></div>",
+            "<button class=\"achievement-action-button achievement-profile-showcase-manage focusable\" type=\"button\" data-overview-showcase-open tabindex=\"0\">" + escapeHtml(gameText("overviewManageShowcase")) + "</button></div>",
+            "<div id=\"achievement-overview-showcase-list\" class=\"achievement-profile-showcase-list\" aria-live=\"polite\"><p class=\"achievements-muted achievement-overview-empty\">" + escapeHtml(gameText("overviewShowcaseLoading")) + "</p></div>",
+            "</section>",
+            "</div>"
         ].join("");
     }
 

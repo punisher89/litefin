@@ -2620,3 +2620,22 @@
     .achievements-page .achievement-game-card,
     .achievements-page .achievement-action-button { transition:none !important; transform:none !important; }
 }
+/* Equipped achievement showcase is also visible on the main player profile. */
+.achievement-profile-showcase-panel { margin-top:0; }
+.achievement-profile-showcase-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+.achievement-profile-showcase-heading .achievement-overview-panel-heading { flex:1 1 auto; margin:0; }
+.achievement-profile-showcase-manage { flex:0 0 auto; min-height:38px; padding:8px 13px; }
+.achievement-profile-showcase-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:11px; }
+.achievement-profile-showcase-card { display:flex; align-items:center; gap:12px; min-width:0; min-height:78px; padding:12px 14px; border:1px solid rgba(165,145,255,.18); border-radius:15px; background:linear-gradient(135deg,rgba(255,255,255,.045),rgba(255,255,255,.018)); }
+.achievement-profile-showcase-card.is-signature { border-color:rgba(232,197,111,.42); background:linear-gradient(135deg,rgba(232,197,111,.105),rgba(123,94,205,.09)); }
+.achievement-profile-showcase-icon { display:grid; place-items:center; flex:0 0 48px; width:48px; height:48px; border:1px solid rgba(177,151,255,.28); border-radius:14px; background:linear-gradient(145deg,rgba(123,94,205,.25),rgba(255,255,255,.035)); font-size:25px; }
+.achievement-profile-showcase-card.is-signature .achievement-profile-showcase-icon { border-color:rgba(232,197,111,.45); background:rgba(232,197,111,.12); }
+.achievement-profile-showcase-copy { display:flex; flex-direction:column; min-width:0; gap:4px; }
+.achievement-profile-showcase-copy strong { color:#f5f1ff; font-size:14px; line-height:1.3; overflow-wrap:anywhere; }
+.achievement-profile-showcase-copy small { color:#e8c56f; font-size:10px; font-weight:800; }
+.achievement-profile-showcase-copy > span { color:#aaa5bf; font-size:11px; line-height:1.35; overflow-wrap:anywhere; }
+@media (max-width:650px) {
+    .achievement-profile-showcase-heading { align-items:flex-start; flex-direction:column; }
+    .achievement-profile-showcase-manage { width:100%; }
+    .achievement-profile-showcase-list { grid-template-columns:minmax(0,1fr); }
+}
