@@ -19,7 +19,20 @@ const log = logger.create('AchievementsPage');
 
 const GAME_TEXT = {
     ru: {
-        overviewTab: 'Обзор', badgesTab: 'Достижения', questsTab: 'Задания', shopTab: 'Магазин', statsTab: 'Статистика', activityTab: 'Активность', activityIntro: 'Последние открытия достижений на сервере.', activityLoading: 'Загружаем ленту активности…', activityEmpty: 'Пока нет событий. Когда пользователи будут открывать достижения, они появятся здесь.', activityUnavailable: 'Лента активности сейчас недоступна.', activityMore: 'Показать ещё', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        overviewTab: 'Обзор', badgesTab: 'Достижения', questsTab: 'Задания', shopTab: 'Магазин', statsTab: 'Статистика', activityTab: 'Активность', activityIntro: 'Последние открытия достижений на сервере.', activityLoading: 'Загружаем ленту активности…', activityEmpty: 'Пока нет событий. Когда пользователи будут открывать достижения, они появятся здесь.', activityUnavailable: 'Лента активности сейчас недоступна.', activityMore: 'Показать ещё', showcaseTab: 'Витрина', challengesTab: 'Испытания', prestigeTab: 'Престиж', settingsTab: 'Настройки',
+        showcaseIntro: 'Твои лучшие разблокированные значки. Выбирай, что будет отображаться в витрине профиля.',
+        showcaseLoading: 'Загружаем витрину…', showcaseEmpty: 'Пока нет экипированных значков.', showcaseAvailable: 'Доступные значки', showcaseSlots: 'Мест занято', showcaseAdd: 'В витрину', showcaseRemove: 'Убрать', showcaseNoAvailable: 'Нет других разблокированных значков.', showcaseUnavailable: 'Не удалось загрузить витрину.',
+        challengesIntro: 'Сезонные и ограниченные по времени испытания сервера.', challengesLoading: 'Загружаем испытания…', challengesEmpty: 'Сейчас нет доступных испытаний.', challengesUnavailable: 'Испытания недоступны или скрыты настройками сервера.', challengeActive: 'Идёт', challengeUpcoming: 'Скоро', challengeEnded: 'Завершено', challengeCompleted: 'Выполнено', challengePeriod: 'Период',
+        prestigeIntro: 'Начни новый цикл достижений и получи постоянный бонус к очкам.', prestigeLevel: 'Уровень престижа', prestigeLifetime: 'Очков за всё время', prestigeScore: 'Очки текущего цикла', prestigeRequired: 'Для престижа требуется 12 000 очков текущего цикла.', prestigeReady: 'Условие выполнено', prestigeLocked: 'Пока рано для престижа', prestigeReset: 'Перейти к престижу', prestigeConfirmTitle: 'Подтвердить престиж?', prestigeConfirm: 'Да, начать престиж', prestigeCancel: 'Отмена', prestigeWarning: 'Будут сброшены текущие достижения, прогресс и счётчики просмотров. Уровень престижа, накопленные очки за всё время и банк очков сохранятся. Это действие нельзя отменить.', prestigeSuccess: 'Престиж успешно повышен.', prestigeUnavailable: 'Не удалось выполнить престиж.',
+        settingsIntro: 'Уведомления, приватность и отображение достижений. Настройки сохраняются в профиле Jellyfin.',
+        settingsNotifications: 'Уведомления', settingsPrivacy: 'Приватность', settingsDisplay: 'Отображение',
+        settingsSaved: 'Настройки сохранены.', settingsSaving: 'Сохраняем…', settingsSaveError: 'Не удалось сохранить настройки.',
+        prefUnlockToasts: 'Уведомления о новых достижениях', prefMilestoneToasts: 'Уведомления о рубежах прогресса', prefSound: 'Звук уведомлений', prefConfetti: 'Эффект конфетти', prefMuteVideo: 'Скрывать всплывающие уведомления во время просмотра', prefMuteSoundVideo: 'Отключать звук уведомлений во время просмотра',
+        prefRarity: 'Минимальная редкость уведомления', prefGrouping: 'Группировка уведомлений', prefPosition: 'Положение уведомлений', prefDeviceScope: 'На каких устройствах показывать уведомления',
+        prefActivity: 'Показывать мои открытия в общей ленте', prefHideCompare: 'Скрыть мой профиль от сравнения', prefHidePrestige: 'Скрыть меня в таблице престижа', prefHideLeaderboard: 'Скрыть меня в таблице лидеров веб-клиента', prefOffline: 'Показывать меня офлайн друзьям', prefHideNowPlaying: 'Скрывать, что я сейчас смотрю', prefHideLastWatched: 'Скрывать последний просмотр',
+        prefShowcase: 'Показывать витрину экипированных значков', prefAutoEquip: 'Автоматически экипировать новые значки', prefSlots: 'Количество мест в витрине', prefSpoilers: 'Скрывать описания закрытых достижений', prefExtremeSpoilers: 'Полностью скрывать закрытые достижения',
+        optionDefault: 'По умолчанию (как на сервере)', optionAll: 'Все', optionRare: 'Редкие и выше', optionEpic: 'Эпические и выше', optionLegendary: 'Только легендарные', optionGrouped: 'Группировать', optionIndividual: 'По одному', optionAllDevices: 'На всех устройствах', optionOriginDevice: 'Только на устройстве просмотра',
+        optionTopRight: 'Сверху справа', optionTopCenter: 'Сверху по центру', optionTopLeft: 'Сверху слева', optionBottomRight: 'Снизу справа', optionBottomCenter: 'Снизу по центру', optionBottomLeft: 'Снизу слева', settingsAdminLimit: 'Фактический максимум мест может быть ограничен администратором сервера.' eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -56,7 +69,20 @@ const GAME_TEXT = {
         statsTopDay: 'Самый активный день недели', statsBiggestDay: 'Рекордный день'
     },
     en: {
-        overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', statsTab: 'Stats', activityTab: 'Activity', activityIntro: 'Recent achievement unlocks on this server.', activityLoading: 'Loading activity feed…', activityEmpty: 'No activity yet. New achievement unlocks will appear here.', activityUnavailable: 'The activity feed is not available right now.', activityMore: 'Load more', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', statsTab: 'Stats', activityTab: 'Activity', activityIntro: 'Recent achievement unlocks on this server.', activityLoading: 'Loading activity feed…', activityEmpty: 'No activity yet. New achievement unlocks will appear here.', activityUnavailable: 'The activity feed is not available right now.', activityMore: 'Load more', showcaseTab: 'Showcase', challengesTab: 'Challenges', prestigeTab: 'Prestige', settingsTab: 'Settings',
+        showcaseIntro: 'Your best unlocked badges. Choose what appears in your profile showcase.',
+        showcaseLoading: 'Loading showcase…', showcaseEmpty: 'No equipped badges yet.', showcaseAvailable: 'Available badges', showcaseSlots: 'Slots used', showcaseAdd: 'Add to showcase', showcaseRemove: 'Remove', showcaseNoAvailable: 'No other unlocked badges available.', showcaseUnavailable: 'Could not load the showcase.',
+        challengesIntro: 'Seasonal and time-limited challenges on this server.', challengesLoading: 'Loading challenges…', challengesEmpty: 'There are no available challenges right now.', challengesUnavailable: 'Challenges are unavailable or hidden by server settings.', challengeActive: 'In progress', challengeUpcoming: 'Upcoming', challengeEnded: 'Ended', challengeCompleted: 'Completed', challengePeriod: 'Period',
+        prestigeIntro: 'Start a new achievement cycle and gain a permanent score bonus.', prestigeLevel: 'Prestige level', prestigeLifetime: 'Lifetime score', prestigeScore: 'Current cycle score', prestigeRequired: 'Prestige requires 12,000 score in the current cycle.', prestigeReady: 'Requirement reached', prestigeLocked: 'Prestige not available yet', prestigeReset: 'Start prestige', prestigeConfirmTitle: 'Confirm prestige?', prestigeConfirm: 'Yes, prestige now', prestigeCancel: 'Cancel', prestigeWarning: 'Your current achievements, progress and watch counters will be reset. Prestige level, lifetime score and score bank will remain. This action cannot be undone.', prestigeSuccess: 'Prestige increased successfully.', prestigeUnavailable: 'Prestige could not be completed.',
+        settingsIntro: 'Notifications, privacy and achievement display. Settings are saved to your Jellyfin profile.',
+        settingsNotifications: 'Notifications', settingsPrivacy: 'Privacy', settingsDisplay: 'Display',
+        settingsSaved: 'Settings saved.', settingsSaving: 'Saving…', settingsSaveError: 'Could not save settings.',
+        prefUnlockToasts: 'New achievement notifications', prefMilestoneToasts: 'Progress milestone notifications', prefSound: 'Notification sound', prefConfetti: 'Confetti effect', prefMuteVideo: 'Hide visual notifications during playback', prefMuteSoundVideo: 'Mute notification sound during playback',
+        prefRarity: 'Minimum notification rarity', prefGrouping: 'Notification grouping', prefPosition: 'Notification position', prefDeviceScope: 'Where to show notifications',
+        prefActivity: 'Show my unlocks in the public activity feed', prefHideCompare: 'Hide my profile from comparisons', prefHidePrestige: 'Hide me from prestige board', prefHideLeaderboard: 'Hide me from the web client leaderboard', prefOffline: 'Appear offline to friends', prefHideNowPlaying: 'Hide what I am currently watching', prefHideLastWatched: 'Hide last watched item',
+        prefShowcase: 'Show equipped badge showcase', prefAutoEquip: 'Automatically equip newly unlocked badges', prefSlots: 'Showcase slot count', prefSpoilers: 'Hide descriptions of locked achievements', prefExtremeSpoilers: 'Hide locked achievements completely',
+        optionDefault: 'Default (follow server)', optionAll: 'All', optionRare: 'Rare and above', optionEpic: 'Epic and above', optionLegendary: 'Legendary only', optionGrouped: 'Grouped', optionIndividual: 'Individual', optionAllDevices: 'All devices', optionOriginDevice: 'Unlocking device only',
+        optionTopRight: 'Top right', optionTopCenter: 'Top center', optionTopLeft: 'Top left', optionBottomRight: 'Bottom right', optionBottomCenter: 'Bottom center', optionBottomLeft: 'Bottom left', settingsAdminLimit: 'The server administrator may set a lower maximum slot count.' eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -327,6 +353,14 @@ class AchievementsPage extends Page {
         this._activityTotalPages = 0;
         this._activityEntries = [];
         this._activityLoading = false;
+        this._preferences = null;
+        this._preferencesLoaded = false;
+        this._preferenceSaving = false;
+        this._showcaseBadges = null;
+        this._showcaseLoading = false;
+        this._challengeDefinitions = null;
+        this._challengeLoading = false;
+        this._prestigeConfirm = false;
         gameCenterServerTranslations = null;
     }
 
@@ -375,6 +409,10 @@ class AchievementsPage extends Page {
                         <button class="achievements-main-tab focusable" data-game-section="shop" type="button" role="tab" aria-selected="false" tabindex="0">🛍 ${escapeHtml(gameText('shopTab'))}</button>
                         <button class="achievements-main-tab focusable" data-game-section="stats" type="button" role="tab" aria-selected="false" tabindex="0">📊 ${escapeHtml(gameText('statsTab'))}</button>
                         <button class="achievements-main-tab focusable" data-game-section="activity" type="button" role="tab" aria-selected="false" tabindex="0">📰 ${escapeHtml(gameText('activityTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="showcase" type="button" role="tab" aria-selected="false" tabindex="0">🏅 ${escapeHtml(gameText('showcaseTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="challenges" type="button" role="tab" aria-selected="false" tabindex="0">🏁 ${escapeHtml(gameText('challengesTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="prestige" type="button" role="tab" aria-selected="false" tabindex="0">✦ ${escapeHtml(gameText('prestigeTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="settings" type="button" role="tab" aria-selected="false" tabindex="0">⚙ ${escapeHtml(gameText('settingsTab'))}</button>
                     </nav>
                     <div class="achievements-error" id="achievements-error" role="status" hidden></div>
                     <div class="achievements-loading" id="achievements-loading">${escapeHtml(i18n.t('Loading'))}</div>
@@ -407,6 +445,31 @@ class AchievementsPage extends Page {
                             <p class="achievements-muted">${escapeHtml(gameText('activityLoading'))}</p>
                         </div>
                         <button id="achievement-activity-more" class="achievements-more focusable" type="button" tabindex="0" hidden>${escapeHtml(gameText('activityMore'))}</button>
+                    </section>
+                    <section class="achievements-section achievements-main-panel achievements-feature-section" id="achievements-showcase-section" data-game-section-panel="showcase" hidden>
+                        <div class="achievements-stats-heading">
+                            <div><h2>${escapeHtml(gameText('showcaseTab'))}</h2><p>${escapeHtml(gameText('showcaseIntro'))}</p></div>
+                            <span id="achievement-showcase-slots" class="achievement-feature-count">—</span>
+                        </div>
+                        <div id="achievement-showcase-status" class="achievement-feature-status" role="status" hidden></div>
+                        <div id="achievement-showcase-equipped" class="achievement-showcase-grid" aria-live="polite"><p class="achievements-muted">${escapeHtml(gameText('showcaseLoading'))}</p></div>
+                        <h3>${escapeHtml(gameText('showcaseAvailable'))}</h3>
+                        <div id="achievement-showcase-available" class="achievement-showcase-grid"></div>
+                    </section>
+                    <section class="achievements-section achievements-main-panel achievements-feature-section" id="achievements-challenges-section" data-game-section-panel="challenges" hidden>
+                        <div class="achievements-stats-heading"><div><h2>${escapeHtml(gameText('challengesTab'))}</h2><p>${escapeHtml(gameText('challengesIntro'))}</p></div></div>
+                        <div id="achievement-challenges-status" class="achievement-feature-status" role="status" hidden></div>
+                        <div id="achievement-challenges-content" class="achievement-challenges-grid" aria-live="polite"><p class="achievements-muted">${escapeHtml(gameText('challengesLoading'))}</p></div>
+                    </section>
+                    <section class="achievements-section achievements-main-panel achievements-feature-section" id="achievements-prestige-section" data-game-section-panel="prestige" hidden>
+                        <div class="achievements-stats-heading"><div><h2>${escapeHtml(gameText('prestigeTab'))}</h2><p>${escapeHtml(gameText('prestigeIntro'))}</p></div></div>
+                        <div id="achievement-prestige-status" class="achievement-feature-status" role="status" hidden></div>
+                        <div id="achievement-prestige-content" class="achievement-prestige-content" aria-live="polite"></div>
+                    </section>
+                    <section class="achievements-section achievements-main-panel achievements-feature-section" id="achievements-settings-section" data-game-section-panel="settings" hidden>
+                        <div class="achievements-stats-heading"><div><h2>${escapeHtml(gameText('settingsTab'))}</h2><p>${escapeHtml(gameText('settingsIntro'))}</p></div></div>
+                        <div id="achievement-settings-status" class="achievement-feature-status" role="status" hidden></div>
+                        <div id="achievement-settings-content" class="achievement-settings-grid" aria-live="polite"></div>
                     </section>
                     <section class="achievements-section achievements-main-panel" id="achievements-quests-section" data-game-section-panel="quests" hidden>
                         <h2>${escapeHtml(i18n.t('AchievementQuests'))}</h2>
@@ -558,6 +621,28 @@ class AchievementsPage extends Page {
             } else if (button.hasAttribute('data-achievement-equip')) {
                 this._equipCosmetic(button.getAttribute('data-achievement-equip'), button);
             }
+            else if (button.hasAttribute('data-showcase-equip')) {
+                this._equipShowcaseBadge(button.getAttribute('data-showcase-equip'), button);
+            } else if (button.hasAttribute('data-showcase-remove')) {
+                this._unequipShowcaseBadge(button.getAttribute('data-showcase-remove'), button);
+            } else if (button.hasAttribute('data-prestige-start')) {
+                this._showPrestigeConfirmation();
+            } else if (button.hasAttribute('data-prestige-confirm')) {
+                this._confirmPrestige(button);
+            } else if (button.hasAttribute('data-prestige-cancel')) {
+                this._cancelPrestigeConfirmation();
+            }
+        });
+
+        this.el.addEventListener('change', (event) => {
+            const control = event.target;
+            if (!control || typeof control.getAttribute !== 'function') return;
+            const key = control.getAttribute('data-user-pref');
+            if (!key) return;
+            const value = control.type === 'checkbox'
+                ? !!control.checked
+                : (control.type === 'number' ? Math.max(1, Math.min(10, Number(control.value) || 5)) : control.value);
+            this._savePreference(key, value, control);
         });
 
         const giftForm = this.$('#achievement-gift-form');
@@ -597,13 +682,19 @@ class AchievementsPage extends Page {
                     log.warn('Achievement Badges server translations unavailable; using Litefin fallbacks:', err);
                     return null;
                 });
-            const [summary, rank, badges, quests, serverTranslations] = await Promise.all([
+            const [summary, rank, badges, quests, serverTranslations, preferences] = await Promise.all([
                 api.get(`${userPath}/summary`),
                 api.get(`${userPath}/rank`),
                 api.get(`${userPath}?lang=${encodeURIComponent(language)}`),
                 api.get(`${userPath}/quests`),
-                translationsTask
+                translationsTask,
+                api.get(`${userPath}/preferences`).catch((err) => {
+                    log.warn('Achievement Badges preferences could not be loaded:', err);
+                    return null;
+                })
             ]);
+            this._preferences = preferences || null;
+            this._preferencesLoaded = !!preferences;
             this._serverTranslations = normalizeServerTranslations(serverTranslations);
             gameCenterServerTranslations = this._serverTranslations;
 
@@ -620,6 +711,8 @@ class AchievementsPage extends Page {
             const activeSection = this.el.querySelector('[data-game-section].active')?.getAttribute('data-game-section');
             if (force && activeSection === 'stats') this._loadStats(this._statsPeriod);
             if (force && activeSection === 'activity') this._loadActivity(false);
+            if (force && activeSection === 'showcase') this._loadShowcase(true);
+            if (force && activeSection === 'challenges') this._loadChallenges(true);
         } catch (err) {
             log.warn('Achievement Badges data could not be loaded:', err);
             this._showError(err);
@@ -669,6 +762,10 @@ class AchievementsPage extends Page {
         setText('[data-game-section="shop"]', 'loadout.tab.shop', '🛍 ');
         setText('[data-game-section="stats"]', 'tabs.stats', '📊 ');
         setText('[data-game-section="activity"]', 'tabs.activity', '📰 ');
+        setText('[data-game-section="showcase"]', 'tabs.showcase', '🏅 ');
+        setText('[data-game-section="challenges"]', 'tabs.challenges', '🏁 ');
+        setText('[data-game-section="prestige"]', 'tabs.prestige', '✦ ');
+        setText('[data-game-section="settings"]', 'tabs.settings', '⚙ ');
         setText('[data-achievement-tab="arsenal"]', 'loadout.tab.powerups', '⚡ ');
         setText('[data-achievement-tab="shop"]', 'loadout.tab.shop', '🛒 ');
         setText('[data-achievement-tab="cosmetics"]', 'loadout.tab.cosmetics', '🎨 ');
@@ -686,7 +783,7 @@ class AchievementsPage extends Page {
     }
 
     _selectMainSection(section) {
-        const allowed = ['overview', 'badges', 'quests', 'shop', 'stats', 'activity'];
+        const allowed = ['overview', 'badges', 'quests', 'shop', 'stats', 'activity', 'showcase', 'challenges', 'prestige', 'settings'];
         const selected = allowed.includes(section) ? section : 'overview';
         this.el.querySelectorAll('[data-game-section]').forEach((button) => {
             const active = button.getAttribute('data-game-section') === selected;
@@ -700,6 +797,10 @@ class AchievementsPage extends Page {
         if (selected === 'shop') this._selectGameTab('shop');
         if (selected === 'stats') this._loadStats(this._statsPeriod);
         if (selected === 'activity') this._loadActivity(false);
+        if (selected === 'showcase') this._loadShowcase(false);
+        if (selected === 'challenges') this._loadChallenges(false);
+        if (selected === 'prestige') this._renderPrestige();
+        if (selected === 'settings') this._renderSettings();
         focusManager.invalidateCache('achievements-game-center');
     }
 
@@ -1344,6 +1445,10 @@ class AchievementsPage extends Page {
         this._renderQuests();
         this._renderBadges();
         this._renderLoadout();
+        this._renderPrestige();
+        this._renderSettings();
+        if (Array.isArray(this._showcaseBadges)) this._renderShowcase();
+        if (Array.isArray(this._challengeDefinitions)) this._renderChallenges();
         focusManager.invalidateCache('achievements-game-center');
     }
 
