@@ -1764,8 +1764,8 @@ class AchievementsPage extends Page {
             + bool('ExtremeSpoilerMode', gameText('prefExtremeSpoilers'), false)
             + '<p class="achievement-stats-note">' + escapeHtml(gameText('settingsAdminLimit')) + '</p></div>'
             + '<div class="achievement-settings-card"><h3>' + escapeHtml(gameText('settingsExtras')) + '</h3>'
-            + bool('EnableCoWatchBonus', gameText('prefCoWatch') + ' — ' + gameText('prefCoWatchDesc'), true)
-            + '</div>';
+            + bool('EnableCoWatchBonus', gameText('prefCoWatch'), true)
+            + '<p class="achievement-stats-note">' + escapeHtml(gameText('prefCoWatchDesc')) + '</p></div>';
         if (this._preferenceSaving) target.querySelectorAll('[data-user-pref]').forEach((control) => { control.disabled = true; });
     }
 
