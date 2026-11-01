@@ -1696,6 +1696,9 @@
     from { opacity:.72; transform:translateY(4px); }
     to { opacity:1; transform:translateY(0); }
 }
+@media (max-width: 1000px) {
+    .achievements-main-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 760px) {
     .achievements-main-tabs { top: 112px; gap:6px; padding:7px; }
     .achievements-main-tab { min-height:46px; padding:9px 5px; font-size:12px; }
