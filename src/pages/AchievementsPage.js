@@ -641,7 +641,7 @@ class AchievementsPage extends Page {
             if (!key) return;
             const value = control.type === 'checkbox'
                 ? !!control.checked
-                : (control.type === 'number' ? Math.max(1, Math.min(10, Number(control.value) || 5)) : control.value);
+                : (key === 'EquippedBadgeSlots' ? Math.max(1, Math.min(10, parseInt(control.value, 10) || 5)) : control.value);
             this._savePreference(key, value, control);
         });
 
@@ -766,6 +766,10 @@ class AchievementsPage extends Page {
         setText('[data-game-section="challenges"]', 'tabs.challenges', '🏁 ');
         setText('[data-game-section="prestige"]', 'tabs.prestige', '✦ ');
         setText('[data-game-section="settings"]', 'tabs.settings', '⚙ ');
+        setText('#achievements-showcase-section .achievements-stats-heading h2', 'tabs.showcase');
+        setText('#achievements-challenges-section .achievements-stats-heading h2', 'tabs.challenges');
+        setText('#achievements-prestige-section .achievements-stats-heading h2', 'achievements.prestige');
+        setText('#achievements-settings-section .achievements-stats-heading h2', 'settings.title');
         setText('[data-achievement-tab="arsenal"]', 'loadout.tab.powerups', '⚡ ');
         setText('[data-achievement-tab="shop"]', 'loadout.tab.shop', '🛒 ');
         setText('[data-achievement-tab="cosmetics"]', 'loadout.tab.cosmetics', '🎨 ');
@@ -1736,7 +1740,6 @@ class AchievementsPage extends Page {
             + bool('EnableUnlockToasts', gameText('prefUnlockToasts'), true)
             + bool('EnableMilestoneToasts', gameText('prefMilestoneToasts'), true)
             + bool('EnableSound', gameText('prefSound'), true)
-            + bool('EnableConfetti', gameText('prefConfetti'), true)
             + bool('MuteToastsDuringPlayback', gameText('prefMuteVideo'), false)
             + bool('MuteToastSoundDuringPlayback', gameText('prefMuteSoundVideo'), true)
             + select('MinimumToastRarity', gameText('prefRarity'), valueOf(prefs, 'MinimumToastRarity', 'minimumToastRarity') || 'all', rarityOptions)
