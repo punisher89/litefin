@@ -19,7 +19,7 @@ const log = logger.create('AchievementsPage');
 
 const GAME_TEXT = {
     ru: {
-        overviewTab: 'Обзор', badgesTab: 'Достижения', questsTab: 'Задания', shopTab: 'Магазин', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        overviewTab: 'Обзор', badgesTab: 'Достижения', questsTab: 'Задания', shopTab: 'Магазин', statsTab: 'Статистика', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -40,10 +40,23 @@ const GAME_TEXT = {
         actionFailed: 'Не удалось выполнить действие.', notEnough: 'Недостаточно очков.', milestone: 'Откроется за достижения прогресса',
         activeUntil: 'Действует до', loadingUsers: 'Список пользователей загружается…',
         shopPowerups: 'Усиления', shopCosmetics: 'Оформление профиля',
-        inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Проверить уведомления', needMoreScore: 'Для покупки не хватает {amount} очков.', needMoreScoreShort: 'Не хватает {amount} ⭐'
+        inventory: 'В инвентаре', balance: 'Баланс', viewShop: 'Перейти в магазин', testNotifications: 'Проверить уведомления', needMoreScore: 'Для покупки не хватает {amount} очков.', needMoreScoreShort: 'Не хватает {amount} ⭐',
+        statsIntro: 'Подробная картина просмотров и прогресса за выбранный период.',
+        statsWeek: '7 дней', statsMonth: '30 дней', statsYear: 'Год',
+        statsLoading: 'Собираем статистику с сервера…', statsUnavailable: 'Статистика пока недоступна.',
+        statsTotal: 'Всего просмотров', statsMovies: 'Фильмы', statsEpisodes: 'Эпизоды', statsDays: 'Дней с просмотрами', statsUnlocked: 'Получено достижений',
+        statsHeatmap: 'Календарь просмотров', statsHeatmapHint: 'Последние 90 дней. Чем ярче ячейка, тем больше просмотров за день.',
+        statsCategories: 'Прогресс по категориям', statsRecords: 'Личные рекорды', statsGoals: 'Ближайшие цели',
+        statsGenres: 'Любимые жанры', statsDirectors: 'Режиссёры', statsActors: 'Актёры',
+        statsNoData: 'Пока нет данных за этот период.', statsNoGoals: 'Пока нет ближайших целей.',
+        statsHours: 'ч', statsHoursWatched: 'Часов просмотра', statsBestStreak: 'Лучшая серия', statsRewatches: 'Повторные просмотры',
+        statsUniqueGenres: 'Жанров просмотрено', statsLongest: 'Самый длинный просмотр', statsCombo: 'Лучшая комбинация',
+        statsApproxClock: 'Распределение по времени (оценка)', statsApproxClockHint: 'Это оценочное распределение сервера, а не точная история времени запуска.',
+        statsYearWrapped: 'Итоги {year} года', statsActiveDays: 'Активных дней', statsTopMonth: 'Самый активный месяц',
+        statsTopDay: 'Самый активный день недели', statsBiggestDay: 'Рекордный день'
     },
     en: {
-        overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', statsTab: 'Stats', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -64,7 +77,20 @@ const GAME_TEXT = {
         actionFailed: 'The action could not be completed.', notEnough: 'Not enough score.', milestone: 'Unlocked through progress milestones',
         activeUntil: 'Active until', loadingUsers: 'Loading user list…',
         shopPowerups: 'Power-ups', shopCosmetics: 'Profile cosmetics',
-        inventory: 'In inventory', balance: 'Balance', viewShop: 'Open shop', testNotifications: 'Test notification', needMoreScore: 'You need {amount} more score to buy this item.', needMoreScoreShort: 'Need {amount} ⭐'
+        inventory: 'In inventory', balance: 'Balance', viewShop: 'Open shop', testNotifications: 'Test notification', needMoreScore: 'You need {amount} more score to buy this item.', needMoreScoreShort: 'Need {amount} ⭐',
+        statsIntro: 'A detailed view of your watching activity and progress for the selected period.',
+        statsWeek: '7 days', statsMonth: '30 days', statsYear: 'Year',
+        statsLoading: 'Loading statistics from the server…', statsUnavailable: 'Statistics are not available yet.',
+        statsTotal: 'Total watches', statsMovies: 'Movies', statsEpisodes: 'Episodes', statsDays: 'Days watched', statsUnlocked: 'Badges unlocked',
+        statsHeatmap: 'Watch calendar', statsHeatmapHint: 'Last 90 days. Brighter cells indicate more watches on that day.',
+        statsCategories: 'Progress by category', statsRecords: 'Personal records', statsGoals: 'Next goals',
+        statsGenres: 'Top genres', statsDirectors: 'Top directors', statsActors: 'Top actors',
+        statsNoData: 'No data for this period yet.', statsNoGoals: 'No nearby goals right now.',
+        statsHours: 'h', statsHoursWatched: 'Hours watched', statsBestStreak: 'Best streak', statsRewatches: 'Rewatches',
+        statsUniqueGenres: 'Genres watched', statsLongest: 'Longest watch', statsCombo: 'Best combo',
+        statsApproxClock: 'Viewing time distribution (estimated)', statsApproxClockHint: 'This is a server-side estimate, not an exact record of playback start times.',
+        statsYearWrapped: '{year} year in review', statsActiveDays: 'Active days', statsTopMonth: 'Most active month',
+        statsTopDay: 'Most active weekday', statsBiggestDay: 'Biggest day'
     }
 };
 
@@ -276,6 +302,10 @@ class AchievementsPage extends Page {
         this._loadout = null;
         this._giftUsers = null;
         this._giftUsersLoading = false;
+        this._statsPeriod = 'month';
+        this._statsCache = Object.create(null);
+        this._statsSharedPromise = null;
+        this._statsRequestId = 0;
     }
 
     render() {
@@ -321,11 +351,28 @@ class AchievementsPage extends Page {
                         <button class="achievements-main-tab focusable" data-game-section="badges" type="button" role="tab" aria-selected="false" tabindex="0">🏅 ${escapeHtml(gameText('badgesTab'))}</button>
                         <button class="achievements-main-tab focusable" data-game-section="quests" type="button" role="tab" aria-selected="false" tabindex="0">⚡ ${escapeHtml(gameText('questsTab'))}</button>
                         <button class="achievements-main-tab focusable" data-game-section="shop" type="button" role="tab" aria-selected="false" tabindex="0">🛍 ${escapeHtml(gameText('shopTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="stats" type="button" role="tab" aria-selected="false" tabindex="0">📊 ${escapeHtml(gameText('statsTab'))}</button>
                     </nav>
                     <div class="achievements-error" id="achievements-error" role="status" hidden></div>
                     <div class="achievements-loading" id="achievements-loading">${escapeHtml(i18n.t('Loading'))}</div>
 
                     <section class="achievements-overview achievements-main-panel" id="achievements-overview" data-game-section-panel="overview" aria-live="polite"></section>
+                    <section class="achievements-section achievements-main-panel achievements-stats-section" id="achievements-stats-section" data-game-section-panel="stats" hidden>
+                        <div class="achievements-stats-heading">
+                            <div>
+                                <h2>${escapeHtml(gameText('statsTab'))}</h2>
+                                <p>${escapeHtml(gameText('statsIntro'))}</p>
+                            </div>
+                            <div class="achievements-stats-periods" role="group" aria-label="${escapeHtml(gameText('statsTab'))}">
+                                <button class="achievement-stats-period focusable" data-game-period="week" type="button" tabindex="0">${escapeHtml(gameText('statsWeek'))}</button>
+                                <button class="achievement-stats-period focusable active" data-game-period="month" type="button" tabindex="0">${escapeHtml(gameText('statsMonth'))}</button>
+                                <button class="achievement-stats-period focusable" data-game-period="year" type="button" tabindex="0">${escapeHtml(gameText('statsYear'))}</button>
+                            </div>
+                        </div>
+                        <div id="achievement-stats-content" class="achievement-stats-content" aria-live="polite">
+                            <p class="achievements-muted">${escapeHtml(gameText('statsLoading'))}</p>
+                        </div>
+                    </section>
                     <section class="achievements-section achievements-main-panel" id="achievements-quests-section" data-game-section-panel="quests" hidden>
                         <h2>${escapeHtml(i18n.t('AchievementQuests'))}</h2>
                         <div class="achievements-quests" id="achievements-quests"></div>
@@ -427,6 +474,10 @@ class AchievementsPage extends Page {
             tab.setAttribute('tabindex', '0');
         });
 
+        this.el.querySelectorAll('[data-game-period]').forEach((button) => {
+            button.addEventListener('click', () => this._loadStats(button.getAttribute('data-game-period')));
+        });
+
         const refresh = this.$('#achievements-refresh');
         if (refresh) refresh.addEventListener('click', () => this._load(true));
 
@@ -475,8 +526,13 @@ class AchievementsPage extends Page {
         if (giftForm) giftForm.addEventListener('submit', (event) => this._sendGift(event));
     }
 
-    async _load() {
+    async _load(force = false) {
         if (this._loading) return;
+        if (force) {
+            this._statsCache = Object.create(null);
+            this._statsSharedPromise = null;
+            this._statsRequestId++;
+        }
         this._loading = true;
         const loading = this.$('#achievements-loading');
         const error = this.$('#achievements-error');
@@ -540,7 +596,7 @@ class AchievementsPage extends Page {
     }
 
     _selectMainSection(section) {
-        const allowed = ['overview', 'badges', 'quests', 'shop'];
+        const allowed = ['overview', 'badges', 'quests', 'shop', 'stats'];
         const selected = allowed.includes(section) ? section : 'overview';
         this.el.querySelectorAll('[data-game-section]').forEach((button) => {
             const active = button.getAttribute('data-game-section') === selected;
@@ -552,7 +608,222 @@ class AchievementsPage extends Page {
             panel.hidden = panel.getAttribute('data-game-section-panel') !== selected;
         });
         if (selected === 'shop') this._selectGameTab('shop');
+        if (selected === 'stats') this._loadStats(this._statsPeriod);
         focusManager.invalidateCache('achievements-game-center');
+    }
+
+
+    async _loadStats(period = this._statsPeriod) {
+        const allowed = ['week', 'month', 'year'];
+        const selected = allowed.includes(period) ? period : 'month';
+        this._statsPeriod = selected;
+        const requestId = ++this._statsRequestId;
+
+        this.el.querySelectorAll('[data-game-period]').forEach((button) => {
+            button.classList.toggle('active', button.getAttribute('data-game-period') === selected);
+        });
+
+        if (!this._userPath) return;
+        if (this._statsCache[selected]) {
+            this._renderStats(this._statsCache[selected]);
+            return;
+        }
+
+        const target = this.$('#achievement-stats-content');
+        if (target) target.innerHTML = \`<p class="achievements-muted">\${escapeHtml(gameText('statsLoading'))}</p>\`;
+
+        const safeGet = async (endpoint) => {
+            try {
+                return await api.get(endpoint);
+            } catch (err) {
+                log.warn(\`Game Center stats request failed (\${endpoint}):\`, err);
+                return null;
+            }
+        };
+
+        if (!this._statsSharedPromise) {
+            const sharedEndpoints = [
+                \`\${this._userPath}/watch-calendar?days=90\`,
+                \`\${this._userPath}/category-progress\`,
+                \`\${this._userPath}/records\`,
+                \`\${this._userPath}/smart-goals?limit=5\`,
+                \`\${this._userPath}/watch-clock\`
+            ];
+            this._statsSharedPromise = Promise.all(sharedEndpoints.map(safeGet)).then((results) => ({
+                calendar: results[0] || {},
+                categories: Array.isArray(results[1]) ? results[1] : [],
+                records: results[2] || {},
+                goals: results[3] || {},
+                clock: results[4] || {}
+            }));
+        }
+
+        const recapTask = safeGet(\`\${this._userPath}/recap?period=\${selected}\`);
+        const wrappedTask = selected === 'year'
+            ? safeGet(\`\${this._userPath}/wrapped?year=\${new Date().getFullYear()}\`)
+            : Promise.resolve(null);
+
+        try {
+            const [recap, shared, wrapped] = await Promise.all([recapTask, this._statsSharedPromise, wrappedTask]);
+            if (requestId !== this._statsRequestId) return;
+            const data = { recap: recap || {}, ...shared, wrapped: wrapped || null, period: selected };
+            this._statsCache[selected] = data;
+            this._renderStats(data);
+        } catch (err) {
+            if (requestId !== this._statsRequestId) return;
+            log.warn('Game Center statistics could not be loaded:', err);
+            if (target) target.innerHTML = \`<p class="achievements-muted">\${escapeHtml(gameText('statsUnavailable'))}</p>\`;
+        } finally {
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
+    _renderStats(data) {
+        const target = this.$('#achievement-stats-content');
+        if (!target) return;
+
+        const recap = data.recap || {};
+        const records = data.records || {};
+        const movies = Number(valueOf(recap, 'MoviesWatched', 'moviesWatched') || 0);
+        const episodes = Number(valueOf(recap, 'EpisodesWatched', 'episodesWatched') || 0);
+        const total = Number(valueOf(recap, 'TotalItems', 'totalItems') ?? (movies + episodes));
+        const days = Number(valueOf(recap, 'DaysWatched', 'daysWatched') || 0);
+        const unlocked = Number(valueOf(recap, 'BadgesUnlocked', 'badgesUnlocked') || 0);
+
+        const metricCards = [
+            { icon: '🎬', label: gameText('statsTotal'), value: total },
+            { icon: '🍿', label: gameText('statsMovies'), value: movies },
+            { icon: '📺', label: gameText('statsEpisodes'), value: episodes },
+            { icon: '📅', label: gameText('statsDays'), value: days },
+            { icon: '🏆', label: gameText('statsUnlocked'), value: unlocked }
+        ].map((item) => \`
+            <div class="achievement-stat achievement-stats-metric">
+                <span class="achievement-stat-icon">\${item.icon}</span>
+                <span class="achievement-stat-label">\${escapeHtml(item.label)}</span>
+                <strong>\${achievementNumber(item.value)}</strong>
+            </div>\`).join('');
+
+        const renderTopList = (title, items) => {
+            const rows = Array.isArray(items) ? items.slice(0, 5) : [];
+            return \`
+                <section class="achievement-stats-card">
+                    <h3>\${escapeHtml(title)}</h3>
+                    \${rows.length ? \`<ol class="achievement-stats-list">\${rows.map((item) => \`
+                        <li><span>\${escapeHtml(valueOf(item, 'Name', 'name') || '—')}</span><strong>\${achievementNumber(valueOf(item, 'Count', 'count') || 0)}</strong></li>
+                    \`).join('')}</ol>\` : \`<p class="achievements-muted">\${escapeHtml(gameText('statsNoData'))}</p>\`}
+                </section>\`;
+        };
+
+        const categories = Array.isArray(data.categories) ? data.categories : [];
+        const categoryHtml = categories.length ? categories.map((item) => {
+            const name = localizedBadgeValue(valueOf(item, 'Category', 'category') || 'General', 'category');
+            const percent = Math.max(0, Math.min(100, Number(valueOf(item, 'Percent', 'percent') || 0)));
+            const count = Number(valueOf(item, 'Unlocked', 'unlocked') || 0);
+            const totalCount = Number(valueOf(item, 'Total', 'total') || 0);
+            return \`
+                <div class="achievement-stats-category">
+                    <div><strong>\${escapeHtml(name)}</strong><span>\${count} / \${totalCount} · \${percent}%</span></div>
+                    <div class="achievement-progress"><span style="width:\${percent}%"></span></div>
+                </div>\`;
+        }).join('') : \`<p class="achievements-muted">\${escapeHtml(gameText('statsNoData'))}</p>\`;
+
+        const countMap = valueOf(data.calendar, 'Counts', 'counts') || {};
+        const maxCount = Math.max(1, ...Object.values(countMap).map((value) => Number(value) || 0));
+        const calendarCells = [];
+        const endDate = new Date();
+        endDate.setHours(12, 0, 0, 0);
+        for (let offset = 89; offset >= 0; offset--) {
+            const date = new Date(endDate);
+            date.setDate(date.getDate() - offset);
+            const key = \`\${date.getFullYear()}-\${String(date.getMonth() + 1).padStart(2, '0')}-\${String(date.getDate()).padStart(2, '0')}\`;
+            const count = Number(countMap[key] || 0);
+            const level = count <= 0 ? 0 : Math.max(1, Math.min(4, Math.ceil((count / maxCount) * 4)));
+            const label = date.toLocaleDateString(achievementLocale(), { day: 'numeric', month: 'short' });
+            calendarCells.push(\`<span class="achievement-calendar-cell level-\${level}" title="\${escapeHtml(label)} · \${achievementNumber(count)}"></span>\`);
+        }
+
+        const recordItems = [
+            { label: gameText('statsHoursWatched'), value: Number(valueOf(records, 'TotalHoursWatched', 'totalHoursWatched') || 0) + ' ' + gameText('statsHours') },
+            { label: gameText('statsBestStreak'), value: achievementNumber(valueOf(records, 'BestWatchStreak', 'bestWatchStreak') || 0) },
+            { label: gameText('statsRewatches'), value: achievementNumber(valueOf(records, 'RewatchCount', 'rewatchCount') || 0) },
+            { label: gameText('statsUniqueGenres'), value: achievementNumber(valueOf(records, 'UniqueGenresWatched', 'uniqueGenresWatched') || 0) },
+            { label: gameText('statsLongest'), value: achievementNumber(valueOf(records, 'LongestItemMinutes', 'longestItemMinutes') || 0) + ' min' },
+            { label: gameText('statsCombo'), value: achievementNumber(valueOf(records, 'BestComboCount', 'bestComboCount') || 0) }
+        ];
+        const recordHtml = recordItems.map((item) => \`
+            <div class="achievement-stats-record"><span>\${escapeHtml(item.label)}</span><strong>\${escapeHtml(item.value)}</strong></div>
+        \`).join('');
+
+        const goals = arrayOf(data.goals, 'Goals', 'goals');
+        const goalHtml = goals.length ? goals.slice(0, 5).map((item) => {
+            const title = valueOf(item, 'Title', 'title') || gameText('statsGoals');
+            const action = valueOf(item, 'Action', 'action') || '';
+            const current = Number(valueOf(item, 'Current', 'current') || 0);
+            const goal = Number(valueOf(item, 'Target', 'target') || 0);
+            const percent = progressPercent(current, goal);
+            return \`
+                <div class="achievement-stats-goal">
+                    <div><strong>\${escapeHtml(title)}</strong><span>\${escapeHtml(action)}</span></div>
+                    <div class="achievement-progress"><span style="width:\${percent}%"></span></div>
+                    <small>\${current} / \${goal}</small>
+                </div>\`;
+        }).join('') : \`<p class="achievements-muted">\${escapeHtml(gameText('statsNoGoals'))}</p>\`;
+
+        const clock = data.clock || {};
+        const clockValues = Array.from({ length: 24 }, (_, hour) => Number(clock[hour] ?? clock[String(hour)] ?? 0));
+        const maxClock = Math.max(1, ...clockValues);
+        const clockHtml = clockValues.map((value, hour) => \`
+            <div class="achievement-clock-hour" title="\${String(hour).padStart(2, '0')}:00 · \${achievementNumber(value)}">
+                <span style="height:\${Math.max(3, Math.round(value / maxClock * 100))}%"></span>
+                <small>\${String(hour).padStart(2, '0')}</small>
+            </div>\`).join('');
+
+        const wrapped = data.wrapped || {};
+        const hasWrapped = data.period === 'year' && !valueOf(wrapped, 'Empty', 'empty');
+        const wrappedHtml = hasWrapped ? \`
+            <section class="achievement-stats-card achievement-stats-wrapped">
+                <h3>\${escapeHtml(gameText('statsYearWrapped', { year: valueOf(wrapped, 'Year', 'year') || new Date().getFullYear() }))}</h3>
+                <div class="achievement-stats-record-grid">
+                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsActiveDays'))}</span><strong>\${achievementNumber(valueOf(wrapped, 'ActiveDays', 'activeDays') || 0)}</strong></div>
+                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsTopMonth'))}</span><strong>\${escapeHtml(valueOf(wrapped, 'TopMonth', 'topMonth') || '—')}</strong></div>
+                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsTopDay'))}</span><strong>\${escapeHtml(valueOf(wrapped, 'TopDayOfWeek', 'topDayOfWeek') || '—')}</strong></div>
+                    <div class="achievement-stats-record"><span>\${escapeHtml(gameText('statsBiggestDay'))}</span><strong>\${achievementNumber(valueOf(wrapped, 'BiggestDayCount', 'biggestDayCount') || 0)}</strong></div>
+                </div>
+            </section>\` : '';
+
+        target.innerHTML = \`
+            <div class="achievement-stats-metrics">\${metricCards}</div>
+            \${wrappedHtml}
+            <section class="achievement-stats-card">
+                <div class="achievement-stats-card-heading"><h3>\${escapeHtml(gameText('statsHeatmap'))}</h3><span>\${escapeHtml(gameText('statsHeatmapHint'))}</span></div>
+                <div class="achievement-calendar-grid">\${calendarCells.join('')}</div>
+            </section>
+            <div class="achievement-stats-columns">
+                <section class="achievement-stats-card">
+                    <h3>\${escapeHtml(gameText('statsCategories'))}</h3>
+                    \${categoryHtml}
+                </section>
+                <section class="achievement-stats-card">
+                    <h3>\${escapeHtml(gameText('statsRecords'))}</h3>
+                    <div class="achievement-stats-record-grid">\${recordHtml}</div>
+                </section>
+            </div>
+            <div class="achievement-stats-columns">
+                \${renderTopList(gameText('statsGenres'), valueOf(recap, 'TopGenres', 'topGenres'))}
+                \${renderTopList(gameText('statsDirectors'), valueOf(recap, 'TopDirectors', 'topDirectors'))}
+                \${renderTopList(gameText('statsActors'), valueOf(recap, 'TopActors', 'topActors'))}
+            </div>
+            <div class="achievement-stats-columns">
+                <section class="achievement-stats-card">
+                    <div class="achievement-stats-card-heading"><h3>\${escapeHtml(gameText('statsGoals'))}</h3><span>\${goals.length}</span></div>
+                    \${goalHtml}
+                </section>
+                <section class="achievement-stats-card">
+                    <div class="achievement-stats-card-heading"><h3>\${escapeHtml(gameText('statsApproxClock'))}</h3></div>
+                    <p class="achievement-stats-note">\${escapeHtml(gameText('statsApproxClockHint'))}</p>
+                    <div class="achievement-clock-grid">\${clockHtml}</div>
+                </section>
+            </div>\`;
     }
 
     _selectGameTab(tab) {
