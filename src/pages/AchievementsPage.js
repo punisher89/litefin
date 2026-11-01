@@ -677,12 +677,12 @@ class AchievementsPage extends Page {
             const userPath = `/Plugins/AchievementBadges/users/${encodeURIComponent(userId)}`;
             this._userId = userId;
             this._userPath = userPath;
-            const translationsTask = language === 'ru'
-                ? Promise.resolve(null)
-                : api.get(`/Plugins/AchievementBadges/translations/${encodeURIComponent(language)}`).catch((err) => {
-                    log.warn('Achievement Badges server translations unavailable; using Litefin fallbacks:', err);
-                    return null;
-                });
+            // Always ask the server first, including Russian. Litefin dictionaries are
+            // fallbacks for missing keys, not a replacement for the server language pack.
+            const translationsTask = api.get(`/Plugins/AchievementBadges/translations/${encodeURIComponent(language)}`).catch((err) => {
+                log.warn('Achievement Badges server translations unavailable; using Litefin fallbacks:', err);
+                return null;
+            });
             const [summary, rank, badges, quests, serverTranslations, preferences, publicConfig] = await Promise.all([
                 api.get(`${userPath}/summary`),
                 api.get(`${userPath}/rank`),
@@ -887,7 +887,7 @@ class AchievementsPage extends Page {
                     Category: valueOf(entry, 'Category', 'category'),
                     Title: title,
                     Description: ''
-                }, language);
+                }, language, this._serverTranslations);
                 title = valueOf(localized, 'Title', 'title') || title;
             }
 
@@ -1514,7 +1514,7 @@ class AchievementsPage extends Page {
         if (slotsTarget) slotsTarget.textContent = gameText('showcaseSlots') + ': ' + equipped.length + ' / ' + slots;
 
         const renderBadge = (badge, action) => {
-            const localized = localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang || 'en');
+            const localized = localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang || 'en', this._serverTranslations);
             const id = String(valueOf(badge, 'Id', 'id') || '');
             const title = valueOf(localized, 'Title', 'title') || id;
             const description = valueOf(localized, 'Description', 'description') || '';
@@ -1873,7 +1873,7 @@ class AchievementsPage extends Page {
             .sort((a, b) => new Date(valueOf(b, 'UnlockedAt', 'unlockedAt')) - new Date(valueOf(a, 'UnlockedAt', 'unlockedAt')))
             .slice(0, 4);
         const recentHtml = recent.length
-            ? `<div class="achievements-recent">${recent.map((badge) => `<span title="${escapeHtml(valueOf(localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang), 'Title', 'title'))}">${badgeIcon(badge)}</span>`).join('')}</div>`
+            ? `<div class="achievements-recent">${recent.map((badge) => `<span title="${escapeHtml(valueOf(localizeAchievementBadge(badge, i18n.currentLang || document.documentElement.lang, this._serverTranslations), 'Title', 'title'))}">${badgeIcon(badge)}</span>`).join('')}</div>`
             : '';
 
         target.innerHTML = `
