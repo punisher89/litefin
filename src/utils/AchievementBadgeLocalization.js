@@ -526,7 +526,6 @@ export function localizeAchievementRank(name, language = '', serverTranslations 
     if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return name;
     return RUSSIAN_RANKS[raw] || name;
 }
-}
 
 export function localizeAchievementQuest(quest, language = '', serverTranslations = null) {
     if (!quest) return quest;
@@ -550,7 +549,6 @@ export function localizeAchievementQuest(quest, language = '', serverTranslation
         Description: localized.description || originalDescription
     };
 }
-}
 
 export function localizeAchievementCatalogItem(item, language = '', serverTranslations = null) {
     if (!item) return item;
@@ -572,7 +570,6 @@ export function localizeAchievementCatalogItem(item, language = '', serverTransl
         DisplayName: localized[0],
         Description: localized[1]
     };
-}
 }
 
 export function localizeAchievementPowerUp(item, language = '', serverTranslations = null) {
@@ -600,7 +597,6 @@ export function localizeAchievementPowerUp(item, language = '', serverTranslatio
         Description: localized[1]
     };
 }
-}
 
 export function localizeAchievementPowerUpType(type, language = '', serverTranslations = null) {
     const rawType = String(type || '').trim();
@@ -610,7 +606,6 @@ export function localizeAchievementPowerUpType(type, language = '', serverTransl
     if (server) return server;
     if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return type;
     return RUSSIAN_POWERUPS[key]?.[0] || type;
-}
 }
 
 export function localizeAchievementMessage(message, language = '') {
