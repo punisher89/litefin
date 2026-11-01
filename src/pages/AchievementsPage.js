@@ -156,7 +156,11 @@ function gameText(key, replacements = {}) {
     const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     const dictionary = language.startsWith('ru') ? GAME_TEXT.ru : GAME_TEXT.en;
     const serverKey = GAME_TEXT_SERVER_KEYS[key];
-    const serverValue = serverKey && gameCenterServerTranslations ? gameCenterServerTranslations[serverKey] : '';
+    const candidateServerValue = serverKey && gameCenterServerTranslations ? gameCenterServerTranslations[serverKey] : '';
+    // Some plugin builds return en.json when a requested language pack is absent.
+    // In Russian UI, treat a non-Russian server fallback as a missing translation.
+    const serverValue = language.startsWith('ru') && typeof candidateServerValue === 'string' && !/[А-Яа-яЁё]/.test(candidateServerValue)
+        ? '' : candidateServerValue;
     let text = (typeof serverValue === 'string' && serverValue.trim()) ? serverValue : (dictionary[key] || GAME_TEXT.en[key] || key);
     Object.keys(replacements).forEach((name) => {
         text = text.replace(new RegExp('\\{' + name + '\\}', 'g'), String(replacements[name]));
@@ -260,7 +264,10 @@ function localizedBadgeValue(value, kind, serverTranslations = null) {
     const raw = String(value || '').trim();
     if (!raw) return '';
     const serverKey = kind === 'rarity' ? 'rarity.' + raw.toLowerCase() : 'category.' + raw;
-    const serverValue = serverTranslations && serverTranslations[serverKey];
+    const candidateServerValue = serverTranslations && serverTranslations[serverKey];
+    const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
+    const serverValue = language.startsWith('ru') && typeof candidateServerValue === 'string' && !/[А-Яа-яЁё]/.test(candidateServerValue)
+        ? '' : candidateServerValue;
     if (typeof serverValue === 'string' && serverValue.trim()) return serverValue;
     const language = String(i18n.currentLang || (typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
     if (!language.startsWith('ru')) return raw;
@@ -761,7 +768,8 @@ class AchievementsPage extends Page {
         const setText = (selector, key, prefix = '') => {
             const element = this.el.querySelector(selector);
             const value = translations[key];
-            if (element && typeof value === 'string' && value.trim()) {
+            const isRussian = String(i18n.currentLang || document.documentElement.lang || '').toLowerCase().startsWith('ru');
+            if (element && typeof value === 'string' && value.trim() && (!isRussian || /[А-Яа-яЁё]/.test(value))) {
                 element.textContent = prefix + value;
             }
         };
