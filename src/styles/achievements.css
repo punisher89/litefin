@@ -1652,7 +1652,7 @@
     top: 104px;
     z-index: 19;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 9px;
     margin: 0 0 22px;
     padding: 9px;
@@ -2031,4 +2031,226 @@
 .achievements-page [tabindex="0"]:focus {
     position: relative;
     z-index: 2;
+}
+
+
+/* Game Center statistics — server-backed and deliberately CSS-only for webOS. */
+.achievements-stats-heading,
+.achievement-stats-card-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+.achievements-stats-heading {
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.achievements-stats-heading h2,
+.achievement-stats-card h3 {
+    margin: 0;
+}
+.achievements-stats-heading p,
+.achievement-stats-card-heading > span,
+.achievement-stats-note {
+    margin: 5px 0 0;
+    color: var(--secondary-text-color, #a7a7b3);
+    font-size: 12px;
+    line-height: 1.45;
+}
+.achievements-stats-periods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+.achievement-stats-period {
+    min-width: 84px;
+    min-height: 42px;
+    padding: 8px 13px;
+    border: 1px solid var(--border-color, rgba(255,255,255,.14));
+    border-radius: 11px;
+    background: rgba(255,255,255,.045);
+    color: var(--text-color, #fff);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.achievement-stats-period.active {
+    border-color: rgba(177,151,255,.65);
+    background: rgba(123,94,205,.24);
+}
+.achievement-stats-period:focus-visible {
+    outline: 3px solid #c2afff;
+    outline-offset: 3px;
+}
+.achievement-stats-content {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.achievement-stats-metrics {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0,1fr));
+    gap: 10px;
+}
+.achievement-stats-metric {
+    min-width: 0;
+    padding: 15px;
+}
+.achievement-stats-metric strong {
+    font-size: clamp(20px, 2vw, 29px);
+}
+.achievement-stats-card {
+    min-width: 0;
+    padding: 17px;
+    border: 1px solid rgba(165,145,255,.15);
+    border-radius: 16px;
+    background: linear-gradient(145deg, rgba(255,255,255,.035), rgba(255,255,255,.012)), var(--card-background, rgba(26,25,42,.82));
+}
+.achievement-stats-card h3 {
+    margin: 0 0 13px;
+    font-size: 15px;
+}
+.achievement-stats-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 13px;
+}
+.achievement-stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin: 0;
+    padding-left: 24px;
+}
+.achievement-stats-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    color: var(--secondary-text-color, #a7a7b3);
+    font-size: 13px;
+}
+.achievement-stats-list li span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.achievement-stats-list li strong {
+    flex: 0 0 auto;
+    color: var(--text-color, #fff);
+    font-variant-numeric: tabular-nums;
+}
+.achievement-stats-category {
+    margin-top: 12px;
+}
+.achievement-stats-category > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+}
+.achievement-stats-category > div:first-child span {
+    color: var(--secondary-text-color, #a7a7b3);
+    white-space: nowrap;
+}
+.achievement-stats-record-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 10px;
+}
+.achievement-stats-record {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.035);
+}
+.achievement-stats-record span {
+    color: var(--secondary-text-color, #a7a7b3);
+    font-size: 11px;
+}
+.achievement-stats-record strong {
+    font-size: 17px;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+.achievement-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(15, minmax(0,1fr));
+    gap: 5px;
+}
+.achievement-calendar-cell {
+    display: block;
+    min-width: 0;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    background: rgba(130,130,145,.13);
+}
+.achievement-calendar-cell.level-1 { background: rgba(124,102,190,.32); }
+.achievement-calendar-cell.level-2 { background: rgba(124,102,190,.52); }
+.achievement-calendar-cell.level-3 { background: rgba(124,102,190,.72); }
+.achievement-calendar-cell.level-4 { background: rgba(161,137,245,.98); }
+.achievement-stats-goal {
+    padding: 10px 0;
+    border-top: 1px solid var(--border-color, rgba(255,255,255,.08));
+}
+.achievement-stats-goal:first-of-type { border-top: 0; }
+.achievement-stats-goal > div:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.achievement-stats-goal strong { font-size: 13px; }
+.achievement-stats-goal span,
+.achievement-stats-goal small {
+    color: var(--secondary-text-color, #a7a7b3);
+    font-size: 11px;
+}
+.achievement-stats-goal small { display: block; margin-top: 5px; text-align: right; }
+.achievement-stats-wrapped .achievement-stats-record-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.achievement-stats-note { margin: -3px 0 12px; }
+.achievement-clock-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0,1fr));
+    gap: 7px 5px;
+    align-items: end;
+}
+.achievement-clock-hour {
+    min-width: 0;
+    height: 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+}
+.achievement-clock-hour > span {
+    display: block;
+    width: 65%;
+    min-height: 3px;
+    border-radius: 4px 4px 1px 1px;
+    background: linear-gradient(180deg, #a991ff, rgba(111,84,196,.45));
+}
+.achievement-clock-hour small {
+    color: var(--secondary-text-color, #a7a7b3);
+    font-size: 9px;
+}
+@media (max-width: 1100px) {
+    .achievement-stats-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
+    .achievement-stats-wrapped .achievement-stats-record-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 760px) {
+    .achievement-stats-columns { grid-template-columns: 1fr; }
+    .achievement-calendar-grid { grid-template-columns: repeat(13,minmax(0,1fr)); }
+}
+@media (max-width: 540px) {
+    .achievement-stats-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .achievement-stats-period { flex: 1 1 0; }
+    .achievement-calendar-grid { grid-template-columns: repeat(10,minmax(0,1fr)); }
+    .achievement-stats-record-grid { grid-template-columns: 1fr; }
+    .achievement-stats-wrapped .achievement-stats-record-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
