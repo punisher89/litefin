@@ -376,8 +376,11 @@ function localizedDescription(raw) {
     return text;
 }
 
-function serverTranslation(translations, key) {
+function serverTranslation(translations, key, language = '') {
     const value = translations && translations[key];
+    // The plugin falls back to en.json for unsupported languages. Do not let
+    // that English fallback mask Litefin's Russian fallback dictionary.
+    if (/^ru(?:[-_]|$)/i.test(String(language || '')) && typeof value === 'string' && !/[А-Яа-яЁё]/.test(value)) return '';
     return typeof value === 'string' && value.trim() ? value : '';
 }
 
@@ -397,10 +400,10 @@ export function localizeAchievementBadge(badge, language = '', serverTranslation
     // The plugin's ?lang=ru badge endpoint is authoritative. If it already
     // returned Russian text, never overwrite it with Litefin's bundled copy.
     // Flat server packs may also provide explicit per-badge keys.
-    const serverTitle = serverTranslation(serverTranslations, 'badge.' + id + '.title')
-        || serverTranslation(serverTranslations, 'badges.' + id + '.title');
-    const serverDescription = serverTranslation(serverTranslations, 'badge.' + id + '.description')
-        || serverTranslation(serverTranslations, 'badges.' + id + '.description');
+    const serverTitle = serverTranslation(serverTranslations, 'badge.' + id + '.title', language)
+        || serverTranslation(serverTranslations, 'badges.' + id + '.title', language);
+    const serverDescription = serverTranslation(serverTranslations, 'badge.' + id + '.description', language)
+        || serverTranslation(serverTranslations, 'badges.' + id + '.description', language);
 
     const title = serverTitle || (hasCyrillic(currentTitle) ? currentTitle : RUSSIAN_TITLES[id]);
     const description = serverDescription || (hasCyrillic(currentDescription)
@@ -536,7 +539,7 @@ const RUSSIAN_POWERUPS = {
 export function localizeAchievementRank(name, language = '', serverTranslations = null) {
     const raw = String(name || '').trim();
     if (!raw) return name;
-    const server = serverTranslation(serverTranslations, 'rank.' + raw.toLowerCase());
+    const server = serverTranslation(serverTranslations, 'rank.' + raw.toLowerCase(), language);
     if (server) return server;
     if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return name;
     return RUSSIAN_RANKS[raw] || name;
@@ -545,8 +548,8 @@ export function localizeAchievementRank(name, language = '', serverTranslations 
 export function localizeAchievementQuest(quest, language = '', serverTranslations = null) {
     if (!quest) return quest;
     const id = String(quest.Id || quest.id || '').trim().toLowerCase();
-    const serverTitle = serverTranslation(serverTranslations, 'quest.' + id + '.title');
-    const serverDescription = serverTranslation(serverTranslations, 'quest.' + id + '.desc');
+    const serverTitle = serverTranslation(serverTranslations, 'quest.' + id + '.title', language);
+    const serverDescription = serverTranslation(serverTranslations, 'quest.' + id + '.desc', language);
     if (serverTitle || serverDescription) {
         return {
             ...quest,
@@ -568,8 +571,8 @@ export function localizeAchievementQuest(quest, language = '', serverTranslation
 export function localizeAchievementCatalogItem(item, language = '', serverTranslations = null) {
     if (!item) return item;
     const id = String(item.Id || item.id || '').trim().toLowerCase();
-    const serverName = serverTranslation(serverTranslations, 'cat.' + id + '.name');
-    const serverDescription = serverTranslation(serverTranslations, 'cat.' + id + '.desc');
+    const serverName = serverTranslation(serverTranslations, 'cat.' + id + '.name', language);
+    const serverDescription = serverTranslation(serverTranslations, 'cat.' + id + '.desc', language);
     if (serverName || serverDescription) {
         return {
             ...item,
@@ -593,9 +596,9 @@ export function localizeAchievementPowerUp(item, language = '', serverTranslatio
     if (fromCatalog !== item) return fromCatalog;
     const rawType = String(item.Type || item.type || '').trim();
     const type = rawType.toLowerCase().replace(/[^a-z]/g, '');
-    const serverName = serverTranslation(serverTranslations, 'pu.' + type + '.name')
-        || serverTranslation(serverTranslations, 'powerup.' + rawType);
-    const serverDescription = serverTranslation(serverTranslations, 'pu.' + type + '.desc');
+    const serverName = serverTranslation(serverTranslations, 'pu.' + type + '.name', language)
+        || serverTranslation(serverTranslations, 'powerup.' + rawType, language);
+    const serverDescription = serverTranslation(serverTranslations, 'pu.' + type + '.desc', language);
     if (serverName || serverDescription) {
         return {
             ...item,
@@ -616,8 +619,8 @@ export function localizeAchievementPowerUp(item, language = '', serverTranslatio
 export function localizeAchievementPowerUpType(type, language = '', serverTranslations = null) {
     const rawType = String(type || '').trim();
     const key = rawType.toLowerCase().replace(/[^a-z]/g, '');
-    const server = serverTranslation(serverTranslations, 'pu.' + key + '.name')
-        || serverTranslation(serverTranslations, 'powerup.' + rawType);
+    const server = serverTranslation(serverTranslations, 'pu.' + key + '.name', language)
+        || serverTranslation(serverTranslations, 'powerup.' + rawType, language);
     if (server) return server;
     if (!/^ru(?:[-_]|$)/i.test(String(language || ''))) return type;
     return RUSSIAN_POWERUPS[key]?.[0] || type;
