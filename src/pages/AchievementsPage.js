@@ -19,7 +19,7 @@ const log = logger.create('AchievementsPage');
 
 const GAME_TEXT = {
     ru: {
-        overviewTab: 'Обзор', badgesTab: 'Достижения', questsTab: 'Задания', shopTab: 'Магазин', statsTab: 'Статистика', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
+        overviewTab: 'Обзор', badgesTab: 'Достижения', questsTab: 'Задания', shopTab: 'Магазин', statsTab: 'Статистика', activityTab: 'Активность', activityIntro: 'Последние открытия достижений на сервере.', activityLoading: 'Загружаем ленту активности…', activityEmpty: 'Пока нет событий. Когда пользователи будут открывать достижения, они появятся здесь.', activityUnavailable: 'Лента активности сейчас недоступна.', activityMore: 'Показать ещё', eyebrow: 'JELLYFIN · ИГРОВОЙ ЦЕНТР', intro: 'Собирай награды за просмотр, открывай новые уровни и пополняй свою коллекцию.', playerLevel: 'ТВОЙ ТЕКУЩИЙ РАНГ', progressToNext: 'Путь к следующему рангу', nextRank: 'Следующий ранг: {name}', maxRank: 'Максимальный ранг достигнут', badgeCollection: 'Коллекция наград', game: 'Игровой центр', arsenal: 'Арсенал', shop: 'Магазин', cosmetics: 'Косметика', gifts: 'Подарить очки',
         scoreBank: 'Доступно очков', spent: 'Потрачено всего', loadingGame: 'Загружаем игровые данные…',
         arsenalEmpty: 'Пока нет усилений. Их можно приобрести в магазине за очки.',
         shopIntro: 'Покупай усиления и оформление профиля за заработанные очки.',
@@ -56,7 +56,7 @@ const GAME_TEXT = {
         statsTopDay: 'Самый активный день недели', statsBiggestDay: 'Рекордный день'
     },
     en: {
-        overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', statsTab: 'Stats', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
+        overviewTab: 'Overview', badgesTab: 'Achievements', questsTab: 'Quests', shopTab: 'Shop', statsTab: 'Stats', activityTab: 'Activity', activityIntro: 'Recent achievement unlocks on this server.', activityLoading: 'Loading activity feed…', activityEmpty: 'No activity yet. New achievement unlocks will appear here.', activityUnavailable: 'The activity feed is not available right now.', activityMore: 'Load more', eyebrow: 'JELLYFIN · GAME CENTER', intro: 'Earn rewards for every watch, climb the ranks and build your personal collection.', playerLevel: 'YOUR CURRENT RANK', progressToNext: 'Progress to next rank', nextRank: 'Next rank: {name}', maxRank: 'Maximum rank reached', badgeCollection: 'Badge Collection', game: 'Game Center', arsenal: 'Arsenal', shop: 'Shop', cosmetics: 'Cosmetics', gifts: 'Gift score',
         scoreBank: 'Available score', spent: 'Total spent', loadingGame: 'Loading game data…',
         arsenalEmpty: 'No power-ups yet. Buy some in the shop with your score.',
         shopIntro: 'Spend earned score on power-ups and profile cosmetics.',
@@ -323,6 +323,10 @@ class AchievementsPage extends Page {
         this._statsSharedPromise = null;
         this._statsRequestId = 0;
         this._serverTranslations = null;
+        this._activityPage = 0;
+        this._activityTotalPages = 0;
+        this._activityEntries = [];
+        this._activityLoading = false;
         gameCenterServerTranslations = null;
     }
 
@@ -370,6 +374,7 @@ class AchievementsPage extends Page {
                         <button class="achievements-main-tab focusable" data-game-section="quests" type="button" role="tab" aria-selected="false" tabindex="0">⚡ ${escapeHtml(gameText('questsTab'))}</button>
                         <button class="achievements-main-tab focusable" data-game-section="shop" type="button" role="tab" aria-selected="false" tabindex="0">🛍 ${escapeHtml(gameText('shopTab'))}</button>
                         <button class="achievements-main-tab focusable" data-game-section="stats" type="button" role="tab" aria-selected="false" tabindex="0">📊 ${escapeHtml(gameText('statsTab'))}</button>
+                        <button class="achievements-main-tab focusable" data-game-section="activity" type="button" role="tab" aria-selected="false" tabindex="0">📰 ${escapeHtml(gameText('activityTab'))}</button>
                     </nav>
                     <div class="achievements-error" id="achievements-error" role="status" hidden></div>
                     <div class="achievements-loading" id="achievements-loading">${escapeHtml(i18n.t('Loading'))}</div>
@@ -390,6 +395,18 @@ class AchievementsPage extends Page {
                         <div id="achievement-stats-content" class="achievement-stats-content" aria-live="polite">
                             <p class="achievements-muted">${escapeHtml(gameText('statsLoading'))}</p>
                         </div>
+                    </section>
+                    <section class="achievements-section achievements-main-panel achievements-activity-section" id="achievements-activity-section" data-game-section-panel="activity" hidden>
+                        <div class="achievements-stats-heading">
+                            <div>
+                                <h2>${escapeHtml(gameText('activityTab'))}</h2>
+                                <p>${escapeHtml(gameText('activityIntro'))}</p>
+                            </div>
+                        </div>
+                        <div id="achievement-activity-list" class="achievement-activity-list" aria-live="polite">
+                            <p class="achievements-muted">${escapeHtml(gameText('activityLoading'))}</p>
+                        </div>
+                        <button id="achievement-activity-more" class="achievements-more focusable" type="button" tabindex="0" hidden>${escapeHtml(gameText('activityMore'))}</button>
                     </section>
                     <section class="achievements-section achievements-main-panel" id="achievements-quests-section" data-game-section-panel="quests" hidden>
                         <h2>${escapeHtml(i18n.t('AchievementQuests'))}</h2>
@@ -496,6 +513,9 @@ class AchievementsPage extends Page {
             button.addEventListener('click', () => this._loadStats(button.getAttribute('data-game-period')));
         });
 
+        const activityMore = this.$('#achievement-activity-more');
+        if (activityMore) activityMore.addEventListener('click', () => this._loadActivity(true));
+
         const refresh = this.$('#achievements-refresh');
         if (refresh) refresh.addEventListener('click', () => this._load(true));
 
@@ -550,6 +570,9 @@ class AchievementsPage extends Page {
             this._statsCache = Object.create(null);
             this._statsSharedPromise = null;
             this._statsRequestId++;
+            this._activityPage = 0;
+            this._activityTotalPages = 0;
+            this._activityEntries = [];
         }
         this._loading = true;
         const loading = this.$('#achievements-loading');
@@ -642,6 +665,7 @@ class AchievementsPage extends Page {
         setText('[data-game-section="quests"]', 'tabs.quests', '⚡ ');
         setText('[data-game-section="shop"]', 'loadout.tab.shop', '🛍 ');
         setText('[data-game-section="stats"]', 'tabs.stats', '📊 ');
+        setText('[data-game-section="activity"]', 'tabs.activity', '📰 ');
         setText('[data-achievement-tab="arsenal"]', 'loadout.tab.powerups', '⚡ ');
         setText('[data-achievement-tab="shop"]', 'loadout.tab.shop', '🛒 ');
         setText('[data-achievement-tab="cosmetics"]', 'loadout.tab.cosmetics', '🎨 ');
@@ -659,7 +683,7 @@ class AchievementsPage extends Page {
     }
 
     _selectMainSection(section) {
-        const allowed = ['overview', 'badges', 'quests', 'shop', 'stats'];
+        const allowed = ['overview', 'badges', 'quests', 'shop', 'stats', 'activity'];
         const selected = allowed.includes(section) ? section : 'overview';
         this.el.querySelectorAll('[data-game-section]').forEach((button) => {
             const active = button.getAttribute('data-game-section') === selected;
@@ -672,9 +696,97 @@ class AchievementsPage extends Page {
         });
         if (selected === 'shop') this._selectGameTab('shop');
         if (selected === 'stats') this._loadStats(this._statsPeriod);
+        if (selected === 'activity') this._loadActivity(false);
         focusManager.invalidateCache('achievements-game-center');
     }
 
+
+
+    async _loadActivity(append = false) {
+        if (!this._userId || this._activityLoading) return;
+        if (!append && this._activityPage > 0) {
+            this._renderActivity();
+            return;
+        }
+
+        const target = this.$('#achievement-activity-list');
+        const more = this.$('#achievement-activity-more');
+        if (!target) return;
+
+        const nextPage = append ? this._activityPage + 1 : 1;
+        if (!append) {
+            this._activityEntries = [];
+            target.innerHTML = `<p class="achievements-muted">${escapeHtml(gameText('activityLoading'))}</p>`;
+        }
+        this._activityLoading = true;
+        if (more) more.disabled = true;
+
+        try {
+            // The server applies ActivityFeedEnabled and per-user privacy settings.
+            const result = await api.get(`/Plugins/AchievementBadges/activity-feed?page=${nextPage}&pageSize=24`);
+            const entries = arrayOf(result, 'Entries', 'entries');
+            this._activityEntries = append ? this._activityEntries.concat(entries) : entries;
+            this._activityPage = nextPage;
+            this._activityTotalPages = Number(valueOf(result, 'TotalPages', 'totalPages') || 0);
+            this._renderActivity();
+        } catch (err) {
+            log.warn('Achievement Badges activity feed could not be loaded:', err);
+            if (!append) target.innerHTML = `<p class="achievements-muted">${escapeHtml(gameText('activityUnavailable'))}</p>`;
+        } finally {
+            this._activityLoading = false;
+            if (more) more.disabled = false;
+            focusManager.invalidateCache('achievements-game-center');
+        }
+    }
+
+    _renderActivity() {
+        const target = this.$('#achievement-activity-list');
+        const more = this.$('#achievement-activity-more');
+        if (!target) return;
+        const language = i18n.currentLang || document.documentElement.lang || 'en';
+        if (!this._activityEntries.length) {
+            target.innerHTML = `<p class="achievements-muted">${escapeHtml(gameText('activityEmpty'))}</p>`;
+            if (more) more.hidden = true;
+            return;
+        }
+
+        target.innerHTML = this._activityEntries.map((entry) => {
+            const badgeId = String(valueOf(entry, 'BadgeId', 'badgeId') || '');
+            const entryUserId = String(valueOf(entry, 'UserId', 'userId') || '');
+            let title = valueOf(entry, 'Title', 'title') || '';
+            // For the current user, reuse the already localized badge payload.
+            // Other users' server-authored titles remain as the server returned them.
+            if (entryUserId && entryUserId === String(this._userId)) {
+                const ownBadge = this._data && this._data.badges.find((badge) =>
+                    String(valueOf(badge, 'Id', 'id') || '') === badgeId
+                );
+                if (ownBadge) title = valueOf(ownBadge, 'Title', 'title') || title;
+            } else if (/^ru(?:[-_]|$)/i.test(String(language))) {
+                const localized = localizeAchievementBadge({
+                    Id: badgeId,
+                    Category: valueOf(entry, 'Category', 'category'),
+                    Title: title,
+                    Description: ''
+                }, language);
+                title = valueOf(localized, 'Title', 'title') || title;
+            }
+
+            const userName = valueOf(entry, 'UserName', 'userName') || 'Jellyfin';
+            const rarity = localizedBadgeValue(valueOf(entry, 'Rarity', 'rarity') || '', 'rarity', this._serverTranslations);
+            const date = achievementDate(valueOf(entry, 'At', 'at'));
+            return `
+                <article class="achievement-activity-item">
+                    <span class="achievement-activity-icon">${badgeIcon({ Icon: valueOf(entry, 'Icon', 'icon'), Category: valueOf(entry, 'Category', 'category') })}</span>
+                    <div class="achievement-activity-body">
+                        <strong>${escapeHtml(title)}</strong>
+                        <span>${escapeHtml(userName)} · ${escapeHtml(date)}</span>
+                    </div>
+                    ${rarity ? `<span class="achievement-rarity">${escapeHtml(rarity)}</span>` : ''}
+                </article>`;
+        }).join('');
+
+        if (more) more.hidden = this._activityPage >= this._activityTotalPages;
+    }
 
     async _loadStats(period = this._statsPeriod) {
         const allowed = ['week', 'month', 'year'];
