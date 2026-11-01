@@ -30,3 +30,40 @@ test('built-in quests use local Russian fallback while custom quests remain serv
     const custom = { Id: 'server-weekly-quest-01', Title: 'My Weekly Quest', Description: 'Watch 5 movies this week.' };
     assert.equal(localizeAchievementQuest(custom, 'ru'), custom);
 });
+
+test('server dictionary localizes quest and rank strings before Litefin fallback', async () => {
+    const { localizeAchievementRank } = await import('../src/utils/AchievementBadgeLocalization.js');
+    const translations = {
+        'quest.daily-movie.title': 'Filmabend',
+        'quest.daily-movie.desc': 'Schau heute einen Film.',
+        'rank.legend': 'Legende'
+    };
+    const quest = localizeAchievementQuest(
+        { Id: 'daily-movie', Title: 'Movie Night', Description: 'Watch a movie.' },
+        'de',
+        translations
+    );
+    assert.equal(quest.Title, 'Filmabend');
+    assert.equal(quest.Description, 'Schau heute einen Film.');
+    assert.equal(localizeAchievementRank('Legend', 'de', translations), 'Legende');
+});
+
+test('server dictionary localizes shop cosmetics and power-ups by stable IDs', async () => {
+    const { localizeAchievementCatalogItem, localizeAchievementPowerUp } = await import('../src/utils/AchievementBadgeLocalization.js');
+    const translations = {
+        'cat.theme-sunset.name': 'Sonnenuntergang',
+        'cat.theme-sunset.desc': 'Warmer Farbverlauf.',
+        'pu.xpboost.name': 'XP-Boost',
+        'pu.xpboost.desc': 'Verdoppelt Punkte.'
+    };
+    const cosmetic = localizeAchievementCatalogItem(
+        { Id: 'theme-sunset', DisplayName: 'Sunset', Description: 'Warm gradient.' }, 'de', translations
+    );
+    assert.equal(cosmetic.DisplayName, 'Sonnenuntergang');
+    assert.equal(cosmetic.Description, 'Warmer Farbverlauf.');
+    const powerup = localizeAchievementPowerUp(
+        { Type: 'XpBoost', DisplayName: 'XP Boost', Description: 'Double score.' }, 'de', translations
+    );
+    assert.equal(powerup.DisplayName, 'XP-Boost');
+    assert.equal(powerup.Description, 'Verdoppelt Punkte.');
+});
