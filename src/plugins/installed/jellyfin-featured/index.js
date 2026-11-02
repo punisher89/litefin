@@ -80,7 +80,8 @@ export default {
         this._loading = (async () => {
             try {
                 const response = await api.serverPlugins.call('/featured/items');
-                this._items = Array.isArray(response?.Items) ? response.Items : [];
+                const items = response?.Items || response?.items;
+                this._items = Array.isArray(items) ? items : [];
                 this._loadedAt = Date.now();
                 this._renderItems();
                 return this._items;
@@ -111,21 +112,24 @@ export default {
 
         status.textContent = '';
         this._items.slice(0, 8).forEach((item) => {
-            if (!item || !item.Id) return;
+            const itemId = item && (item.Id || item.id);
+            if (!itemId) return;
 
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'focusable featured-native-card';
             button.tabIndex = 0;
-            button.dataset.itemId = text(item.Id);
-            button.addEventListener('click', () => this.api.openItem(item.Id));
+            button.dataset.itemId = text(itemId);
+            button.addEventListener('click', () => this.api.openItem(itemId));
 
-            if (item.HasImage) {
+            const hasImage = item.HasImage !== undefined ? item.HasImage : item.hasImage;
+            const imageType = item.ImageType || item.imageType || 'Primary';
+            if (hasImage) {
                 const image = document.createElement('img');
                 image.className = 'featured-native-card__image';
                 image.loading = 'lazy';
                 image.alt = '';
-                image.src = this.api.getImageUrl(item.Id, item.ImageType || 'Primary', {
+                image.src = this.api.getImageUrl(itemId, imageType, {
                     maxWidth: 520,
                     quality: 85
                 });
@@ -135,16 +139,17 @@ export default {
 
             const title = document.createElement('span');
             title.className = 'featured-native-card__name';
-            title.textContent = text(item.Name);
+            title.textContent = text(item.Name || item.name);
             button.appendChild(title);
 
             const metadata = [];
-            if (item.ProductionYear) metadata.push(text(item.ProductionYear));
-            if (item.OfficialRating || item.official_rating) {
-                metadata.push(text(item.OfficialRating || item.official_rating));
-            }
-            if (item.CommunityRating != null) {
-                metadata.push('★ ' + Number(item.CommunityRating).toFixed(1));
+            const productionYear = item.ProductionYear || item.productionYear;
+            const officialRating = item.OfficialRating || item.officialRating || item.official_rating;
+            const communityRating = item.CommunityRating ?? item.communityRating;
+            if (productionYear) metadata.push(text(productionYear));
+            if (officialRating) metadata.push(text(officialRating));
+            if (communityRating != null) {
+                metadata.push('★ ' + Number(communityRating).toFixed(1));
             }
             if (metadata.length) {
                 const details = document.createElement('span');
