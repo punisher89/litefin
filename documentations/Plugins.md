@@ -7,12 +7,12 @@ Litefin features a modular plugin system that allows extending the application's
 The plugin system is built around three main components:
 
 1.  **PluginManager** (`src/plugins/PluginManager.js`): The central hub that loads bundled plugins, manages their lifecycle (init/enable/disable/destroy), and broadcasts app events.
-2.  **PluginAPI** (`src/plugins/PluginAPI.js`): A sandboxed interface provided to each plugin. Plugins should only interact with Litefin through this API to ensure stability and compatibility.
+2.  **PluginAPI** (`src/plugins/PluginAPI.js`): A stable compatibility facade provided to each plugin. It is not a security sandbox; bundled plugin code still runs in the app origin.
 3.  **ServerPluginClient** (`src/plugins/ServerPluginClient.js`): A specialized client that detects and communicates with server-side Jellyfin plugins (like Intro Skipper) via hybrid detection strategy (admin `/Plugins` query + endpoint probing for non-admin users).
 
 ## Bundled Plugins
 
-Litefin currently registers 6 bundled plugins in `PluginManager.js`:
+Litefin currently registers 8 bundled plugins in `PluginManager.js`:
 
 | Plugin ID         | Description                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------------- |
@@ -22,6 +22,8 @@ Litefin currently registers 6 bundled plugins in `PluginManager.js`:
 | `mdblist-ratings` | Fetch and display IMDb, Rotten Tomatoes, Metacritic, Trakt, TMDB, and Letterboxd ratings on cards |
 | `achievement-badges` | Read-only native Home and Player integration for equipped and recent Achievement Badges |
 | `actor-plus` | Native, D-pad-friendly actor profile highlights on Litefin's Person page |
+| `jellyfin-featured` | Reads `/featured/items` and renders the configured, personalized feed in a native Home widget |
+| `jellyfin-enhanced` | Native first subset: resolution, HDR, and audio-format chips on movie detail pages |
 
 ## Creating a Plugin
 
@@ -206,8 +208,8 @@ that every Jellyfin server plugin's Web UI can run unchanged in a native TV app.
 | Achievement Badges | Native read-only adapter | Reads equipped and recent badges through authenticated user endpoints. Unlocking, score, quests, shop, cosmetics and friends remain server-owned and are not yet reproduced in Litefin. |
 | MDBList Ratings | Existing native adapter | The existing adapter continues to fetch ratings, awards and feature labels from MDBList Server Plugin. |
 | ActorPlus | Native adaptation | Uses Litefin's Person page and filmography. ActorPlus's Jellyfin Web hover UI is not loaded. |
-| Jellyfin Featured | Reimplementation required | Litefin has its own Hero Carousel and configurable home rows; Featured's web injection and saved presets are not imported. |
-| Jellyfin Enhanced | Reimplementation required | Functions must be ported individually to Litefin pages and APIs rather than injecting into Jellyfin Web. |
+| Jellyfin Featured | Native adapter | Reads the configured feed from `/featured/items` and displays it in Litefin's native Home UI; does not use frontend injection. |
+| Jellyfin Enhanced | Partial native adapter | Displays resolution, HDR, and audio format from media fields already fetched by DetailsPage. Other Enhanced features still require individual ports. |
 
 ## Runtime trust boundary
 
