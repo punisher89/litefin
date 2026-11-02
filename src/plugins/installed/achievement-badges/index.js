@@ -24,7 +24,7 @@ export default {
     id: 'achievement-badges',
     name: 'Achievement Badges',
     version: '1.0.0',
-    description: 'Нативные значки достижений на главной странице и в плеере Litefin.',
+    description: 'Экипированные и недавно открытые значки на главной странице Litefin.',
     serverDependency: 'achievement-badges',
     defaultEnabled: true,
 
