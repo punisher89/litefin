@@ -42,7 +42,7 @@ export const AWESOME_JELLYFIN_CATALOG = Object.freeze([
         category: 'Избранное на главной',
         status: 'native-adapter',
         statusLabel: 'Нативная интеграция',
-        summary: 'Получает настроенную и персонализированную подборку через /featured/items и отображает её отдельным D-pad-совместимым блоком на главной Litefin. Веб-инъекция не используется.',
+        summary: 'Получает настроенную и персонализированную подборку через /featured/items и отображает её отдельным D-pad-совместимым блоком на главной Litefin. Веб-инъекция не используется. Актуальный серверный релиз 12.9.0.0 требует Jellyfin ABI 12.2.0.0.',
         source: 'https://github.com/spkesDE/jellyfin-featured-plugin'
     },
     {
