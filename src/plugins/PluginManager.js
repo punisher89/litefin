@@ -639,6 +639,7 @@ class PluginManager {
         this._plugins.clear();
 
         this._extensionHost.destroy();
+        this._lastPageContext = null;
         serverPluginClient.reset();
         this._initialized = false;
         log.info('PluginManager destroyed');
