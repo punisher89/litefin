@@ -53,7 +53,7 @@ jobs:
         run: npm run lint
 
       - name: Build webOS Normal package
-        run: npm run package:webos
+        run: npm run package:webos-normal
 
       - name: Upload webOS package
         uses: actions/upload-artifact@v4
