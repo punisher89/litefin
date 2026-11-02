@@ -1443,6 +1443,12 @@ class DetailsPage extends Page {
 
             // Re-render hero header and technical details to reflect the selected version
             this._renderHeroText();
+            // Notify native page extensions so metadata (e.g. Enhanced media chips)
+            // follows the newly selected MediaSource instead of showing stale values.
+            eventBus.emit('details:media-source-changed', {
+                page: this,
+                mediaSourceId: id
+            });
             // Re-trigger zero-latency prewarm for the newly selected version
             if (
                 this._item &&
