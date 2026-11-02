@@ -770,6 +770,7 @@ class PluginManager {
             toast: this._deps.toast,
             getPlayer: () => this._currentPlayer,
             getCurrentItem: () => this._currentItem,
+            navigate: this._deps.navigate,
             extensionHost: this._extensionHost
         });
 
