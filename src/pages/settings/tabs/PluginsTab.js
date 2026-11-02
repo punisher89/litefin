@@ -78,10 +78,12 @@ export class PluginsTab {
         const catalogCards = AWESOME_JELLYFIN_CATALOG.map((entry) => {
             const installed = entry.adapterId ? plugins.find((plugin) => plugin.id === entry.adapterId) : null;
             const clientState = installed
-                ? (installed.enabled ? 'Модуль Litefin включён' : 'Модуль Litefin отключён')
-                : (entry.status === 'native-reimplementation'
-                    ? 'Отдельные функции ещё требуют переноса в Litefin'
-                    : 'Клиентский адаптер и серверный плагин проверяются отдельно');
+                ? (installed.dependencyDeferred
+                    ? 'Ожидается проверка серверного плагина'
+                    : (installed.enabled
+                        ? 'Модуль Litefin активен'
+                        : 'Не активен: отключён в настройках или отсутствует серверная зависимость'))
+                : 'Клиентский адаптер не включён в эту сборку Litefin';
             const statusClass = 'awesome-plugin-card__status--' + entry.status;
             return `
                 <article class="awesome-plugin-card">
