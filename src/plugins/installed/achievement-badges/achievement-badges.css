@@ -36,3 +36,12 @@
 .achievement-summary-osd {
     min-width: 88px;
 }
+
+.achievement-summary-widget__details {
+    margin: 0;
+    line-height: 1.45;
+    opacity: .84;
+}
+.achievement-summary-widget__details[hidden] {
+    display: none;
+}
