@@ -10,9 +10,9 @@ export const AWESOME_JELLYFIN_CATALOG = Object.freeze([
         adapterId: 'achievement-badges',
         name: 'Achievement Badges',
         category: 'Достижения',
-        status: 'supported',
-        statusLabel: 'Нативная интеграция',
-        summary: 'Показывает экипированные значки и последние открытия через пользовательский API серверного плагина. Данные только для чтения.',
+        status: 'native-adapter',
+        statusLabel: 'Нативная интеграция · просмотр',
+        summary: 'Показывает экипированные значки и последние открытия через пользовательский API серверного плагина. Данные только для чтения; магазин, квесты и косметика пока не перенесены.',
         source: 'https://github.com/ZL154/AchievementBadges_for_Jellyfin'
     },
     {
