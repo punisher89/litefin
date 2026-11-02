@@ -103,7 +103,7 @@ test('disposing an extension cancels its deferred mount', async () => {
         }
     }, {});
 
-    host.mountPage('home', pageEl, { ready });
+    host.mountPage('home', pageEl, { ready: ready.promise });
     dispose();
     ready.resolve();
     await ready.promise;
