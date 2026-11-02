@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-// Logger reads localStorage during module initialization.
+// Logger publishes itself on window and reads localStorage during module initialization.
+globalThis.window = globalThis;
 globalThis.localStorage = {
     getItem: () => null,
     key: () => null,
