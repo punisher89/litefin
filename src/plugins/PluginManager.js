@@ -89,6 +89,14 @@ const BUNDLED_PLUGINS = [
     {
         id: 'actor-plus',
         load: () => import('./installed/actor-plus/index.js')
+    },
+    {
+        id: 'jellyfin-featured',
+        load: () => import('./installed/jellyfin-featured/index.js')
+    },
+    {
+        id: 'jellyfin-enhanced',
+        load: () => import('./installed/jellyfin-enhanced/index.js')
     }
 ];
 
