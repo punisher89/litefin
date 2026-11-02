@@ -12,7 +12,7 @@ The plugin system is built around three main components:
 
 ## Bundled Plugins
 
-Litefin ships with 4 bundled plugins registered in `PluginManager.js`:
+Litefin currently registers 6 bundled plugins in `PluginManager.js`:
 
 | Plugin ID         | Description                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------------- |
@@ -20,6 +20,8 @@ Litefin ships with 4 bundled plugins registered in `PluginManager.js`:
 | `syncplay`        | Real-time synchronized group playback via WebSockets                                              |
 | `local-intros`    | Play custom local video files before media content                                                |
 | `mdblist-ratings` | Fetch and display IMDb, Rotten Tomatoes, Metacritic, Trakt, TMDB, and Letterboxd ratings on cards |
+| `achievement-badges` | Read-only native Home and Player integration for equipped and recent Achievement Badges |
+| `actor-plus` | Native, D-pad-friendly actor profile highlights on Litefin's Person page |
 
 ## Creating a Plugin
 
@@ -153,11 +155,69 @@ Embeds Litefin directly inside your Jellyfin server web interface:
 - **Manual Sideloading**: Drop `Litefin.Client.Plugin.dll` and `manifest.json` into `/plugins/Litefin_Client/`.
 - Accessible at `http://<server-ip>:<port>/litefin`.
 
-## Security & Sandbox
+## Native UI extension slots
 
-Plugins are **sandboxed** via the `PluginAPI`.
+The PluginAPI exposes native page slots. An extension returns an `HTMLElement`
+from its synchronous `render(context, api)` callback. The host manages insertion,
+page teardown, and optional D-pad focus registration.
+
+| API method | Slot | Litefin page |
+| --- | --- | --- |
+| `api.addFeaturedWidget(widget)` | `home:featured` | Home, after the native hero placeholder |
+| `api.addHomeWidget(widget)` | `home:widgets` | Home, before library rows |
+| `api.addDetailsWidget(widget)` | `details:content` | Media details |
+| `api.addPersonWidget(widget)` | `person:profile` | Actor / Person profile |
+
+Widget descriptor fields:
+
+- `id` (required): unique within the plugin.
+- `render(context, api)` (required): returns an `HTMLElement` or `null`.
+- `order` (optional): lower values mount first.
+- `focusOptions` (optional): FocusManager options; the host unregisters them on unmount.
+- `onMount(wrapper, context, api)` / `onUnmount(wrapper, context, api)` (optional): lifecycle callbacks.
+- `deferUntilReady` (optional): wait for the page's `ready` promise before calling render.
+
+Example:
+
+```javascript
+export default {
+    id: 'example-widget',
+    init(api) {
+        api.addHomeWidget({
+            id: 'hello',
+            order: 10,
+            render() {
+                const root = document.createElement('section');
+                root.textContent = 'Hello from Litefin';
+                return root;
+            }
+        });
+    }
+};
+```
+
+## Awesome Jellyfin compatibility
+
+The Settings > Plugins catalog reports Litefin-side support. It does not claim
+that every Jellyfin server plugin's Web UI can run unchanged in a native TV app.
+
+| Integration | Litefin status | Notes |
+| --- | --- | --- |
+| Achievement Badges | Native read-only adapter | Reads equipped and recent badges through authenticated user endpoints. Unlocking, score, quests, shop, cosmetics and friends remain server-owned and are not yet reproduced in Litefin. |
+| MDBList Ratings | Existing native adapter | The existing adapter continues to fetch ratings, awards and feature labels from MDBList Server Plugin. |
+| ActorPlus | Native adaptation | Uses Litefin's Person page and filmography. ActorPlus's Jellyfin Web hover UI is not loaded. |
+| Jellyfin Featured | Reimplementation required | Litefin has its own Hero Carousel and configurable home rows; Featured's web injection and saved presets are not imported. |
+| Jellyfin Enhanced | Reimplementation required | Functions must be ported individually to Litefin pages and APIs rather than injecting into Jellyfin Web. |
+
+## Runtime trust boundary
+
+`PluginAPI` is a compatibility facade, **not a JavaScript security sandbox**.
+Bundled plugins execute in the Litefin application origin and must be reviewed
+and trusted before inclusion in a release. The Extension Host limits where
+native UI is mounted and manages its lifecycle; it does not isolate JavaScript.
 
 - **DO NOT** import internal Litefin modules directly (e.g., `src/core/Router.js`).
-- **DO** use `api.on()` (auto-unsubscribed), `api.showToast()`, `api.getStorage()`, `api.addOSDWidget()`, and `api.serverPlugins` for all operations.
-- This ensures your plugin doesn't break if Litefin's internal directory structure changes.
+- **DO** use `api.on()` (auto-unsubscribed), `api.showToast()`, `api.getStorage()`,
+  the native UI slot methods, `api.addOSDWidget()`, and `api.serverPlugins`.
+- Do not load remote scripts, use `eval`, or store a server administrator API key in a client plugin.
 
