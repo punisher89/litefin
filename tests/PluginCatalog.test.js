@@ -24,6 +24,7 @@ test('Featured and Enhanced are reported as native adapters, not Web injectors',
     assert.equal(getAwesomeJellyfinEntry('jellyfin-enhanced').status, 'native-adapter');
     assert.equal(getAwesomeJellyfinEntry('jellyfin-featured').adapterId, 'jellyfin-featured');
     assert.equal(getAwesomeJellyfinEntry('jellyfin-enhanced').adapterId, 'jellyfin-enhanced');
+    assert.match(getAwesomeJellyfinEntry('jellyfin-featured').summary, /ABI 12\\.2\\.0\\.0/);
 });
 
 test('existing MDBList integration remains supported', () => {
