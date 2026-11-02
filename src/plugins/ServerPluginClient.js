@@ -380,10 +380,6 @@ class ServerPluginClient {
         if (!endpoint) {
             return { available: false, deferred: true, data: null };
         }
-        if (!endpoint) {
-            // Cannot probe with this item, defer
-            return { available: false, deferred: true, data: null };
-        }
 
         try {
             log.debug(`Probing endpoint for '${pluginId}': ${endpoint}`);
