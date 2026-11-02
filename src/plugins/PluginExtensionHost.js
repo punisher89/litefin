@@ -26,7 +26,8 @@ class PluginExtensionHost {
     constructor() {
         this._extensions = new Map();
         this._mounted = new Map();
-        this._pending = new Set();
+        // Map<extensionKey, activePageContext> for deferred mounts.
+        this._pending = new Map();
         this._activePage = null;
     }
 
@@ -87,11 +88,14 @@ class PluginExtensionHost {
         if (!this._activePage) return;
         if (pageEl && this._activePage.pageEl !== pageEl) return;
 
-        const activeEl = this._activePage.pageEl;
+        const activePage = this._activePage;
+        const activeEl = activePage.pageEl;
         for (const [key, mounted] of Array.from(this._mounted.entries())) {
             if (mounted.pageEl === activeEl) this._unmountEntry(key);
         }
-        this._pending.clear();
+        for (const [key, pendingPage] of Array.from(this._pending.entries())) {
+            if (pendingPage === activePage) this._pending.delete(key);
+        }
         this._activePage = null;
     }
 
@@ -99,10 +103,12 @@ class PluginExtensionHost {
         const active = this._activePage;
         const slotConfig = PLUGIN_EXTENSION_SLOTS[entry.slot];
         if (!active || !slotConfig || slotConfig.page !== active.pageId) return;
-        if (this._mounted.get(entry.key)?.pageEl === active.pageEl || this._pending.has(entry.key)) return;
+        if (this._mounted.get(entry.key)?.pageEl === active.pageEl) return;
+        if (this._pending.get(entry.key) === active) return;
+        if (this._pending.has(entry.key)) this._pending.delete(entry.key);
 
         const mount = () => {
-            this._pending.delete(entry.key);
+            if (this._pending.get(entry.key) === active) this._pending.delete(entry.key);
             if (this._activePage !== active) return;
 
             const pageRoot = active.pageEl.matches?.('.page')
@@ -185,9 +191,9 @@ class PluginExtensionHost {
 
         const ready = active.page && active.page.ready;
         if (entry.extension.deferUntilReady === true && ready && typeof ready.then === 'function') {
-            this._pending.add(entry.key);
+            this._pending.set(entry.key, active);
             ready.then(mount).catch((err) => {
-                this._pending.delete(entry.key);
+                if (this._pending.get(entry.key) === active) this._pending.delete(entry.key);
                 log.warn('Page readiness wait failed for extension:', entry.key, err);
             });
         } else {
