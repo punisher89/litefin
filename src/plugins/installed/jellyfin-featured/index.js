@@ -4,6 +4,8 @@
  * Reads the plugin's authenticated /featured/items endpoint and renders a
  * compact, D-pad friendly row inside Litefin's native Home page.
  */
+import './jellyfin-featured.css';
+
 const CACHE_TTL = 5 * 60 * 1000;
 
 function text(value) {
