@@ -10,6 +10,8 @@
 import { api } from '../../../api/index.js';
 import { seerr } from '../../../api/seerrClient.js';
 import { pluginManager } from '../../../plugins/PluginManager.js';
+import { AWESOME_JELLYFIN_CATALOG } from '../../../plugins/PluginCatalog.js';
+import '../../../plugins/plugin-catalog.css';
 import { focusManager } from '../../../ui/FocusManager.js';
 import { i18n } from '../../../utils/i18n.js';
 import { logger } from '../../../utils/Logger.js';
@@ -73,6 +75,30 @@ export class PluginsTab {
                 ? rows
                 : `<p class="settings-empty-state">${i18n.t('NoPlugins', ['No plugins installed.'])}</p>`;
 
+        const catalogCards = AWESOME_JELLYFIN_CATALOG.map((entry) => {
+            const installed = entry.adapterId ? plugins.find((plugin) => plugin.id === entry.adapterId) : null;
+            const clientState = installed
+                ? (installed.enabled ? 'Модуль Litefin включён' : 'Модуль Litefin отключён')
+                : (entry.status === 'native-reimplementation'
+                    ? 'Отдельные функции ещё требуют переноса в Litefin'
+                    : 'Клиентский адаптер и серверный плагин проверяются отдельно');
+            const statusClass = 'awesome-plugin-card__status--' + entry.status;
+            return `
+                <article class="awesome-plugin-card">
+                    <div class="awesome-plugin-card__top">
+                        <div>
+                            <h4 class="awesome-plugin-card__name">${entry.name}</h4>
+                            <span class="awesome-plugin-card__category">${entry.category}</span>
+                        </div>
+                        <span class="awesome-plugin-card__status ${statusClass}">${entry.statusLabel}</span>
+                    </div>
+                    <p class="awesome-plugin-card__summary">${entry.summary}</p>
+                    <a class="awesome-plugin-card__link" href="${entry.source}" target="_blank" rel="noopener noreferrer">Репозиторий проекта ↗</a>
+                    <span class="awesome-plugin-card__client-state">${clientState}</span>
+                </article>
+            `;
+        }).join('');
+
         return `
             <div class="settings-tab-content">
                 <div class="plugins-tab-header">
@@ -101,6 +127,10 @@ export class PluginsTab {
                         </span>
                     </div>
                 </div>
+
+                <h3 class="setting-section-title">Совместимость с приоритетными плагинами Awesome Jellyfin</h3>
+                <p class="content-subtitle">Здесь показана поддержка со стороны Litefin. Наличие серверного плагина само по себе не означает, что его интерфейс Jellyfin Web появится в TV-клиенте.</p>
+                <div class="awesome-plugin-catalog">${catalogCards}</div>
 
                 <h3 class="setting-section-title">${i18n.t('InstalledPlugins', ['Installed Plugins'])}</h3>
                 ${content}
