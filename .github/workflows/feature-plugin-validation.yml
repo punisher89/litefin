@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   webos-modern:
-    name: Tests, lint and webOS 6+ package
+    name: Tests, lint and webOS Normal package
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -52,13 +52,13 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
-      - name: Build webOS Modern package (webOS 6.0+)
-        run: npm run package:webos-modern
+      - name: Build webOS Normal package
+        run: npm run package:webos
 
       - name: Upload webOS package
         uses: actions/upload-artifact@v4
         with:
-          name: Litefin-webOS-Modern-${{ github.sha }}
-          path: Litefin-*-webOS-Modern.ipk
+          name: Litefin-webOS-Normal-${{ github.sha }}
+          path: Litefin-*-webOS-Normal.ipk
           if-no-files-found: error
           retention-days: 14
