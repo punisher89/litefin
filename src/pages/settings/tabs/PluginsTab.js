@@ -95,7 +95,7 @@ export class PluginsTab {
                         <span class="awesome-plugin-card__status ${statusClass}">${entry.statusLabel}</span>
                     </div>
                     <p class="awesome-plugin-card__summary">${entry.summary}</p>
-                    <a class="awesome-plugin-card__link" href="${entry.source}" target="_blank" rel="noopener noreferrer">Репозиторий проекта ↗</a>
+                    <a class="focusable awesome-plugin-card__link" tabindex="0" href="${entry.source}" target="_blank" rel="noopener noreferrer">Репозиторий проекта ↗</a>
                     <span class="awesome-plugin-card__client-state">${clientState}</span>
                 </article>
             `;
