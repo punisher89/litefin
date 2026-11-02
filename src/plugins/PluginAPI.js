@@ -112,6 +112,26 @@ class PluginAPI {
         return jellyfinApi.getItem(itemId, params);
     }
 
+    /**
+     * Build an authenticated Jellyfin image URL using the shared API client.
+     * @param {string} itemId
+     * @param {string} imageType
+     * @param {Object} params
+     * @returns {string}
+     */
+    getImageUrl(itemId, imageType = 'Primary', params = {}) {
+        return jellyfinApi.getImageUrl(itemId, imageType, params);
+    }
+
+    /**
+     * Open a media item's native Litefin details page.
+     * @param {string} itemId
+     */
+    openItem(itemId) {
+        if (!itemId || typeof window === 'undefined') return;
+        window.location.hash = '#/details/' + encodeURIComponent(itemId);
+    }
+
     // ========================================================================
     // Player Access
     // ========================================================================
