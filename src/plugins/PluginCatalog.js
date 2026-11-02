@@ -37,22 +37,22 @@ export const AWESOME_JELLYFIN_CATALOG = Object.freeze([
     },
     {
         id: 'jellyfin-featured',
-        adapterId: null,
+        adapterId: 'jellyfin-featured',
         name: 'Jellyfin Featured',
         category: 'Избранное на главной',
-        status: 'native-reimplementation',
-        statusLabel: 'Нужен перенос функций',
-        summary: 'Litefin имеет собственный Hero Carousel и строки контента. Настройки и frontend-инъекция Jellyfin Featured не импортируются автоматически.',
+        status: 'native-adapter',
+        statusLabel: 'Нативная интеграция',
+        summary: 'Получает настроенную и персонализированную подборку через /featured/items и отображает её отдельным D-pad-совместимым блоком на главной Litefin. Веб-инъекция не используется.',
         source: 'https://github.com/spkesDE/jellyfin-featured-plugin'
     },
     {
         id: 'jellyfin-enhanced',
-        adapterId: null,
+        adapterId: 'jellyfin-enhanced',
         name: 'Jellyfin Enhanced',
         category: 'Улучшения интерфейса',
-        status: 'native-reimplementation',
-        statusLabel: 'Нужен перенос функций',
-        summary: 'Скрипты Jellyfin Web нельзя без изменений запустить в нативном интерфейсе Litefin. Отдельные возможности потребуется переносить в страницы и API Litefin.',
+        status: 'native-adapter',
+        statusLabel: 'Первая функция перенесена',
+        summary: 'Первый нативный модуль показывает разрешение, HDR и аудиоформат на странице фильма. Остальные функции Jellyfin Enhanced требуют отдельных переносов.',
         source: 'https://github.com/n00bcodr/Jellyfin-Enhanced'
     }
 ]);
