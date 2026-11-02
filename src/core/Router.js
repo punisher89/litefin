@@ -311,7 +311,10 @@ class Router {
                     const prevPageId = this._currentPage._routePattern
                         ? this._currentPage._routePattern.split('/')[1]
                         : 'unknown';
-                    pluginManager.notifyPageUnload(prevPageId);
+                    pluginManager.notifyPageUnload(
+                        prevPageId,
+                        this._currentPage.el || document.getElementById('page-container')
+                    );
                     this._currentPage.destroy();
                 }
 
@@ -360,7 +363,11 @@ class Router {
                 }
 
                 const pageId = route.pattern.split('/')[1] || 'unknown';
-                pluginManager.notifyPageLoad(pageId, this._currentPage.el || document.getElementById('page-container'));
+                pluginManager.notifyPageLoad(
+                    pageId,
+                    this._currentPage.el || document.getElementById('page-container'),
+                    this._currentPage
+                );
 
                 // Update state
                 state.set('router:currentPath', fullPath);
