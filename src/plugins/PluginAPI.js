@@ -24,6 +24,7 @@ import { storage } from '../utils/StorageService.js';
 import { i18n } from '../utils/i18n.js';
 import { serverPluginClient } from './ServerPluginClient.js';
 import { playQueue } from '../core/PlayQueue.js';
+import { state } from '../core/StateManager.js';
 import { api as jellyfinApi } from '../api/ApiClient.js';
 
 // ============================================================================
@@ -49,6 +50,8 @@ class PluginAPI {
         this._toast = refs.toast || null;
         this._getPlayer = refs.getPlayer || (() => null);
         this._getCurrentItem = refs.getCurrentItem || (() => null);
+        this._extensionHost = refs.extensionHost || null;
+        this._extensionDisposers = new Set();
 
         // Namespaced logger for this plugin
         this.log = logger.create(`Plugin:${pluginId}`);
@@ -129,6 +132,73 @@ class PluginAPI {
      */
     getCurrentItem() {
         return this._getCurrentItem();
+    }
+
+    /**
+     * Return the signed-in Jellyfin user record without exposing credentials.
+     * @returns {Object|null}
+     */
+    getCurrentUser() {
+        return state.get('user:data') || null;
+    }
+
+    /**
+     * Return the signed-in Jellyfin user ID, if available.
+     * @returns {string|null}
+     */
+    getCurrentUserId() {
+        const user = this.getCurrentUser();
+        const id = user && (user.Id || user.id);
+        return id ? String(id) : null;
+    }
+
+    // ========================================================================
+    // Universal native UI extension API
+    // ========================================================================
+
+    /**
+     * Register native Litefin UI in a documented page slot.
+     * @param {string} slot - Supported native slot ID
+     * @param {Object} extension - { id, render(context, api), order?, focusOptions? }
+     * @returns {Function|null} Disposer
+     */
+    registerExtension(slot, extension) {
+        if (!this._extensionHost) {
+            this.log.warn('registerExtension called but ExtensionHost is unavailable');
+            return null;
+        }
+        const dispose = this._extensionHost.register(this._pluginId, slot, extension, this);
+        if (typeof dispose !== 'function') return null;
+        this._extensionDisposers.add(dispose);
+        return () => {
+            if (!this._extensionDisposers.has(dispose)) return;
+            this._extensionDisposers.delete(dispose);
+            dispose();
+        };
+    }
+
+    addHomeWidget(extension) {
+        return this.registerExtension('home:widgets', extension);
+    }
+
+    addFeaturedWidget(extension) {
+        return this.registerExtension('home:featured', extension);
+    }
+
+    addDetailsWidget(extension) {
+        return this.registerExtension('details:content', extension);
+    }
+
+    addPersonWidget(extension) {
+        return this.registerExtension('person:profile', extension);
+    }
+
+    /** @internal Clear mounted page UI while keeping this API reusable. */
+    _clearExtensions() {
+        for (const dispose of Array.from(this._extensionDisposers)) {
+            try { dispose(); } catch (err) { this.log.warn('Extension cleanup failed:', err); }
+        }
+        this._extensionDisposers.clear();
     }
 
     // ========================================================================
@@ -322,6 +392,9 @@ class PluginAPI {
      * @internal
      */
     _destroy() {
+        // Remove page extensions before subscriptions and widgets are released
+        this._clearExtensions();
+
         // Unsubscribe from all EventBus events
         for (const unsub of this._subscriptions) {
             if (typeof unsub === 'function') unsub();
