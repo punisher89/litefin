@@ -19,7 +19,7 @@ export const AWESOME_JELLYFIN_CATALOG = Object.freeze([
   summary:'Блок известных работ и ролей в нативном профиле актёра Litefin.',source:'https://github.com/Druidblack/Jellyfin.Plugin.ActorPlus',
   settings:[{key:'showRoles',label:'Показывать список ролей',type:'toggle',default:'true'},{key:'worksCount',label:'Количество известных работ',type:'select',default:'3',options:[['3','3'],['5','5'],['8','8']]}]},
  {id:'jellyfin-featured',adapterId:'jellyfin-featured',name:'Jellyfin Featured',category:'Избранное на главной',status:'native-adapter',statusLabel:'Нативная интеграция',
-  summary:'Персонализированная подборка /featured/items в собственной карусели Litefin.',source:'https://github.com/spkesDE/jellyfin-featured-plugin',
+  summary:'Персонализированная подборка /featured/items в собственной карусели Litefin. Для этой интеграции требуется серверный ABI 12.2.0.0.',source:'https://github.com/spkesDE/jellyfin-featured-plugin',
   settings:[{key:'itemLimit',label:'Количество карточек',type:'select',default:'8',options:[['4','4'],['6','6'],['8','8'],['10','10']]},{key:'showMetadata',label:'Показывать год и рейтинги',type:'toggle',default:'true'}]},
  {id:'jellyfin-enhanced',adapterId:'jellyfin-enhanced',name:'Jellyfin Enhanced',category:'Улучшения интерфейса',status:'native-adapter',statusLabel:'Частичная нативная адаптация',
   summary:'Формат видео и звука: разрешение, HDR, видеокодек и аудиоформат.',source:'https://github.com/n00bcodr/Jellyfin-Enhanced',
