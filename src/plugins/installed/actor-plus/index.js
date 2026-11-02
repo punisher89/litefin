@@ -1,3 +1,5 @@
+import './actor-plus.css';
+
 /**
  * Native Litefin adaptation of ActorPlus-style actor profile highlights.
  * The original plugin injects hover UI into Jellyfin Web; this adapter adds a
@@ -45,10 +47,6 @@ export default {
             id: 'known-for',
             name: 'Известные работы',
             order: 10,
-            focusOptions: {
-                orientation: 'vertical',
-                leaveLeft: 'sidebar'
-            },
             render: () => {
                 const root = document.createElement('section');
                 root.className = 'actor-profile-highlights';
