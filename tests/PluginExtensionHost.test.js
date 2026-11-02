@@ -11,6 +11,22 @@ globalThis.localStorage = {
 const { default: PluginExtensionHost, PLUGIN_EXTENSION_SLOTS } =
     await import('../src/plugins/PluginExtensionHost.js');
 
+function createDeferred() {
+    let resolve;
+    const promise = new Promise((done) => {
+        resolve = done;
+    });
+    return { promise, resolve };
+}
+
+function createPageElement() {
+    const target = {};
+    return {
+        isConnected: true,
+        querySelector: (selector) => selector === '.page' ? null : target
+    };
+}
+
 test('native extension slots map only to known Litefin pages', () => {
     assert.equal(PLUGIN_EXTENSION_SLOTS['home:widgets'].page, 'home');
     assert.equal(PLUGIN_EXTENSION_SLOTS['home:featured'].page, 'home');
@@ -68,5 +84,71 @@ test('unsupported slots and duplicate extension IDs are rejected', () => {
     assert.equal(duplicate, null);
 
     dispose();
+    host.destroy();
+});
+
+test('disposing an extension cancels its deferred mount', async () => {
+    const host = new PluginExtensionHost();
+    const ready = createDeferred();
+    const pageEl = createPageElement();
+    let renderCalls = 0;
+
+    const dispose = host.register('sample', 'home:widgets', {
+        id: 'deferred',
+        deferUntilReady: true,
+        render: () => {
+            renderCalls += 1;
+            return null;
+        }
+    }, {});
+
+    host.mountPage('home', pageEl, { ready });
+    dispose();
+    ready.resolve();
+    await ready.promise;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(renderCalls, 0, 'a disposed extension must never render later');
+    assert.deepEqual(host.getExtensions(), []);
+    host.destroy();
+});
+
+test('an old deferred callback cannot cancel a replacement with the same extension ID', async () => {
+    const host = new PluginExtensionHost();
+    const ready = createDeferred();
+    const pageEl = createPageElement();
+    let oldRenderCalls = 0;
+    let newRenderCalls = 0;
+
+    const disposeOld = host.register('sample', 'home:widgets', {
+        id: 'replaceable',
+        deferUntilReady: true,
+        render: () => {
+            oldRenderCalls += 1;
+            return null;
+        }
+    }, {});
+
+    host.mountPage('home', pageEl, { ready });
+    disposeOld();
+
+    const disposeNew = host.register('sample', 'home:widgets', {
+        id: 'replaceable',
+        deferUntilReady: true,
+        render: () => {
+            newRenderCalls += 1;
+            return null;
+        }
+    }, {});
+
+    ready.resolve();
+    await ready.promise;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(oldRenderCalls, 0, 'the replaced extension must stay disposed');
+    assert.equal(newRenderCalls, 1, 'the current registration must mount exactly once');
+    assert.deepEqual(host.getExtensions().map((entry) => entry.id), ['replaceable']);
+
+    disposeNew();
     host.destroy();
 });
