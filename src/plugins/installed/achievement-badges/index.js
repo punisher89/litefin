@@ -31,6 +31,7 @@ export default {
     _data: { equipped: [], recent: [] },
     _lastFetched: 0,
     _loading: null,
+    _dataScopeKey: null,
     _mountedWrapper: null,
 
     init(api) {
@@ -58,24 +59,47 @@ export default {
         api.log.info('Achievement Badges native widget registered');
     },
 
+    _getScopeKey(api) {
+        const userId = api.getCurrentUserId();
+        if (!userId) return null;
+        return String(api.serverUrl || '') + '|' + String(userId);
+    },
+
     async _refresh(api) {
-        if (this._loading) return this._loading;
+        const userId = api.getCurrentUserId();
+        const scopeKey = this._getScopeKey(api);
+        if (!userId || !scopeKey) return null;
+
+        if (this._loading && this._loading.scopeKey === scopeKey) {
+            return this._loading.promise;
+        }
+
+        if (this._dataScopeKey !== scopeKey) {
+            // Never show another profile's badges while the new profile loads.
+            this._data = { equipped: [], recent: [] };
+            this._dataScopeKey = scopeKey;
+            this._lastFetched = 0;
+            this._updateHomeWidget();
+        }
+
         if (Date.now() - this._lastFetched < CACHE_TTL) {
             this._updateHomeWidget();
             return this._data;
         }
 
-        const userId = api.getCurrentUserId();
-        if (!userId) return null;
-
         const userPath = '/Plugins/AchievementBadges/users/' + encodeURIComponent(userId);
-        this._loading = (async () => {
+        const request = { scopeKey, promise: null };
+        request.promise = (async () => {
             try {
                 const lang = String(i18n.currentLang || 'en').toLowerCase();
                 const responses = await Promise.all([
                     api.serverPlugins.call(userPath + '/equipped?lang=' + encodeURIComponent(lang)),
                     api.serverPlugins.call(userPath + '/recent-unlocks?limit=3')
                 ]);
+
+                // Ignore a late response after a profile/server switch or plugin restart.
+                if (this._loading !== request || this._getScopeKey(api) !== scopeKey) return null;
+
                 this._data = {
                     equipped: asArray(responses[0]),
                     recent: asArray(responses[1])
@@ -84,13 +108,16 @@ export default {
                 this._updateHomeWidget();
                 return this._data;
             } catch (err) {
-                api.log.warn('Achievement Badges data request failed:', err && err.message);
+                if (this._loading === request && this._getScopeKey(api) === scopeKey) {
+                    api.log.warn('Achievement Badges data request failed:', err && err.message);
+                }
                 return null;
             } finally {
-                this._loading = null;
+                if (this._loading === request) this._loading = null;
             }
         })();
-        return this._loading;
+        this._loading = request;
+        return request.promise;
     },
 
     _createHomeWidget() {
