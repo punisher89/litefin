@@ -145,7 +145,7 @@ export default {
             const metadata = [];
             const productionYear = item.ProductionYear || item.productionYear;
             const officialRating = item.OfficialRating || item.officialRating || item.official_rating;
-            const communityRating = item.CommunityRating ?? item.communityRating;
+            const communityRating = item.CommunityRating ?? item.communityRating ?? item.community_rating;
             if (productionYear) metadata.push(text(productionYear));
             if (officialRating) metadata.push(text(officialRating));
             if (communityRating != null) {
