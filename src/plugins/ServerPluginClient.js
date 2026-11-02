@@ -323,7 +323,7 @@ class ServerPluginClient {
             'local-intros': ['local intros', 'localintros'],
             'mdblist-ratings': ['mdblist', 'mdb list', 'mdblist ratings'],
             'achievement-badges': ['achievement badges', 'achievementbadges'],
-            'jellyfin-featured': ['jellyfin featured', 'featured'],
+            'jellyfin-featured': ['jellyfin featured'],
             litefin: ['litefin']
         };
 
