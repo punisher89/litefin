@@ -2,10 +2,10 @@
  * ============================================================================
  * Litefin Tizen - PluginAPI
  * ============================================================================
- * The sandboxed API surface that each plugin receives via its init() call.
- * Plugins should ONLY interact with the app through this object — never
- * import internal modules directly. This keeps plugins isolated and lets us
- * change internals without breaking plugins.
+ * The compatibility API surface that each plugin receives via init().
+ * Plugins should interact with Litefin through this object rather than
+ * importing internal modules. This stabilizes the extension contract but
+ * does not isolate plugin JavaScript from the application origin.
  *
  * Each plugin instance gets its own PluginAPI, namespaced by its plugin ID.
  *
