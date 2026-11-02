@@ -655,6 +655,7 @@ class PersonPage extends Page {
                 });
                 this._applyRolesToCards();
                 log.debug(`Applied ${this._roleMap.size} character roles from plugin single-pass response`);
+                eventBus.emit('person:roles-loaded', { page: this });
                 return;
             }
 
@@ -677,6 +678,7 @@ class PersonPage extends Page {
             this._applyRolesToCards();
 
             log.debug(`Added ${this._roleMap.size} character roles via fallback request`);
+            eventBus.emit('person:roles-loaded', { page: this });
         } catch (error) {
             log.warn('Could not load character roles', error);
         }
