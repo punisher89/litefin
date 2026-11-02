@@ -1372,7 +1372,8 @@ class App {
                             api,
                             focusManager,
                             toast: null, // Toast component reference wired up once UI is ready
-                            getCurrentPage: () => router._currentPage
+                            getCurrentPage: () => router._currentPage,
+                            navigate: (path) => router.navigate(path)
                         })
                         .catch((err) => log.error('pluginManager.init failed:', err));
                 }
@@ -1743,7 +1744,8 @@ class App {
                     api,
                     focusManager,
                     toast: null, // Toast wired up once UI is ready
-                    getCurrentPage: () => router._currentPage
+                    getCurrentPage: () => router._currentPage,
+                    navigate: (path) => router.navigate(path)
                 })
                 .catch((err) => log.error('pluginManager.init (post-login) failed:', err));
         });
