@@ -130,7 +130,7 @@ test('an old deferred callback cannot cancel a replacement with the same extensi
         }
     }, {});
 
-    host.mountPage('home', pageEl, { ready });
+    host.mountPage('home', pageEl, { ready: ready.promise });
     disposeOld();
 
     const disposeNew = host.register('sample', 'home:widgets', {
