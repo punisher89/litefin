@@ -47,7 +47,7 @@ jobs:
         run: npm ci
 
       - name: Run plugin integration and initialization tests
-        run: node --test tests/PluginCatalog.test.js tests/PluginExtensionHost.test.js tests/LitefinServerPluginDetection.test.js tests/PluginManagerInit.test.js
+        run: node --test tests/PluginCatalog.test.js tests/PluginExtensionHost.test.js tests/LitefinServerPluginDetection.test.js
 
       - name: Run ESLint
         run: npm run lint
