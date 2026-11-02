@@ -113,6 +113,7 @@ class PluginManager {
 
         // Native Home, Details, and Person page extension slots
         this._extensionHost = new PluginExtensionHost();
+        this._lastPageContext = null;
 
         // Current player reference (valid during playback only)
         this._currentPlayer = null;
@@ -166,7 +167,7 @@ class PluginManager {
                 ? currentPage._routePattern.split('/')[1] || 'unknown'
                 : 'unknown';
             const pageEl = currentPage.el || document.getElementById('page-container');
-            this._extensionHost.mountPage(pageId, pageEl, currentPage);
+            this.notifyPageLoad(pageId, pageEl, currentPage);
         }
 
         this._initialized = true;
@@ -362,13 +363,17 @@ class PluginManager {
      * @param {HTMLElement} pageEl - The page's root DOM element
      */
     notifyPageLoad(pageId, pageEl, page) {
+        this._lastPageContext = { pageId, pageEl, page };
         this._extensionHost.mountPage(pageId, pageEl, page);
         for (const [id, entry] of this._plugins) {
             if (!entry.enabled) continue;
+            if (entry._lastNotifiedPageId === pageId && entry._lastNotifiedPageEl === pageEl) continue;
             try {
                 if (typeof entry.plugin.onPageLoad === 'function') {
                     entry.plugin.onPageLoad(pageId, pageEl, entry.api);
                 }
+                entry._lastNotifiedPageId = pageId;
+                entry._lastNotifiedPageEl = pageEl;
             } catch (err) {
                 log.error(`Plugin '${id}' onPageLoad() threw:`, err);
             }
@@ -382,12 +387,18 @@ class PluginManager {
      */
     notifyPageUnload(pageId, pageEl) {
         this._extensionHost.unmountPage(pageEl);
+        if (this._lastPageContext && this._lastPageContext.pageEl === pageEl) {
+            this._lastPageContext = null;
+        }
         for (const [id, entry] of this._plugins) {
             if (!entry.enabled) continue;
+            if (entry._lastNotifiedPageId !== pageId || entry._lastNotifiedPageEl !== pageEl) continue;
             try {
                 if (typeof entry.plugin.onPageUnload === 'function') {
                     entry.plugin.onPageUnload(pageId, entry.api);
                 }
+                entry._lastNotifiedPageId = null;
+                entry._lastNotifiedPageEl = null;
             } catch (err) {
                 log.error(`Plugin '${id}' onPageUnload() threw:`, err);
             }
