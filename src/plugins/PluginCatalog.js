@@ -23,7 +23,7 @@ export const AWESOME_JELLYFIN_CATALOG = Object.freeze([
         status: 'supported',
         statusLabel: 'Уже поддерживается',
         summary: 'Существующий адаптер Litefin получает рейтинги, награды и дополнительные метки из MDBList Server Plugin.',
-        source: 'https://github.com/jellyfin/jellyfin-plugin-mdblist-ratings'
+        source: 'https://github.com/Druidblack/Jellyfin.Plugin.MDBList_Ratings'
     },
     {
         id: 'actor-plus',
