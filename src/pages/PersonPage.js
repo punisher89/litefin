@@ -216,6 +216,7 @@ class PersonPage extends Page {
                 // 4b. Movies/Shows/Episodes — fetch all items first
                 const result = await api.getPersonItems(this._personId);
                 this._items = result.Items || [];
+                eventBus.emit('person:loaded', { page: this, person: this._person });
                 log.debug('Loaded items', {
                     total: this._items.length,
                     movies: this._items.filter((i) => i.Type === 'Movie').length,
