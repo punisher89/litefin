@@ -1,3 +1,7 @@
+.enhanced-media-format[hidden] {
+    display: none;
+}
+
 .enhanced-media-format {
     display: flex;
     flex-direction: column;
