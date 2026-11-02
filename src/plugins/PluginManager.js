@@ -156,9 +156,9 @@ class PluginManager {
         // Load all bundled plugins concurrently
         await Promise.all(BUNDLED_PLUGINS.map((entry) => this._loadPlugin(entry)));
 
-        // The manager is initialized after the first page is sometimes mounted
-        // (deferred boot after splash / profile selection). Mount newly registered
-        // extensions into that existing page without replaying plugin page hooks.
+        // The manager may initialize after the initial page has mounted
+        // (deferred boot after splash / profile selection). Replay its page-load
+        // hooks once so integrations such as MDBList can populate that page.
         const currentPage = typeof this._deps.getCurrentPage === 'function'
             ? this._deps.getCurrentPage()
             : null;
