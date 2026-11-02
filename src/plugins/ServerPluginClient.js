@@ -79,6 +79,20 @@ const KNOWN_PROBES = {
         dataEndpoint: (itemId) => `/Plugins/MdbListRatings/CachedByItemId?itemId=${itemId}`
     },
 
+    // Achievement Badges: authenticated per-user API, does not require a media item.
+    'achievement-badges': {
+        probeWithoutItem: true,
+        probeEndpoint: () => {
+            const user = state.get('user:data');
+            const userId = user && (user.Id || user.id);
+            return userId
+                ? '/Plugins/AchievementBadges/users/' + encodeURIComponent(userId) + '/recent-unlocks?limit=1'
+                : null;
+        },
+        dataEndpoint: (userId) => '/Plugins/AchievementBadges/users/' +
+            encodeURIComponent(userId) + '/recent-unlocks?limit=1'
+    },
+
     // Litefin Companion Server Plugin
     litefin: {
         probeEndpoint: () => `/Litefin/Hero?limit=1`,
@@ -301,6 +315,7 @@ class ServerPluginClient {
             'open-subtitles': ['open subtitles', 'opensubtitles'],
             'local-intros': ['local intros', 'localintros'],
             'mdblist-ratings': ['mdblist', 'mdb list', 'mdblist ratings'],
+            'achievement-badges': ['achievement badges', 'achievementbadges'],
             litefin: ['litefin']
         };
 
@@ -348,12 +363,15 @@ class ServerPluginClient {
         // Some probes need an item — if not provided, we can't probe yet.
         // Return deferred:true so PluginManager enables the plugin tentatively
         // and re-checks at playback time (when we have a real item).
-        if (!item) {
+        if (!item && probe.probeWithoutItem !== true) {
             log.debug(`Plugin '${pluginId}' probe requires an item — deferring until playback`);
             return { available: false, deferred: true, data: null };
         }
 
-        const endpoint = probe.probeEndpoint(item);
+        const endpoint = probe.probeEndpoint(item || null);
+        if (!endpoint) {
+            return { available: false, deferred: true, data: null };
+        }
         if (!endpoint) {
             // Cannot probe with this item, defer
             return { available: false, deferred: true, data: null };
