@@ -133,3 +133,43 @@ test('ServerPluginClient & ApiClient: disabled plugin in server registry is trea
     const isIntroSkipperActive = serverPluginClient._checkInAdminList('intro-skipper', mockAdminList);
     assert.equal(isIntroSkipperActive.available, true, 'Active Intro Skipper plugin should be considered active');
 });
+
+test('ServerPluginClient: detects Achievement Badges and Jellyfin Featured without a media item', async () => {
+    const { serverPluginClient } = await import('../src/plugins/ServerPluginClient.js');
+    const { state } = await import('../src/core/StateManager.js');
+    const requestedUrls = [];
+
+    state.set('user:data', { Id: 'user-123', Name: 'TV User' });
+    serverPluginClient.init({
+        get: async (endpoint) => {
+            requestedUrls.push(endpoint);
+            return [];
+        }
+    });
+
+    const achievements = await serverPluginClient._probeEndpoint('achievement-badges', null);
+    const featured = await serverPluginClient._probeEndpoint('jellyfin-featured', null);
+
+    assert.equal(achievements.available, true);
+    assert.equal(featured.available, true);
+    assert.deepEqual(requestedUrls, [
+        '/Plugins/AchievementBadges/users/user-123/recent-unlocks?limit=1',
+        '/featured/items'
+    ]);
+
+    serverPluginClient.reset();
+    state.set('user:data', null);
+});
+
+test('ServerPluginClient: maps priority plugin names in the admin plugin list', async () => {
+    const { serverPluginClient } = await import('../src/plugins/ServerPluginClient.js');
+    const adminList = [
+        { Name: 'Achievement Badges', Status: 'Active' },
+        { Name: 'Jellyfin Featured', Status: 'Active' },
+        { Name: 'MDBList Ratings', Status: 'Active' }
+    ];
+
+    assert.equal(serverPluginClient._checkInAdminList('achievement-badges', adminList).available, true);
+    assert.equal(serverPluginClient._checkInAdminList('jellyfin-featured', adminList).available, true);
+    assert.equal(serverPluginClient._checkInAdminList('mdblist-ratings', adminList).available, true);
+});
