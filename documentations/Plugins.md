@@ -9,6 +9,8 @@ The plugin system is built around three main components:
 1.  **PluginManager** (`src/plugins/PluginManager.js`): The central hub that loads bundled plugins, manages their lifecycle (init/enable/disable/destroy), and broadcasts app events.
 2.  **PluginAPI** (`src/plugins/PluginAPI.js`): A stable compatibility facade provided to each plugin. It is not a security sandbox; bundled plugin code still runs in the app origin.
 3.  **ServerPluginClient** (`src/plugins/ServerPluginClient.js`): A specialized client that detects and communicates with server-side Jellyfin plugins (like Intro Skipper) via hybrid detection strategy (admin `/Plugins` query + endpoint probing for non-admin users).
+4.  **PluginExtensionHost** (`src/plugins/PluginExtensionHost.js`): Mounts native plugin widgets into documented Home, Details, and Person page slots, and owns D-pad focus / teardown lifecycle.
+5.  **PluginCatalog** (`src/plugins/PluginCatalog.js`): Curated Awesome Jellyfin compatibility registry. It distinguishes native adapters from Web-only plugins that need individual ports.
 
 ## Bundled Plugins
 
@@ -20,7 +22,7 @@ Litefin currently registers 8 bundled plugins in `PluginManager.js`:
 | `syncplay`        | Real-time synchronized group playback via WebSockets                                              |
 | `local-intros`    | Play custom local video files before media content                                                |
 | `mdblist-ratings` | Fetch and display IMDb, Rotten Tomatoes, Metacritic, Trakt, TMDB, and Letterboxd ratings on cards |
-| `achievement-badges` | Read-only native Home and Player integration for equipped and recent Achievement Badges |
+| `achievement-badges` | Read-only native Home integration for equipped and recently unlocked badges |
 | `actor-plus` | Native, D-pad-friendly actor profile highlights on Litefin's Person page |
 | `jellyfin-featured` | Reads `/featured/items` and renders the configured, personalized feed in a native Home widget |
 | `jellyfin-enhanced` | Native first subset: resolution, HDR, and audio-format chips on movie detail pages |
