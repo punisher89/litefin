@@ -78,9 +78,16 @@ export default {
 
                 // PersonPage loads its metadata and filmography asynchronously.
                 // This event updates the already-mounted widget without polling.
-                return extensionApi.on('person:loaded', (payload) => {
+                const unsubscribeLoaded = extensionApi.on('person:loaded', (payload) => {
                     if (payload && payload.page === context.page) update();
                 });
+                const unsubscribeRoles = extensionApi.on('person:roles-loaded', (payload) => {
+                    if (payload && payload.page === context.page) update();
+                });
+                return () => {
+                    unsubscribeLoaded();
+                    unsubscribeRoles();
+                };
             }
         });
     }
