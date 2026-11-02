@@ -180,6 +180,7 @@ Widget descriptor fields:
 - `focusOptions` (optional): FocusManager options; the host unregisters them on unmount.
 - `onMount(wrapper, context, api)` / `onUnmount(wrapper, context, api)` (optional): lifecycle callbacks.
 - `deferUntilReady` (optional): wait for the page's `ready` promise before calling render.
+- `details:media-source-changed`: page event emitted when a user selects another media version; the payload contains the affected `page` and `mediaSourceId`.
 
 Example:
 
