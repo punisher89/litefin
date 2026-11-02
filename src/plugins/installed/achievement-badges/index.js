@@ -6,6 +6,7 @@
  */
 
 import './achievement-badges.css';
+import { i18n } from '../../../utils/i18n.js';
 
 const CACHE_TTL = 2 * 60 * 1000;
 
@@ -70,8 +71,9 @@ export default {
         const userPath = '/Plugins/AchievementBadges/users/' + encodeURIComponent(userId);
         this._loading = (async () => {
             try {
+                const lang = String(i18n.currentLang || 'en').toLowerCase();
                 const responses = await Promise.all([
-                    api.serverPlugins.call(userPath + '/equipped'),
+                    api.serverPlugins.call(userPath + '/equipped?lang=' + encodeURIComponent(lang)),
                     api.serverPlugins.call(userPath + '/recent-unlocks?limit=3')
                 ]);
                 this._data = {
@@ -106,18 +108,24 @@ export default {
         const badges = document.createElement('div');
         badges.className = 'achievement-summary-widget__badges';
 
+        const details = document.createElement('p');
+        details.className = 'achievement-summary-widget__details';
+        details.hidden = true;
+
         const action = document.createElement('button');
         action.type = 'button';
         action.className = 'focusable achievement-summary-widget__action';
         action.tabIndex = 0;
-        action.textContent = 'Показать сводку';
+        action.textContent = 'Показать список значков';
         action.addEventListener('click', () => {
-            this.api.showToast(this._formatSummary(), 5000);
+            details.hidden = !details.hidden;
+            action.textContent = details.hidden ? 'Показать список значков' : 'Скрыть список значков';
         });
 
         root.appendChild(heading);
         root.appendChild(summary);
         root.appendChild(badges);
+        root.appendChild(details);
         root.appendChild(action);
         return root;
     },
@@ -128,6 +136,7 @@ export default {
 
         const summary = wrapper.querySelector('.achievement-summary-widget__summary');
         const badges = wrapper.querySelector('.achievement-summary-widget__badges');
+        const details = wrapper.querySelector('.achievement-summary-widget__details');
         if (!summary || !badges) return;
 
         const equipped = this._data.equipped || [];
@@ -151,32 +160,12 @@ export default {
             chip.textContent = badgeTitle(badge);
             badges.appendChild(chip);
         });
-    },
 
-    _formatSummary() {
-        const equipped = this._data.equipped || [];
-        const recent = this._data.recent || [];
-        const names = recent.slice(0, 3).map(badgeTitle);
-        return 'Экипировано значков: ' + equipped.length +
-            '. Недавние открытия: ' + (names.length ? names.join(', ') : 'нет');
-    },
-
-    onPlayerStart(item, api) {
-        if (Date.now() - this._lastFetched > CACHE_TTL) void this._refresh(api);
-
-        api.addOSDWidget({
-            id: 'achievement-summary',
-            render: () => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'osd-button achievement-summary-osd';
-                button.tabIndex = 0;
-                button.textContent = '🏆 ' + ((this._data.recent || []).length);
-                return button;
-            },
-            shouldShow: () => (this._data.recent || []).length > 0,
-            onSelect: () => api.showToast(this._formatSummary(), 5000)
-        });
+        if (details) {
+            const allBadges = equipped.concat(recent);
+            const names = allBadges.map(badgeTitle);
+            details.textContent = names.length ? names.join(' · ') : 'Значков пока нет';
+        }
     },
 
     destroy() {
