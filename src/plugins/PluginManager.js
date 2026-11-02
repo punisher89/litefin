@@ -147,6 +147,20 @@ class PluginManager {
         // Load all bundled plugins concurrently
         await Promise.all(BUNDLED_PLUGINS.map((entry) => this._loadPlugin(entry)));
 
+        // The manager is initialized after the first page is sometimes mounted
+        // (deferred boot after splash / profile selection). Mount newly registered
+        // extensions into that existing page without replaying plugin page hooks.
+        const currentPage = typeof this._deps.getCurrentPage === 'function'
+            ? this._deps.getCurrentPage()
+            : null;
+        if (currentPage) {
+            const pageId = currentPage._routePattern
+                ? currentPage._routePattern.split('/')[1] || 'unknown'
+                : 'unknown';
+            const pageEl = currentPage.el || document.getElementById('page-container');
+            this._extensionHost.mountPage(pageId, pageEl, currentPage);
+        }
+
         this._initialized = true;
         log.info(`Plugin system ready. ${this._plugins.size} plugin(s) active.`);
     }
