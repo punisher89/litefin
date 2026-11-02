@@ -133,6 +133,15 @@ class PluginAPI {
         this._navigate('/details/' + encodeURIComponent(itemId));
     }
 
+    /**
+     * Navigate to an application-relative Litefin route.
+     * @param {string} path
+     */
+    navigate(path) {
+        if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return;
+        this._navigate(path);
+    }
+
     // ========================================================================
     // Player Access
     // ========================================================================

@@ -28,6 +28,7 @@ export default {
 
     init(api) {
         this.api = api;
+        this.settings = api.getStorage();
         this._wrapper = null;
 
         api.addFeaturedWidget({
@@ -138,7 +139,9 @@ export default {
         }
 
         status.textContent = '';
-        this._items.slice(0, 8).forEach((item) => {
+        const itemLimit = Math.max(1, Math.min(16, Number(this.settings && this.settings.get('itemLimit')) || 8));
+        const showMetadata = !this.settings || this.settings.get('showMetadata') !== 'false';
+        this._items.slice(0, itemLimit).forEach((item) => {
             const itemId = item && (item.Id || item.id);
             if (!itemId) return;
 
@@ -173,9 +176,9 @@ export default {
             const productionYear = item.ProductionYear || item.productionYear;
             const officialRating = item.OfficialRating || item.officialRating || item.official_rating;
             const communityRating = item.CommunityRating ?? item.communityRating ?? item.community_rating;
-            if (productionYear) metadata.push(text(productionYear));
-            if (officialRating) metadata.push(text(officialRating));
-            if (communityRating != null) {
+            if (showMetadata && productionYear) metadata.push(text(productionYear));
+            if (showMetadata && officialRating) metadata.push(text(officialRating));
+            if (showMetadata && communityRating != null) {
                 metadata.push('★ ' + Number(communityRating).toFixed(1));
             }
             if (metadata.length) {

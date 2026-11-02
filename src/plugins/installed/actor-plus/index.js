@@ -6,7 +6,7 @@ import './actor-plus.css';
  * D-pad friendly summary to Litefin's own Person page.
  */
 
-function renderPersonSummary(root, page) {
+function renderPersonSummary(root, page, settings) {
     const person = page && page._person;
     const summary = root.querySelector('.actor-profile-highlights__summary');
     const rolesEl = root.querySelector('.actor-profile-highlights__roles');
@@ -18,7 +18,9 @@ function renderPersonSummary(root, page) {
 
     const works = Array.isArray(page._items) ? page._items : [];
     const roleMap = page._roleMap instanceof Map ? page._roleMap : new Map();
-    const roles = Array.from(new Set(Array.from(roleMap.values()).filter(Boolean))).slice(0, 4);
+    const showRoles = !settings || settings.get('showRoles') !== 'false';
+    const roles = showRoles ? Array.from(new Set(Array.from(roleMap.values()).filter(Boolean))).slice(0, 4) : [];
+    const worksCount = Math.max(1, Math.min(10, Number(settings && settings.get('worksCount')) || 3));
 
     if (summary) summary.textContent = 'В фильмографии: ' + works.length + ' проектов';
     if (rolesEl) {
@@ -27,7 +29,7 @@ function renderPersonSummary(root, page) {
     }
     if (worksEl) {
         worksEl.textContent = '';
-        works.slice(0, 3).forEach((work) => {
+        works.slice(0, worksCount).forEach((work) => {
             const label = document.createElement('span');
             label.textContent = String(work.Name || work.name || '');
             if (label.textContent) worksEl.appendChild(label);
@@ -73,7 +75,8 @@ export default {
             },
             onMount: (wrapper, context, extensionApi) => {
                 const root = wrapper.querySelector('.actor-profile-highlights');
-                const update = () => renderPersonSummary(root, context.page);
+                const settings = extensionApi.getStorage();
+                const update = () => renderPersonSummary(root, context.page, settings);
                 update();
 
                 // PersonPage loads its metadata and filmography asynchronously.

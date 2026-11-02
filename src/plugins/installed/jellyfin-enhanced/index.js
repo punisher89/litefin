@@ -51,7 +51,7 @@ function uniqueLabels(labels) {
     return Array.from(new Set(labels.filter(Boolean)));
 }
 
-function updateMediaFormat(root, page) {
+function updateMediaFormat(root, page, settings) {
     if (!root || !page) return;
 
     const item = page._item;
@@ -62,11 +62,12 @@ function updateMediaFormat(root, page) {
     const video = firstStream(streams, 'Video');
     const audio = firstStream(streams, 'Audio');
 
+    const enabled = (key) => !settings || settings.get(key) !== 'false';
     const labels = uniqueLabels([
-        resolutionLabel(video),
-        hdrLabel(video),
-        video && video.Codec ? String(video.Codec).toUpperCase() : '',
-        audioLabel(audio)
+        enabled('showResolution') ? resolutionLabel(video) : '',
+        enabled('showHdr') ? hdrLabel(video) : '',
+        enabled('showVideoCodec') && video && video.Codec ? String(video.Codec).toUpperCase() : '',
+        enabled('showAudio') ? audioLabel(audio) : ''
     ]);
 
     root.textContent = '';
@@ -98,6 +99,7 @@ export default {
     defaultEnabled: true,
 
     init(api) {
+        const settings = api.getStorage();
         api.addDetailsWidget({
             id: 'media-format',
             name: 'Формат видео и звука',
@@ -106,14 +108,14 @@ export default {
             render: (context) => {
                 const root = document.createElement('section');
                 root.className = 'enhanced-media-format';
-                updateMediaFormat(root, context && context.page);
+                updateMediaFormat(root, context && context.page, settings);
                 return root;
             },
             onMount: (wrapper, context, extensionApi) => {
                 const root = wrapper.querySelector('.enhanced-media-format');
                 return extensionApi.on('details:media-source-changed', (payload) => {
                     if (payload && payload.page === context.page) {
-                        updateMediaFormat(root, context.page);
+                        updateMediaFormat(root, context.page, settings);
                     }
                 });
             }

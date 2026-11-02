@@ -22,7 +22,7 @@ Litefin currently registers 8 bundled plugins in `PluginManager.js`:
 | `syncplay`        | Real-time synchronized group playback via WebSockets                                              |
 | `local-intros`    | Play custom local video files before media content                                                |
 | `mdblist-ratings` | Fetch and display IMDb, Rotten Tomatoes, Metacritic, Trakt, TMDB, and Letterboxd ratings on cards |
-| `achievement-badges` | Read-only native Home integration for equipped and recently unlocked badges |
+| `achievement-badges` | Dedicated native Achievement Badges page with rank, badges, quests, shop, cosmetics, and stats |
 | `actor-plus` | Native, D-pad-friendly actor profile highlights on Litefin's Person page |
 | `jellyfin-featured` | Reads `/featured/items` and renders the configured, personalized feed in a native Home widget |
 | `jellyfin-enhanced` | Native first subset: resolution, HDR, and audio-format chips on movie detail pages |
@@ -161,7 +161,7 @@ Embeds Litefin directly inside your Jellyfin server web interface:
 
 ## Native UI extension slots
 
-The PluginAPI exposes native page slots. An extension returns an `HTMLElement`
+The PluginAPI exposes native page slots and `navigate(path)` for application-relative Litefin routes. An extension returns an `HTMLElement`
 from its synchronous `render(context, api)` callback. The host manages insertion,
 page teardown, and optional D-pad focus registration.
 
@@ -208,7 +208,7 @@ that every Jellyfin server plugin's Web UI can run unchanged in a native TV app.
 
 | Integration | Litefin status | Notes |
 | --- | --- | --- |
-| Achievement Badges | Native read-only adapter | Reads equipped and recent badges through authenticated user endpoints. Unlocking, score, quests, shop, cosmetics and friends remain server-owned and are not yet reproduced in Litefin. |
+| Achievement Badges | Native page | Reads authenticated rank, summary, badge collection, equipped badges, quests, shop, cosmetics, recap and leaderboard endpoints. Litefin display preferences are local; achievement state and purchases remain server-owned. |
 | MDBList Ratings | Existing native adapter | The existing adapter continues to fetch ratings, awards and feature labels from MDBList Server Plugin. |
 | ActorPlus | Native adaptation | Uses Litefin's Person page and filmography. ActorPlus's Jellyfin Web hover UI is not loaded. |
 | Jellyfin Featured | Native adapter | Reads the configured feed from `/featured/items` and displays it in Litefin's native Home UI; does not use frontend injection. Current upstream release 12.9.0.0 targets Jellyfin ABI 12.2.0.0. |

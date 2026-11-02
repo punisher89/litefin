@@ -14,6 +14,7 @@ import { AWESOME_JELLYFIN_CATALOG } from '../../../plugins/PluginCatalog.js';
 import '../../../plugins/plugin-catalog.css';
 import { focusManager } from '../../../ui/FocusManager.js';
 import { i18n } from '../../../utils/i18n.js';
+import { storage } from '../../../utils/StorageService.js';
 import { logger } from '../../../utils/Logger.js';
 import { EXTERNAL_LINK_SVG } from '../../../utils/Icons.js';
 import { openExternalUrl } from '../modals/AboutDeviceSpecs.js';
@@ -34,6 +35,30 @@ export class PluginsTab {
 
         // Track registered listeners for cleanup
         this._listeners = [];
+    }
+
+    _renderCatalogSettings(entry) {
+        if (!Array.isArray(entry.settings) || !entry.settings.length) return '';
+        const rows = entry.settings.map((setting) => {
+            const key = setting.storageKey || ('plugin:' + entry.id + ':' + setting.key);
+            const value = storage.getItem(key) ?? setting.default ?? '';
+            let control;
+            if (setting.type === 'select') {
+                control = '<select class="focusable awesome-plugin-setting__select" data-plugin-setting="' + setting.key +
+                    '" data-storage-key="' + key + '" tabindex="0">' +
+                    (setting.options || []).map((option) => '<option value="' + option[0] + '" ' +
+                        (String(value) === String(option[0]) ? 'selected' : '') + '>' + option[1] + '</option>').join('') +
+                    '</select>';
+            } else {
+                const active = String(value) === 'true';
+                control = '<button type="button" class="toggle-switch awesome-plugin-setting__toggle ' + (active ? 'active' : '') +
+                    '" data-plugin-setting="' + setting.key + '" data-storage-key="' + key + '" data-setting-value="' +
+                    (active ? 'true' : 'false') + '" aria-pressed="' + active + '" tabindex="0"></button>';
+            }
+            return '<div class="awesome-plugin-setting"><span>' + setting.label + '</span>' + control + '</div>';
+        }).join('');
+        return '<details class="awesome-plugin-card__settings"><summary class="focusable" tabindex="0">⚙ Настройки Litefin</summary>' +
+            '<div class="awesome-plugin-card__settings-body">' + rows + '</div></details>';
     }
 
     /**
@@ -97,6 +122,7 @@ export class PluginsTab {
                     <p class="awesome-plugin-card__summary">${entry.summary}</p>
                     <a class="focusable awesome-plugin-card__link" tabindex="0" href="${entry.source}" target="_blank" rel="noopener noreferrer">Репозиторий проекта ↗</a>
                     <span class="awesome-plugin-card__client-state">${clientState}</span>
+                    ${this._renderCatalogSettings(entry)}
                 </article>
             `;
         }).join('');
@@ -239,6 +265,26 @@ export class PluginsTab {
                 await pluginManager.setPluginEnabled(pluginId, true);
             });
         }
+
+        // Persist Litefin-side presentation preferences for the catalog adapters.
+        const settingControls = (container || document).querySelectorAll('[data-plugin-setting]');
+        settingControls.forEach((control) => {
+            const save = (value) => {
+                const key = control.dataset.storageKey;
+                if (!key) return;
+                storage.setItem(key, String(value));
+                if (control.tagName === 'BUTTON') {
+                    control.dataset.settingValue = String(value);
+                    control.classList.toggle('active', String(value) === 'true');
+                    control.setAttribute('aria-pressed', String(value));
+                }
+            };
+            if (control.tagName === 'SELECT') {
+                addManagedListener(control, 'change', () => save(control.value));
+            } else {
+                addManagedListener(control, 'click', () => save(control.dataset.settingValue !== 'true'));
+            }
+        });
 
         // Trigger companion plugin & Seerr status probe
         this.refreshSeerrStatus(container);

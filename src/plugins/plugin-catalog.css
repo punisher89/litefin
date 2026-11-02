@@ -86,3 +86,13 @@
     background: rgba(255,255,255,.09);
     font-size: .82rem;
 }
+
+/* Litefin-local settings controls inside Awesome Jellyfin cards */
+.awesome-plugin-card__settings{margin-top:12px;border-top:1px solid rgba(255,255,255,.1);padding-top:9px}
+.awesome-plugin-card__settings summary{display:inline-block;padding:8px 2px;color:var(--jf-accent);font-size:13px;font-weight:700;cursor:pointer}
+.awesome-plugin-card__settings summary:focus{outline:2px solid var(--jf-accent);outline-offset:3px}
+.awesome-plugin-card__settings-body{display:flex;flex-direction:column;gap:8px;padding:8px 0 3px}
+.awesome-plugin-setting{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:37px;font-size:12px;opacity:.9}
+.awesome-plugin-setting__select{min-width:82px;max-width:145px;padding:7px 9px;border:1px solid rgba(255,255,255,.2);border-radius:7px;background:rgba(255,255,255,.08);color:inherit;font-size:12px}
+.awesome-plugin-setting__select option{background:#202434;color:#fff}
+.awesome-plugin-setting__toggle{flex:0 0 46px;min-width:46px;height:25px}

@@ -25,6 +25,7 @@ export default {
         this.log = api.log;
         this._settings = null;
         this._settingsPromise = null;
+        this._uiSettings = api.getStorage();
         this._awardsEnabledOnServer = true; // Default to true until checked
         this.log.info('MDBList Ratings plugin initialization started');
 
@@ -118,7 +119,8 @@ export default {
 
             // 2. Filter and order ratings strictly according to user settings & deduplicate
             const rawRatings = data && data.hasCache ? data.ratings || [] : [];
-            const filteredRatings = filterAndOrderRatings(rawRatings, settings);
+            const showRatings = !this._uiSettings || this._uiSettings.get('showRatings') !== 'false';
+            const filteredRatings = showRatings ? filterAndOrderRatings(rawRatings, settings) : [];
 
             // 3. Resolve IMDb ID only if awards are requested and enabled
             let finalImdbId = null;
@@ -137,7 +139,7 @@ export default {
 
             // 4. Fetch awards if allowed and user wants awards
             let awards = null;
-            const userWantsAwards = storage.getItem('pref:showMdbAwards') !== 'false';
+            const userWantsAwards = (!this._uiSettings || this._uiSettings.get('showAwards') !== 'false') && storage.getItem('pref:showMdbAwards') !== 'false';
             if (awardsAllowed && finalImdbId && userWantsAwards) {
                 try {
                     const awardsData = await this.api.serverPlugins.call(

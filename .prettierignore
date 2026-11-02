@@ -1,8 +1,0 @@
-dist/
-node_modules/
-src/player/
-player/dist/
-*.wgt
-*.css
-*.scss
-*.html
