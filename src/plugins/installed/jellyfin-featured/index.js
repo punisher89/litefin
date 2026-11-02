@@ -1,0 +1,166 @@
+/**
+ * Native home-feed adapter for Jellyfin Featured.
+ *
+ * Reads the plugin's authenticated /featured/items endpoint and renders a
+ * compact, D-pad friendly row inside Litefin's native Home page.
+ */
+const CACHE_TTL = 5 * 60 * 1000;
+
+function text(value) {
+    return value == null ? '' : String(value);
+}
+
+export default {
+    id: 'jellyfin-featured',
+    name: 'Jellyfin Featured',
+    version: '1.0.0',
+    description: 'Показывает подборку Jellyfin Featured в нативной главной странице Litefin.',
+    serverDependency: 'jellyfin-featured',
+    defaultEnabled: true,
+
+    _items: [],
+    _loadedAt: 0,
+    _loading: null,
+    _wrapper: null,
+
+    init(api) {
+        this.api = api;
+        this._wrapper = null;
+
+        api.addFeaturedWidget({
+            id: 'featured-feed',
+            name: 'Featured',
+            order: 5,
+            focusOptions: {
+                orientation: 'horizontal',
+                leaveLeft: 'sidebar'
+            },
+            render: () => this._renderShell(),
+            onMount: (wrapper) => {
+                this._wrapper = wrapper;
+                void this._load(api);
+            },
+            onUnmount: () => {
+                this._wrapper = null;
+            }
+        });
+        api.log.info('Jellyfin Featured native adapter registered');
+    },
+
+    _renderShell() {
+        const root = document.createElement('section');
+        root.className = 'featured-native-widget';
+
+        const heading = document.createElement('h2');
+        heading.className = 'featured-native-widget__title';
+        heading.textContent = 'Для вас';
+
+        const status = document.createElement('p');
+        status.className = 'featured-native-widget__status';
+        status.textContent = 'Загрузка подборки…';
+
+        const cards = document.createElement('div');
+        cards.className = 'featured-native-widget__items';
+
+        root.appendChild(heading);
+        root.appendChild(status);
+        root.appendChild(cards);
+        return root;
+    },
+
+    async _load(api) {
+        if (this._loading) return this._loading;
+        if (Date.now() - this._loadedAt < CACHE_TTL) {
+            this._renderItems();
+            return this._items;
+        }
+
+        this._loading = (async () => {
+            try {
+                const response = await api.serverPlugins.call('/featured/items');
+                this._items = Array.isArray(response?.Items) ? response.Items : [];
+                this._loadedAt = Date.now();
+                this._renderItems();
+                return this._items;
+            } catch (err) {
+                api.log.warn('Jellyfin Featured feed request failed:', err && err.message);
+                this._renderError();
+                return [];
+            } finally {
+                this._loading = null;
+            }
+        })();
+        return this._loading;
+    },
+
+    _renderItems() {
+        const root = this._wrapper;
+        if (!root || !root.isConnected) return;
+
+        const status = root.querySelector('.featured-native-widget__status');
+        const cards = root.querySelector('.featured-native-widget__items');
+        if (!status || !cards) return;
+
+        cards.textContent = '';
+        if (!this._items.length) {
+            status.textContent = 'Сейчас нет доступных рекомендаций';
+            return;
+        }
+
+        status.textContent = '';
+        this._items.slice(0, 8).forEach((item) => {
+            if (!item || !item.Id) return;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'focusable featured-native-card';
+            button.tabIndex = 0;
+            button.dataset.itemId = text(item.Id);
+            button.addEventListener('click', () => this.api.openItem(item.Id));
+
+            if (item.HasImage) {
+                const image = document.createElement('img');
+                image.className = 'featured-native-card__image';
+                image.loading = 'lazy';
+                image.alt = '';
+                image.src = this.api.getImageUrl(item.Id, item.ImageType || 'Primary', {
+                    maxWidth: 520,
+                    quality: 85
+                });
+                image.onerror = () => { image.style.visibility = 'hidden'; };
+                button.appendChild(image);
+            }
+
+            const title = document.createElement('span');
+            title.className = 'featured-native-card__name';
+            title.textContent = text(item.Name);
+            button.appendChild(title);
+
+            const metadata = [];
+            if (item.ProductionYear) metadata.push(text(item.ProductionYear));
+            if (item.OfficialRating || item.official_rating) {
+                metadata.push(text(item.OfficialRating || item.official_rating));
+            }
+            if (item.CommunityRating != null) {
+                metadata.push('★ ' + Number(item.CommunityRating).toFixed(1));
+            }
+            if (metadata.length) {
+                const details = document.createElement('span');
+                details.className = 'featured-native-card__meta';
+                details.textContent = metadata.join(' · ');
+                button.appendChild(details);
+            }
+            cards.appendChild(button);
+        });
+    },
+
+    _renderError() {
+        const status = this._wrapper?.querySelector('.featured-native-widget__status');
+        if (status) status.textContent = 'Не удалось загрузить подборку';
+    },
+
+    destroy() {
+        this._wrapper = null;
+        this._loading = null;
+    }
+};
