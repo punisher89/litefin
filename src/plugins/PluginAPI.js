@@ -50,6 +50,7 @@ class PluginAPI {
         this._toast = refs.toast || null;
         this._getPlayer = refs.getPlayer || (() => null);
         this._getCurrentItem = refs.getCurrentItem || (() => null);
+        this._navigate = refs.navigate || ((path) => { window.location.hash = '#' + path; });
         this._extensionHost = refs.extensionHost || null;
         this._extensionDisposers = new Set();
 
@@ -128,8 +129,8 @@ class PluginAPI {
      * @param {string} itemId
      */
     openItem(itemId) {
-        if (!itemId || typeof window === 'undefined') return;
-        window.location.hash = '#/details/' + encodeURIComponent(itemId);
+        if (!itemId || typeof this._navigate !== 'function') return;
+        this._navigate('/details/' + encodeURIComponent(itemId));
     }
 
     // ========================================================================
