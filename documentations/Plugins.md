@@ -210,7 +210,7 @@ that every Jellyfin server plugin's Web UI can run unchanged in a native TV app.
 | Achievement Badges | Native read-only adapter | Reads equipped and recent badges through authenticated user endpoints. Unlocking, score, quests, shop, cosmetics and friends remain server-owned and are not yet reproduced in Litefin. |
 | MDBList Ratings | Existing native adapter | The existing adapter continues to fetch ratings, awards and feature labels from MDBList Server Plugin. |
 | ActorPlus | Native adaptation | Uses Litefin's Person page and filmography. ActorPlus's Jellyfin Web hover UI is not loaded. |
-| Jellyfin Featured | Native adapter | Reads the configured feed from `/featured/items` and displays it in Litefin's native Home UI; does not use frontend injection. |
+| Jellyfin Featured | Native adapter | Reads the configured feed from `/featured/items` and displays it in Litefin's native Home UI; does not use frontend injection. Current upstream release 12.9.0.0 targets Jellyfin ABI 12.2.0.0. |
 | Jellyfin Enhanced | Partial native adapter | Displays resolution, HDR, and audio format from media fields already fetched by DetailsPage. Other Enhanced features still require individual ports. |
 
 ## Runtime trust boundary
