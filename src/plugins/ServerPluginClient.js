@@ -93,6 +93,13 @@ const KNOWN_PROBES = {
             encodeURIComponent(userId) + '/recent-unlocks?limit=1'
     },
 
+    // Jellyfin Featured: returns the server's configured, user-personalized feed.
+    'jellyfin-featured': {
+        probeWithoutItem: true,
+        probeEndpoint: () => '/featured/items',
+        dataEndpoint: () => '/featured/items'
+    },
+
     // Litefin Companion Server Plugin
     litefin: {
         probeEndpoint: () => `/Litefin/Hero?limit=1`,
@@ -316,6 +323,7 @@ class ServerPluginClient {
             'local-intros': ['local intros', 'localintros'],
             'mdblist-ratings': ['mdblist', 'mdb list', 'mdblist ratings'],
             'achievement-badges': ['achievement badges', 'achievementbadges'],
+            'jellyfin-featured': ['jellyfin featured', 'featured'],
             litefin: ['litefin']
         };
 
