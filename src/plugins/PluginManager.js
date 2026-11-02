@@ -34,6 +34,7 @@ import { storage } from '../utils/StorageService.js';
 import { serverPluginClient } from './ServerPluginClient.js';
 import PluginAPI from './PluginAPI.js';
 import PluginWidgetHost from './PluginWidgetHost.js';
+import PluginExtensionHost from './PluginExtensionHost.js';
 import { eventBus } from '../core/EventBus.js';
 
 const log = logger.create('PluginManager');
@@ -80,6 +81,14 @@ const BUNDLED_PLUGINS = [
     {
         id: 'mdblist-ratings',
         load: () => import('./installed/mdblist-ratings/index.js')
+    },
+    {
+        id: 'achievement-badges',
+        load: () => import('./installed/achievement-badges/index.js')
+    },
+    {
+        id: 'actor-plus',
+        load: () => import('./installed/actor-plus/index.js')
     }
 ];
 
@@ -93,6 +102,9 @@ class PluginManager {
 
         // Current OSD widget host (valid during playback only)
         this._widgetHost = null;
+
+        // Native Home, Details, and Person page extension slots
+        this._extensionHost = new PluginExtensionHost();
 
         // Current player reference (valid during playback only)
         this._currentPlayer = null;
@@ -327,7 +339,8 @@ class PluginManager {
      * @param {string} pageId - Route/page identifier (e.g., 'details', 'home')
      * @param {HTMLElement} pageEl - The page's root DOM element
      */
-    notifyPageLoad(pageId, pageEl) {
+    notifyPageLoad(pageId, pageEl, page) {
+        this._extensionHost.mountPage(pageId, pageEl, page);
         for (const [id, entry] of this._plugins) {
             if (!entry.enabled) continue;
             try {
@@ -345,7 +358,8 @@ class PluginManager {
      *
      * @param {string} pageId - Route/page identifier
      */
-    notifyPageUnload(pageId) {
+    notifyPageUnload(pageId, pageEl) {
+        this._extensionHost.unmountPage(pageEl);
         for (const [id, entry] of this._plugins) {
             if (!entry.enabled) continue;
             try {
@@ -477,6 +491,7 @@ class PluginManager {
             if (this._widgetHost) {
                 this._widgetHost.removeAllWidgetsForPlugin(pluginId);
             }
+            entry.api._clearExtensions();
 
             log.info(`Plugin '${pluginId}' disabled by user`);
             eventBus.emit(`${pluginId}:disabled`);
@@ -578,6 +593,7 @@ class PluginManager {
         }
         this._plugins.clear();
 
+        this._extensionHost.destroy();
         serverPluginClient.reset();
         this._initialized = false;
         log.info('PluginManager destroyed');
@@ -707,7 +723,8 @@ class PluginManager {
             focusManager: this._deps.focusManager,
             toast: this._deps.toast,
             getPlayer: () => this._currentPlayer,
-            getCurrentItem: () => this._currentItem
+            getCurrentItem: () => this._currentItem,
+            extensionHost: this._extensionHost
         });
 
         // Register the plugin entry early so it appears in getPluginIds()
@@ -722,6 +739,7 @@ class PluginManager {
                 log.error(`Plugin '${id}' init() threw:`, err);
                 // Disable the plugin to prevent broken state on future calls
                 this._plugins.get(plugin.id).enabled = false;
+                api._clearExtensions();
             }
         }
     }
