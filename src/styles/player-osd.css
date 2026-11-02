@@ -1,0 +1,2861 @@
+/**
+ * Player OSD Styles - Tizen TV Layout
+ * 
+ * Matches Jellyfin Tizen TV OSD styling.
+ */
+
+/* ============================================================================
+   CSS Variables
+   ============================================================================ */
+
+.player-osd {
+    /* OSD specific button variables with fallback inheritance to global button variables */
+    --jf-osd-btn-bg: var(--jf-btn-primary-bg);
+    --jf-osd-btn-color: var(--jf-btn-primary-color);
+    --jf-osd-btn-border: var(--jf-btn-primary-border);
+    --jf-osd-btn-focus-bg: var(--jf-btn-primary-bg); /* Align focused button color with primary accent background */
+    --jf-osd-btn-focus-color: var(--jf-btn-primary-color);
+    --jf-osd-btn-focus-border: var(--jf-btn-primary-focus-border);
+    --jf-osd-btn-hover-border: var(--jf-btn-primary-hover-border);
+}
+
+:root {
+    --osd-text-color: var(--jf-text-primary, #fff);
+    --osd-accent-color: var(--jf-accent);
+    --osd-gradient-opacity: 0.75;
+    --osd-gradient-dark: rgba(0, 0, 0, 1);
+    --osd-slider-bg: rgba(255, 255, 255, 0.3);
+    --osd-slider-progress: var(--jf-btn-primary-bg);
+    --osd-btn-hover: var(--jf-button-hover, rgba(255, 255, 255, 0.1));
+    /* Fallback value for customized seek bar thumb background */
+    --osd-thumb-bg: #ffffff;
+}
+
+/* 
+ * ── OSD Seek Bar Custom Thumb Color Options ────────────────────────────────
+ * Maps document element attributes to selected theme/monochrome options.
+ */
+html[data-osd-thumb-color="white"] {
+    --osd-thumb-bg: #ffffff;
+}
+html[data-osd-thumb-color="black"] {
+    --osd-thumb-bg: #000000;
+}
+html[data-osd-thumb-color="theme-accent"] {
+    --osd-thumb-bg: var(--jf-btn-primary-bg);
+}
+html[data-osd-thumb-color="theme-inverted"] {
+    --osd-thumb-bg: var(--jf-btn-primary-focus-bg);
+}
+
+/* 
+ * ── OSD Seek Bar Custom Progress Color Options ─────────────────────────────
+ * Maps document element attributes to selected theme/monochrome options.
+ */
+html[data-osd-progress-color="white"] {
+    --osd-slider-progress: #ffffff;
+}
+html[data-osd-progress-color="black"] {
+    --osd-slider-progress: #000000;
+}
+html[data-osd-progress-color="theme-accent"] {
+    --osd-slider-progress: var(--jf-btn-primary-bg);
+}
+html[data-osd-progress-color="theme-inverted"] {
+    --osd-slider-progress: var(--jf-btn-primary-focus-bg);
+}
+
+/* ============================================================================
+   Icons (SVG)
+   ============================================================================ */
+
+.osd-icon {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+    pointer-events: none;
+}
+
+/* ============================================================================
+   OSD Container
+   ============================================================================ */
+
+.player-osd {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    color: var(--osd-text-color);
+    user-select: none;
+    font-weight: bold;
+    /* GPU acceleration for Tizen */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    /* Force remove system focus rings */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-focus-ring-color: transparent;
+    overflow: hidden;
+}
+
+/* New: Main OSD wrapper for header/bottom */
+.osd-main {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 1;
+    -webkit-transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* When Layer 1 is hidden, disable all pointer hit-testing and hide from accessibility/render tree */
+.osd-main.osd-hidden {
+    opacity: 0;
+    pointer-events: none !important;
+    visibility: hidden;
+}
+
+/* Force all descendants to ignore pointer events so invisible buttons and sliders cannot be clicked */
+.osd-main.osd-hidden,
+.osd-main.osd-hidden * {
+    pointer-events: none !important;
+}
+
+.osd-main > * {
+    pointer-events: all;
+}
+
+/* Container for persistent widgets (Skip buttons, offsets, etc) */
+.osd-overlays {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.osd-overlays > * {
+    pointer-events: all;
+}
+
+/* ============================================================================
+   TOP HEADER
+   ============================================================================ */
+
+.osd-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 2.4em 2.4em 4.8em;
+    /* 2em*1.2, 4em*1.2 */
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-pack: justify;
+    justify-content: space-between;
+    -webkit-box-align: center;
+    align-items: center;
+    z-index: 1;
+}
+
+.osd-header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, var(--osd-gradient-dark) 0%, rgba(0, 0, 0, 0) 100%);
+    opacity: var(--osd-gradient-opacity, 0.75);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.osd-header-left {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+}
+
+.player-osd .osd-header-left > * + * {
+    margin-left: 1.8em;
+}
+
+.osd-header-right {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+}
+
+.player-osd .osd-header-right > * + * {
+    margin-left: 1.8em;
+}
+
+.osd-clock {
+    font-size: 1.4rem;
+    font-weight: 500;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    letter-spacing: 0.05em;
+    opacity: 0.9;
+}
+
+/*
+ * Main OSD Title (Show name or standalone media title).
+ * Formats primary title text with prominent weight and clean shadow.
+ * Margin is zeroed to guarantee exact vertical and baseline alignment
+ * with the secondary title segment across all display scales.
+ */
+.osd-title {
+    font-size: 1.8em;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    max-width: 60vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.osd-title-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center; /* Better for mixed Logo + Text */
+    max-height: 60px;
+    gap: 0.6rem;
+}
+
+.osd-title-main {
+    display: flex;
+    align-items: center;
+    height: 60px; /* Force height to match wrapper */
+}
+
+.osd-title-logo {
+    object-fit: contain;
+    /* PERFORMANCE: Rely on header gradient overlay for image contrast instead of heavy GPU filter: drop-shadow */
+    /* Force Hardware acceleration */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    display: block;
+}
+
+/* Customizable logo sizes */
+.osd-title-logo.logo-small {
+    max-height: 36px;
+    max-width: 140px;
+}
+
+.osd-title-logo.logo-medium {
+    max-height: 52px;
+    max-width: 200px;
+}
+
+.osd-title-logo.logo-large {
+    max-height: 68px;
+    max-width: 260px;
+}
+
+.osd-title-logo.logo-extralarge {
+    max-height: 84px;
+    max-width: 320px;
+}
+
+.osd-title-logo.logo-xxl {
+    max-height: 100px;
+    max-width: 380px;
+}
+
+/* Adjust title wrapper and main row heights depending on logo size */
+.osd-title-wrap.has-logo-small,
+.osd-title-wrap.has-logo-small .osd-title-main {
+    height: 48px !important;
+    max-height: 48px !important;
+}
+
+.osd-title-wrap.has-logo-medium,
+.osd-title-wrap.has-logo-medium .osd-title-main {
+    height: 60px !important;
+    max-height: 60px !important;
+}
+
+.osd-title-wrap.has-logo-large,
+.osd-title-wrap.has-logo-large .osd-title-main {
+    height: 76px !important;
+    max-height: 76px !important;
+}
+
+.osd-title-wrap.has-logo-extralarge,
+.osd-title-wrap.has-logo-extralarge .osd-title-main {
+    height: 92px !important;
+    max-height: 92px !important;
+}
+
+.osd-title-wrap.has-logo-xxl,
+.osd-title-wrap.has-logo-xxl .osd-title-main {
+    height: 108px !important;
+    max-height: 108px !important;
+}
+
+/*
+ * Secondary OSD Title (Episode designation, episode name, and production year).
+ * Matches primary title font-size (1.8em) and line-height (1.5) to keep a unified
+ * typographic baseline and cap-height across the horizontal title line.
+ * Subtle hierarchy is preserved via weight (500) and optical opacity.
+ */
+.osd-title-secondary {
+    font-size: 1.8em;
+    font-weight: 500;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    opacity: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5;
+    margin: 0;
+}
+
+
+.osd-sync-icon {
+    opacity: 0.8;
+}
+
+.osd-sync-icon .osd-icon {
+    width: 33.6px;
+    /* 28px * 1.2 */
+    height: 33.6px;
+}
+
+/* ============================================================================
+   BOTTOM OSD
+   ============================================================================ */
+
+.osd-bottom {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10em 2.4em 3em;
+    /* 5em*1.2, 2em*1.2, 2.5em*1.2 */
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    z-index: 1;
+}
+
+.osd-bottom::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(0deg, var(--osd-gradient-dark) 0%, rgba(0, 0, 0, 0) 100%);
+    opacity: var(--osd-gradient-opacity, 0.75);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.player-osd .osd-bottom > * + * {
+    margin-top: 1.0em;
+}
+
+/* Controls Row (above slider) */
+.osd-controls-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    margin-bottom: 0.6em;
+    /* 0.5em * 1.2 */
+}
+
+.osd-controls-left,
+.osd-controls-right {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+.player-osd .osd-controls-left > * + *,
+.player-osd .osd-controls-right > * + * {
+    margin-left: 0.72em;
+}
+
+.osd-spacer {
+    -webkit-box-flex: 1;
+    flex: 1;
+}
+
+.player-osd .osd-ends-at {
+    margin-left: 1.4em;
+    /* Increased spacing to separate from buttons */
+    font-size: 1.2em;
+    /* 1em * 1.2 */
+    font-weight: bold;
+    opacity: 0.9;
+}
+
+/* ============================================================================
+   VOLUME & MUTE CONTROLS (DESKTOP & WEB)
+   ============================================================================ */
+
+.osd-volume-group {
+    display: -webkit-inline-flex;
+    display: inline-flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    position: relative;
+    vertical-align: middle;
+}
+
+.osd-volume-slider-container {
+    position: relative;
+    display: -webkit-inline-flex;
+    display: inline-flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    width: 86px;
+    height: 36px;
+    margin-left: 0.5em;
+    cursor: pointer;
+}
+
+.osd-volume-track {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    height: 3px;
+    background: var(--osd-slider-bg, rgba(255, 255, 255, 0.3));
+    border-radius: 2px;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.osd-volume-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    background: var(--osd-slider-progress, var(--jf-btn-primary-bg, #00a4dc));
+    border-radius: 2px;
+    pointer-events: none;
+    transition: width 0.08s ease-out;
+}
+
+.osd-volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+    outline: none;
+}
+
+.osd-volume-slider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+}
+
+.osd-volume-slider::-moz-range-track {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+}
+
+.osd-volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--osd-slider-progress, var(--jf-btn-primary-bg, #00a4dc));
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    margin-top: 11px;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.osd-volume-slider:hover::-webkit-slider-thumb,
+.osd-volume-slider:active::-webkit-slider-thumb {
+    transform: scale(1.22);
+}
+
+.osd-volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--osd-slider-progress, var(--jf-btn-primary-bg, #00a4dc));
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.osd-volume-slider:hover::-moz-range-thumb,
+.osd-volume-slider:active::-moz-range-thumb {
+    transform: scale(1.22);
+}
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+
+
+.osd-btn {
+    display: -webkit-box;
+    display: -webkit-inline-flex;
+    display: inline-flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border: none; /* Base reset */
+    background: transparent;
+    color: var(--osd-text-color);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: 
+        background 0.18s ease,
+        transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box; /* Ensure border doesn't grow the button */
+}
+
+/* 
+ * ── Ultra-Legacy Overrides: OSD Buttons ────────────────────────────────────
+ * Chromium 32 has buggy flexbox/inline-flex centering.
+ * We fallback to a robust block + padding + margin: 0 auto centering strategy.
+ */
+html[data-layout-tier="ultra-legacy"] .osd-btn {
+    display: block !important;
+    text-align: center;
+    padding: 12.2px 0; /* (58px height - 33.6px icon) / 2 */
+    box-sizing: border-box;
+}
+
+html[data-layout-tier="ultra-legacy"] .osd-btn .osd-icon {
+    display: block;
+    margin: 0 auto;
+}
+
+.osd-btn:hover,
+.osd-btn:focus,
+.osd-btn.focused,
+.osd-btn.magic-hover {
+    /* Focus styles use high contrast solid accent colors */
+    background: var(--jf-osd-btn-focus-bg) !important;
+    color: var(--jf-osd-btn-focus-color) !important;
+    outline: none !important;
+}
+
+/* 
+ * ── OSD Button Focus Border Customization ──────────────────────────────────
+ * Controlled via Settings > Display. Adjusts the prominence of the focus
+ * ring around active player controls.
+ */
+
+/* Focus border styles follow the global button customization settings (hover has no border) */
+.osd-btn:focus,
+.osd-btn.focused,
+.osd-btn.magic-hover,
+.osd-btn:hover {
+    border: 2px solid var(--jf-osd-btn-focus-border) !important;
+}
+
+/*
+ * ── OSD Button Focus GROW Effect ───────────────────────────────────────────
+ * The focused control - play/pause included - scales up a little so the current
+ * D-pad target is readable from couch distance; the icon grows with it. The
+ * Next-Up buttons scale on focus in the same way (.upnext-btn in upnext.css).
+ * .osd-btn already carries the transform transition, which is armed here for the
+ * icon as well.
+ */
+.osd-btn:focus,
+.osd-btn.focused {
+    -webkit-transform: scale(1.08);
+    transform: scale(1.08);
+}
+
+.osd-btn .osd-icon {
+    -webkit-transition: -webkit-transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.osd-btn:focus .osd-icon,
+.osd-btn.focused .osd-icon {
+    -webkit-transform: scale(1.12);
+    transform: scale(1.12);
+}
+
+/*
+ * "Low VRAM" mode disables the focus scaling for UI controls, including
+ * .osd-btn (see the html[data-low-vram="true"] rules in base.css). Those rules
+ * match the button only, so the icon is reset here as well - otherwise the
+ * button would stay at scale(1) while its icon still jumped to scale(1.12).
+ */
+html[data-low-vram="true"] .osd-btn:focus .osd-icon,
+html[data-low-vram="true"] .osd-btn.focused .osd-icon {
+    -webkit-transform: none !important;
+    transform: none !important;
+}
+
+/*
+ * The Magic Remote pointer mode disables focus transforms for the focused element
+ * as well (body.webos-cursor-active in base.css). That rule matches the button, not
+ * the icon, so the icon is reset here too while the pointer is active.
+ */
+body.webos-cursor-active .osd-btn:focus .osd-icon,
+body.webos-cursor-active .osd-btn.focused .osd-icon {
+    -webkit-transform: none !important;
+    transform: none !important;
+}
+
+/* Accent color for active toggle buttons when not focused */
+.osd-btn.active:not(#osdFavoriteBtn) {
+    color: var(--jf-osd-btn-bg) !important;
+}
+
+/* Active buttons when hovered get standard soft hover treatment */
+.osd-btn.active:not(#osdFavoriteBtn):hover {
+    background: var(--osd-btn-hover) !important;
+    color: var(--osd-text-color) !important;
+}
+
+/* Active buttons when focused receive complete focus ring styling */
+.osd-btn.active:not(#osdFavoriteBtn):focus,
+.osd-btn.active:not(#osdFavoriteBtn).focused,
+.osd-btn.active:not(#osdFavoriteBtn).magic-hover {
+    background: var(--jf-osd-btn-focus-bg) !important;
+    color: var(--jf-osd-btn-focus-color) !important;
+    border-color: var(--jf-osd-btn-focus-border) !important;
+}
+
+/* Pulse Animation Trigger */
+.osd-btn.pulse-trigger svg {
+    -webkit-animation: jf-pulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: jf-pulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@-webkit-keyframes jf-pulse {
+    0% { -webkit-transform: scale(1); transform: scale(1); }
+    50% { -webkit-transform: scale(1.4); transform: scale(1.4); }
+    100% { -webkit-transform: scale(1); transform: scale(1); }
+}
+
+@keyframes jf-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+}
+
+
+.osd-btn .osd-icon {
+    width: 33.6px;
+    /* 28px * 1.2 */
+    height: 33.6px;
+}
+
+/* SyncPlay Indicators */
+.osd-syncplay-icon-wrap {
+    position: relative;
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.osd-syncplay-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 11px;
+    height: 11px;
+    background: #32D74B; /* Accent green */
+    border-radius: 50%;
+    border: 2px solid #000;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.osd-syncplay-dot.visible {
+    opacity: 1;
+    transform: scale(1);
+    -webkit-animation: osd-syncplay-pulse 2s ease-in-out infinite;
+    animation: osd-syncplay-pulse 2s ease-in-out infinite;
+}
+
+
+.osd-btn.syncplay-active:not(:focus):not(.focused) {
+    color: #32D74B;
+}
+
+@-webkit-keyframes osd-syncplay-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(50, 215, 75, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(50, 215, 75, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(50, 215, 75, 0);
+    }
+}
+
+@keyframes osd-syncplay-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(50, 215, 75, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(50, 215, 75, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(50, 215, 75, 0);
+    }
+}
+
+
+/* Back button - circular, accent color on focus */
+.osd-back-btn {
+    width: 57.6px;
+    /* 48px * 1.2 */
+    height: 57.6px;
+    background: transparent;
+    border: none;
+    /* margin-right removed - using gap in parent */
+}
+
+.osd-back-btn:hover {
+    background: var(--osd-btn-hover);
+}
+
+.osd-back-btn:focus,
+.osd-back-btn.focused {
+    border: 2px solid var(--jf-osd-btn-focus-border) !important;
+    background: var(--jf-osd-btn-focus-bg) !important;
+    color: var(--jf-osd-btn-focus-color) !important;
+    outline: none !important;
+}
+
+.osd-back-btn .osd-icon {
+    width: 28.8px;
+    /* 24px * 1.2 */
+    height: 28.8px;
+}
+
+.osd-btn-play {
+    width: 86.4px;
+    /* 72px * 1.2 */
+    height: 86.4px;
+    background: transparent;
+    border: none;
+    margin: 0 0.72em;
+    /* 0.6em * 1.2 */
+}
+
+.osd-btn-play:hover {
+    background: var(--osd-btn-hover);
+}
+
+.osd-btn-play:focus,
+.osd-btn-play.focused {
+    background: var(--jf-osd-btn-focus-bg) !important;
+    color: var(--jf-osd-btn-focus-color) !important;
+    border: 2px solid var(--jf-osd-btn-focus-border) !important;
+}
+
+.osd-btn-play .osd-icon {
+    width: 48px;
+    /* 40px * 1.2 */
+    height: 48px;
+}
+
+.osd-btn-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: default;
+}
+
+/* ============================================================================
+   SLIDER ROW (at bottom)
+   ============================================================================ */
+
+.osd-slider-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    margin-top: 0.6em;
+    /* 0.5em * 1.2 */
+}
+
+.osd-time {
+    font-size: 1.2em;
+    /* 1em * 1.2 */
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    padding: 0 0.6em;
+    /* 0.5em * 1.2 */
+    min-width: 5em;
+    /* Enough for 00:00:00 with tabular-nums */
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 36px; /* Match seek bar container height for perfect vertical centering */
+    line-height: 1;
+}
+
+.osd-time-current {
+    justify-content: flex-start;
+}
+
+.osd-time-total {
+    justify-content: flex-end;
+}
+
+.osd-slider-container {
+    position: relative;
+    height: 36px;
+    /* Removed display:flex to ensure absolute children strictly follow top:0 */
+}
+
+/* Specific spacing for main OSD seekbar */
+.osd-slider-row .osd-slider-container {
+    flex: 1;
+    margin: 0 1.25em;
+}
+
+/* Seek Tooltip - Shows target time above seekbar during seeking */
+.osd-seek-tooltip {
+    position: absolute;
+    /* 
+     * Anchor tooltip using bottom edge rather than fixed top pixel offset.
+     * This guarantees consistent vertical clearance above the seek thumb 
+     * across all TV screen resolutions and font rendering engines (including Tizen).
+     */
+    top: auto;
+    bottom: calc(100% + 14px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--osd-gradient-dark, rgba(0, 0, 0, 0.9));
+    border: 2px solid var(--jf-action-btn-border)!important;
+    color: var(--osd-text-color, #fff);
+    font-size: 1.68em;
+    /* 1.4em * 1.2 */
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    padding: 9.6px 19.2px;
+    /* 8px * 1.2, 16px * 1.2 */
+    border-radius: var(--jf-border-radius-lg);
+    /* Standardized dynamic radius */
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease;
+    z-index: 200;
+    /* Flex layout lets the thumbnail stack above the time text */
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.osd-seek-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/*
+ * When a trickplay thumbnail is showing, loosen the fixed width constraint
+ * so the thumbnail (which JS sets to its tile pixel width) determines the size.
+ */
+.osd-seek-tooltip.has-trickplay {
+    /* Let content size the box; JS will set exact thumb dimensions */
+    white-space: nowrap;
+    padding: 8px 8px 12px;
+    /* Tooltip inherits bottom: calc(100% + 14px) from base class */
+}
+
+/*
+ * Trickplay thumbnail div.
+ * Width/height and background-* properties are all set dynamically by
+ * OSDController._updateTrickplayTooltip() using the tile math from
+ * TrickplayManager.getThumbnail(). The element is hidden by default so
+ * there is zero visual impact when trickplay is disabled or absent.
+ */
+.osd-trickplay-thumb {
+    /* Start hidden — JS shows it once we have a valid tile */
+    display: none;
+    /* Rounded corners so the sprite sheet looks presentable */
+    border-radius: 6px;
+    overflow: hidden;
+    /* Avoid stretching when JS hasn't set exact dimensions yet */
+    flex-shrink: 0;
+    /* GPU acceleration for the rapid background-position updates */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: background-position, background-image;
+}
+
+/* Time/speed-indicator text inside the tooltip */
+.osd-seek-tooltip-text {
+    /* Takes up the full width of the tooltip; centers the text naturally */
+    display: block;
+    text-align: center;
+}
+
+/* Standardize Interaction Layer - Thin and self-centering */
+.osd-slider, 
+.osd-offset-slider {
+    position: absolute;
+    top: 50% !important;
+    left: 0 !important;
+    transform: translateY(-50%) !important;
+    width: 100% !important;
+    height: 8px !important; /* Matches visual track height */
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent !important;
+    outline: none;
+    cursor: pointer;
+    margin: 0 !important;
+    z-index: 10;
+}
+
+/* Reset runnable track to match input height */
+.osd-slider::-webkit-slider-runnable-track,
+.osd-offset-slider::-webkit-slider-runnable-track {
+    background: transparent !important;
+    border: none !important;
+    height: 8px !important; 
+    margin: 0 !important;
+}
+
+/* Remove legacy/duplicated definitions */
+
+/* Main OSD Position Seekbar */
+/* Remove legacy/duplicated definitions */
+
+/* Standardize Slider Track (Visual) - Centered in 36px container */
+.osd-slider-track {
+    position: absolute;
+    left: 0;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 100%;
+    height: 8px !important;
+    background: var(--osd-slider-bg, rgba(255, 255, 255, 0.3));
+    border-radius: var(--jf-border-radius);
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden; /* Mask the fill's corners at 0/100% */
+}
+
+.osd-slider-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: var(--osd-slider-progress);
+    width: 0%;
+    /* border-radius removed to ensure it touches the thumb seamlessly */
+    box-shadow: 2px 0 0 var(--osd-slider-progress); /* Bridge gap to thumb center */
+    pointer-events: none;
+    transition: width 0.1s ease-out;
+}
+
+/* Standardize track margins to ensure thumb is centered in 36px */
+/* Chapter Markers */
+
+/* Chapter Markers */
+.osd-chapter-markers {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 2px; /* Offset to start where the track actually starts (half of thumb width) */
+    right: 3.6px;
+    height: 13px;
+    pointer-events: none;
+    z-index: 2; /* Above track */
+}
+
+.osd-chapter-marker {
+    position: absolute;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--osd-slider-bg, rgba(255, 255, 255, 0.6));
+    pointer-events: none;
+}
+
+/* UNIVERSAL THUMB STYLES - Thin Input Model */
+.osd-slider::-webkit-slider-thumb,
+.osd-offset-slider::-webkit-slider-thumb,
+.menu-slider .osd-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--osd-thumb-bg, var(--jf-text-primary, #fff));
+    cursor: pointer;
+    margin-top: 0 !important; /* Center on thin track when heights match */
+    transition: height 0.1s, width 0.1s, margin-top 0.1s;
+    border: none !important;
+}
+
+/* Ensure menu/settings sliders always use default text primary color, not OSD seekbar colors */
+.menu-slider .osd-slider::-webkit-slider-thumb {
+    background: var(--jf-text-primary, #fff) !important;
+}
+
+/* Player/Offset Thumbs (8px Track) */
+.osd-slider::-webkit-slider-thumb,
+.osd-offset-slider::-webkit-slider-thumb {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: var(--jf-border-radius) !important;
+}
+
+/* Settings Thumbs (6px Track) */
+.menu-slider .osd-slider::-webkit-slider-thumb {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: var(--jf-border-radius) !important;
+}
+
+/* FOCUSED STATES - Expand symmetrically using negative margins */
+
+/* Player/Offset Focus (28px Thumb on 8px Track) */
+/* Formula: (TrackHeight - ThumbHeight) / 2 = (8 - 28) / 2 = -10px */
+.osd-slider-container:hover .osd-slider::-webkit-slider-thumb,
+.osd-slider-container.focused .osd-slider::-webkit-slider-thumb,
+.osd-slider-container.magic-hover .osd-slider::-webkit-slider-thumb,
+.osd-slider.focused::-webkit-slider-thumb,
+.osd-slider:focus::-webkit-slider-thumb,
+.osd-offset-slider:hover::-webkit-slider-thumb,
+.osd-offset-slider.focused::-webkit-slider-thumb,
+.osd-offset-slider:focus::-webkit-slider-thumb {
+    width: 10px !important;
+    height: 28px !important;
+    border-radius: var(--jf-border-radius) !important;
+    margin-top: -10px !important;
+    background: var(--osd-thumb-bg, #fff) !important;
+}
+
+/* Settings Focus (24px Thumb on 6px Track) */
+/* Formula: (TrackHeight - ThumbHeight) / 2 = (6 - 24) / 2 = -9px */
+.track-option.focused .menu-slider .osd-slider::-webkit-slider-thumb {
+    width: 10px !important;
+    height: 24px !important;
+    border-radius: var(--jf-border-radius) !important;
+    margin-top: -9px !important;
+    background: var(--jf-accent-content-color, #fff) !important;
+}
+
+
+.osd-slider-container:hover .osd-slider::-moz-range-thumb,
+.osd-slider-container.focused .osd-slider::-moz-range-thumb,
+.osd-slider.focused::-moz-range-thumb,
+.osd-slider:focus::-moz-range-thumb,
+.osd-offset-slider:hover::-moz-range-thumb,
+.osd-offset-slider.focused::-moz-range-thumb,
+.osd-offset-slider:focus::-moz-range-thumb {
+    width: 10px;
+    height: 28px;
+    border-radius: var(--jf-border-radius);
+    border: none;
+}
+
+/* ============================================================================
+   ANTI-SPOILER / MINIMALIST OSD SEEKBAR (HIDE PROGRESS, TIME & ENDS AT WHEN UNFOCUSED)
+   ============================================================================
+   - Preserves box dimensions to prevent layout jitter or sudden element jumps.
+   - Hides INSTANTLY (0ms) when leaving the seekbar as requested by user.
+   - Smoothly reveals progress fill, thumb, times, and ends-at when focusing or interacting with seekbar.
+   - Strictly decoupled from play/pause or other control buttons (no :focus-within on bottom container).
+   ============================================================================ */
+
+/* Base state: Hidden INSTANTLY when unfocused (no delay or trailing fade-out) */
+.osd-bottom.hide-unfocused-progress .osd-ends-at,
+.osd-bottom.hide-unfocused-progress .osd-time,
+.osd-slider-row.hide-unfocused-progress .osd-time {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: none !important;
+}
+
+/* Mask progress bar fill until focus is received */
+.osd-bottom.hide-unfocused-progress .osd-slider-fill,
+.osd-slider-row.hide-unfocused-progress .osd-slider-fill {
+    opacity: 0 !important;
+    transition: none !important;
+}
+
+/* Mask seekbar thumbs until focus is received */
+.osd-bottom.hide-unfocused-progress .osd-slider::-webkit-slider-thumb,
+.osd-slider-row.hide-unfocused-progress .osd-slider::-webkit-slider-thumb {
+    opacity: 0 !important;
+    transition: none !important;
+}
+
+.osd-bottom.hide-unfocused-progress .osd-slider::-moz-range-thumb,
+.osd-slider-row.hide-unfocused-progress .osd-slider::-moz-range-thumb {
+    opacity: 0 !important;
+    transition: none !important;
+}
+
+/* ============================================================================
+   ACTIVE / REVEALED STATES
+   ============================================================================
+   Triggered EXCLUSIVELY when the user focuses the seekbar (.seekbar-active),
+   hovers directly over the seekbar row (.osd-slider-row:hover / .hovered),
+   points via Magic Remote on the seekbar (.magic-hover), or scrubs (.dragging).
+   Note: Does NOT trigger when play/pause or other control buttons are focused!
+   ============================================================================ */
+
+/* Revealed state for Ends At indicator (standard 0.9 opacity) */
+.osd-bottom.hide-unfocused-progress.seekbar-active .osd-ends-at,
+.osd-bottom.hide-unfocused-progress.magic-hover .osd-ends-at,
+.osd-bottom.hide-unfocused-progress.dragging .osd-ends-at,
+.osd-bottom.hide-unfocused-progress.hovered .osd-ends-at {
+    opacity: 0.9 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transition: opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Revealed states for Time labels */
+.osd-bottom.hide-unfocused-progress.seekbar-active .osd-time,
+.osd-bottom.hide-unfocused-progress.magic-hover .osd-time,
+.osd-bottom.hide-unfocused-progress.dragging .osd-time,
+.osd-bottom.hide-unfocused-progress.hovered .osd-time,
+.osd-slider-row.hide-unfocused-progress.seekbar-active .osd-time,
+.osd-slider-row.hide-unfocused-progress:hover .osd-time,
+.osd-slider-row.hide-unfocused-progress.magic-hover .osd-time,
+.osd-slider-row.hide-unfocused-progress.dragging .osd-time {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transition: opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Revealed states for Progress Fill */
+.osd-bottom.hide-unfocused-progress.seekbar-active .osd-slider-fill,
+.osd-bottom.hide-unfocused-progress.magic-hover .osd-slider-fill,
+.osd-bottom.hide-unfocused-progress.dragging .osd-slider-fill,
+.osd-bottom.hide-unfocused-progress.hovered .osd-slider-fill,
+.osd-slider-row.hide-unfocused-progress.seekbar-active .osd-slider-fill,
+.osd-slider-row.hide-unfocused-progress:hover .osd-slider-fill,
+.osd-slider-row.hide-unfocused-progress.magic-hover .osd-slider-fill,
+.osd-slider-row.hide-unfocused-progress.dragging .osd-slider-fill {
+    opacity: 1 !important;
+    transition: width 0.1s ease-out, opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Revealed states for WebKit Thumb */
+.osd-bottom.hide-unfocused-progress.seekbar-active .osd-slider::-webkit-slider-thumb,
+.osd-bottom.hide-unfocused-progress.magic-hover .osd-slider::-webkit-slider-thumb,
+.osd-bottom.hide-unfocused-progress.dragging .osd-slider::-webkit-slider-thumb,
+.osd-bottom.hide-unfocused-progress.hovered .osd-slider::-webkit-slider-thumb,
+.osd-slider-row.hide-unfocused-progress.seekbar-active .osd-slider::-webkit-slider-thumb,
+.osd-slider-row.hide-unfocused-progress:hover .osd-slider::-webkit-slider-thumb,
+.osd-slider-row.hide-unfocused-progress.magic-hover .osd-slider::-webkit-slider-thumb,
+.osd-slider-row.hide-unfocused-progress.dragging .osd-slider::-webkit-slider-thumb {
+    opacity: 1 !important;
+    transition: height 0.1s, width 0.1s, margin-top 0.1s, opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Revealed states for Mozilla Thumb */
+.osd-bottom.hide-unfocused-progress.seekbar-active .osd-slider::-moz-range-thumb,
+.osd-bottom.hide-unfocused-progress.magic-hover .osd-slider::-moz-range-thumb,
+.osd-bottom.hide-unfocused-progress.dragging .osd-slider::-moz-range-thumb,
+.osd-bottom.hide-unfocused-progress.hovered .osd-slider::-moz-range-thumb,
+.osd-slider-row.hide-unfocused-progress.seekbar-active .osd-slider::-moz-range-thumb,
+.osd-slider-row.hide-unfocused-progress:hover .osd-slider::-moz-range-thumb,
+.osd-slider-row.hide-unfocused-progress.magic-hover .osd-slider::-moz-range-thumb,
+.osd-slider-row.hide-unfocused-progress.dragging .osd-slider::-moz-range-thumb {
+    opacity: 1 !important;
+    transition: opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* ============================================================================
+   Utility
+   ============================================================================ */
+
+.hide {
+    display: none !important;
+}
+
+/* ============================================================================
+   TV Focus Styles
+   ============================================================================ */
+
+/* Focused button style */
+.osd-btn.focused {
+    background: var(--jf-osd-btn-focus-bg) !important;
+    outline: none;
+}
+
+/* ============================================================================
+   Track Selection Menu
+   ============================================================================ */
+
+.track-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(var(--jf-overlay-bg-rgb, 0, 0, 0), var(--osd-track-menu-bg-opacity, 0.85));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-out;
+    transform: translateZ(100px); /* Tizen Fix */
+}
+
+.track-menu-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.track-menu {
+    background: transparent;
+    padding: 1.8em;
+    min-width: 750px;
+    max-width: 90vw;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.track-menu-title {
+    font-size: 1.56em;
+    /* 1.3em * 1.2 */
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1.2em;
+    /* 1em * 1.2 */
+    color: var(--osd-text-color);
+}
+
+.track-menu-options {
+    display: flex;
+    flex-direction: column;
+}
+
+.track-menu-options > * + * {
+    margin-top: 0.6em;
+}
+
+.track-option {
+    position: relative; /* Ensure absolute children (badges) are scoped to each item */
+    display: flex;
+    align-items: center;
+    padding: 0.96em 1.44em;
+    /* 0.8em * 1.2, 1.2em * 1.2 */
+    border-radius: var(--jf-border-radius-lg);
+    /* Standardized dynamic radius */
+    background: transparent;
+    border: none;
+    color: var(--osd-text-color);
+    font-size: 1.2em;
+    /* 1em * 1.2 */
+    font-weight: bold;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    box-sizing: border-box;
+    transition: background 0.15s;
+}
+
+.track-option:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Focused State: Use customizable focus background and contrast text colors */
+.track-option.focused {
+    background: var(--jf-btn-primary-focus-bg) !important;
+    color: var(--jf-btn-primary-focus-color) !important;
+}
+
+.track-option-check {
+    width: 28.8px;
+    /* 24px * 1.2 */
+    margin-right: 0.96em;
+    /* 0.8em * 1.2 */
+    opacity: 0;
+}
+
+.track-option.selected .track-option-check {
+    opacity: 1;
+}
+
+/* ── Transcoded Audio Track Styling ───────────────────────────────────────
+ * To ensure optimal visual clarity and legibility, audio tracks that require
+ * server-side transcoding preserve full 100% text opacity and contrast
+ * rather than being visually dimmed. Actionable items remain completely
+ * readable and responsive, with the dedicated "TRANSCODE" pill badge
+ * providing the clean semantic indicator.
+ * ────────────────────────────────────────────────────────────────────── */
+.track-option.track-unsupported {
+    /* Maintain full text opacity and contrast across all states */
+    opacity: 1;
+}
+
+.track-option.track-unsupported.focused,
+.track-option.track-unsupported:hover {
+    /* Full contrast on focus and hover */
+    opacity: 1;
+}
+
+/* Distinct badge color for the "TRANSCODE" indicator on unsupported tracks */
+.track-badge-unsupported {
+    background: rgba(255, 160, 0, 0.25) !important;
+    color: rgb(255, 180, 60) !important;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Unsupported Playback Speeds Styling
+ * ────────────────────────────────────────────────────────────────────────────
+ * Unsupported rates are greyed out with subdued opacity in rest state to
+ * establish a clear visual hierarchy, while preserving interactive accessibility.
+ * Hover, keyboard focus, and remote D-pad selection smoothly ramp to 95% opacity
+ * using fluid cubic-bezier spring easing (cubic-bezier(0.25, 1, 0.5, 1)).
+ * The item remains 100% interactive so the user can test or override if desired.
+ * ──────────────────────────────────────────────────────────────────────────── */
+.track-option.speed-unsupported {
+    opacity: 0.52;
+    transition: opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1),
+                background-color 0.22s cubic-bezier(0.25, 1, 0.5, 1),
+                transform 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.track-option.speed-unsupported .track-label-text {
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.track-option.speed-unsupported:hover,
+.track-option.speed-unsupported.focused,
+.track-option.speed-unsupported:focus,
+.track-option.speed-unsupported.magic-hover {
+    opacity: 0.95;
+}
+
+.track-option.speed-unsupported:hover .track-label-text,
+.track-option.speed-unsupported.focused .track-label-text,
+.track-option.speed-unsupported:focus .track-label-text {
+    color: #ffffff;
+}
+
+.track-option.speed-unsupported.selected {
+    opacity: 1;
+}
+
+.track-option.speed-unsupported.selected .track-label-text {
+    color: #ffffff;
+}
+
+/* Capsule Pill Badge for Unsupported Speeds */
+.track-option .track-badge-unsupported {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 7px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 9999px;
+    background: rgba(255, 159, 10, 0.18) !important;
+    color: #ff9f0a !important;
+    border: 1px solid rgba(255, 159, 10, 0.35) !important;
+    margin-left: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
+    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.track-option.focused .track-badge-unsupported,
+.track-option:hover .track-badge-unsupported {
+    background: rgba(255, 159, 10, 0.28) !important;
+    border-color: rgba(255, 159, 10, 0.5) !important;
+}
+
+[dir="rtl"] .track-option .track-badge-unsupported {
+    margin-left: 0;
+    margin-right: 8px;
+}
+.track-option-icon {
+    width: 28.8px;
+    /* 24px * 1.2 */
+    margin-right: 0.96em;
+    /* 0.8em * 1.2 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.track-option-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+}
+
+.track-option .track-label-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Single line for OSD tracks */
+    margin-right: 20px;
+}
+
+.track-option .track-badges {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 10px;
+    margin-left: auto !important; /* Forces badges to the far right on Tizen 4.0 */
+}
+
+.track-option-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.track-option-secondary {
+    font-size: 0.85em;
+    opacity: 0.6;
+    margin-top: 0.2em;
+}
+
+/* ============================================================================
+   Debug Overlay
+   ============================================================================ */
+#debug-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 40%;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    color: #0f0;
+    font-family: var(--jf-font-family, monospace);
+    font-size: 14px;
+    padding: 10px;
+    z-index: 9999;
+    overflow-y: auto;
+    pointer-events: none;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+#debug-overlay .log-error {
+    color: #f55;
+}
+
+#debug-overlay .log-warn {
+    color: #fe0;
+}
+
+#debug-overlay .log-info {
+    color: #fff;
+}
+
+/* Internal layout for settings items within the standard .track-option */
+.subtitle-setting-item {
+    justify-content: flex-start !important; /* Start-aligned so we control the gap via flex/margin */
+    padding: 1.2em 2em !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.sub-setting-label {
+    flex: 0 0 280px !important; /* Fixed width ensures all sliders start at the same column */
+    text-align: left;
+}
+
+.sub-setting-control {
+    flex: 1 !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.sub-setting-value {
+    font-weight: bold;
+    min-width: 2.0em;
+    text-align: right; /* Value after slider looks better left-aligned */
+    margin-left: 20px;
+}
+
+/* Slider integration within the menu item */
+.sub-setting-slider-group {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+
+.osd-slider-container.menu-slider {
+    flex: 1 !important;
+    height: 30px;
+    position: relative;
+    margin: 0; /* Menus handle their own spacing */
+}
+
+/* Ensure slider track is visible on the dark menu background */
+.osd-slider-container.menu-slider .osd-slider-track {
+    background: rgba(255, 255, 255, 0.2);
+    height: 6px !important;
+    border-radius: var(--jf-border-radius);
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    overflow: hidden;
+    margin-top: 0 !important;
+}
+
+.osd-slider-container.menu-slider .osd-slider-fill {
+    background: var(--osd-accent-color);
+    /* border-radius removed */
+}
+
+/* When the item is focused, the fill becomes the contrast color */
+.track-option.focused .menu-slider .osd-slider-fill {
+    background: var(--jf-accent-content-color, #fff);
+}
+
+/* When the item is focused, the track becomes brighter contrast tint */
+.track-option.focused .menu-slider .osd-slider-track {
+    background: rgba(var(--jf-accent-content-color-rgb, 255, 255, 255), 0.25);
+}
+
+.menu-slider .osd-slider {
+    position: absolute;
+    top: 50% !important;
+    left: 0;
+    transform: translateY(-50%) !important;
+    width: 100% !important;
+    height: 6px !important; /* Matches settings track height */
+}
+
+.menu-slider .osd-slider::-webkit-slider-runnable-track {
+    background: transparent !important;
+    height: 6px !important;
+    border: none !important;
+    margin: 0 !important;
+}
+
+/* ============================================================================
+   Playback Info Overlay
+   ============================================================================ */
+
+#osdPlaybackInfoOverlay {
+    position: fixed;
+    top: 60px;
+    right: 40px;
+    width: 420px;
+    max-height: min(680px, calc(100vh - 100px));
+    background: rgba(14, 14, 18, 0.92);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-radius: var(--jf-border-radius-lg, 16px);
+    padding: 16px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#osdPlaybackInfoOverlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.playback-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.playback-info-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.playback-info-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.playback-info-close:focus,
+.playback-info-close.focused {
+    background: var(--osd-accent-color);
+    color: var(--jf-primary-btn-color) !important;
+    outline: none;
+    border: 2px solid var(--jf-action-btn-active-border)!important;
+}
+
+/* Sections */
+.pi-section {
+    margin-bottom: 5px;
+}
+
+.pi-section:last-child {
+    margin-bottom: 0;
+}
+
+.pi-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 2px;
+    margin-bottom: 4px;
+}
+
+/* Rows */
+.pi-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.pi-row:last-child {
+    margin-bottom: 0;
+}
+
+.pi-label {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+.pi-value {
+    color: #fff;
+    font-weight: 600;
+    text-align: right;
+    max-width: 60%;
+    word-break: break-all;
+    line-height: 0.8;
+}
+#osdOffsetOverlay {
+    position: fixed;
+    top: 100px;
+    left: 50%;
+    -webkit-transform: translateX(-50%);
+    transform: translateX(-50%);
+    width: 480px; /* Reduced width for compact layout */
+    background: rgba(0, 0, 0, .65);
+    border: 1px solid hsla(0, 0%, 100%, .1);
+    border-radius: var(--jf-border-radius-lg);
+    padding: 20px 24px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.osd-offset-header {
+    margin-bottom: 12px;
+}
+
+.osd-offset-content {
+    margin-bottom: 12px;
+}
+
+.osd-offset-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.osd-offset-title-group {
+    display: flex;
+    align-items: baseline;
+}
+
+.osd-offset-title {
+    margin-right: 12px;
+}
+
+.osd-offset-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    /* No horizontal gap needed now that slider is full width */
+}
+
+/* Visible state — toggled by JS */
+#osdOffsetOverlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* "SUBTITLE OFFSET" label */
+.osd-offset-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+/* Offset value display, e.g. "+1.2s" */
+.osd-offset-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--jf-text-primary); 
+    font-variant-numeric: tabular-nums;
+}
+
+/* Close button */
+.osd-offset-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.osd-badge {
+    padding: 6px 14px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.4);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    margin-right: 12px;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+}
+
+.osd-offset-close .osd-icon {
+    width: 22px;
+    height: 22px;
+}
+
+.osd-offset-close:hover,
+.osd-offset-close:focus,
+.osd-offset-close.focused {
+    background: var(--osd-accent-color);
+    color: var(--jf-primary-btn-color) !important;
+    transform: scale(1.1);
+    outline: none !important;
+    border: 2px solid var(--jf-action-btn-active-border)!important;
+}
+
+/* Removed redundant/conflicting container height */
+/* ============================================================================
+   Lyrics Modal Context Menu
+   ============================================================================ */
+
+.lyrics-modal {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 40vw;
+    height: 100vh;
+    background: rgba(10, 10, 15, 0.95);
+
+    border-radius: 0;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    z-index: 2000;
+    transform: translateX(100%);
+    pointer-events: none;
+    -webkit-transition: -webkit-transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    opacity: 0;
+}
+
+.lyrics-modal.visible {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* 
+   When lyrics are active, shrink the player components to the left to make room.
+*/
+body.lyrics-active .osd-header,
+body.lyrics-active .osd-controls,
+body.lyrics-active .player-container,
+body.lyrics-active .loading-backdrop-layer {
+    width: 60vw !important;
+}
+
+body.lyrics-active .subtitle-overlay {
+    width: 60vw !important;
+    left: 0 !important;
+}
+
+.osd-header, 
+.osd-controls, 
+.player-container, 
+.loading-backdrop-layer {
+    -webkit-transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1), left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1), left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.subtitle-overlay {
+    -webkit-transition: 
+        width 0.4s cubic-bezier(0.25, 1, 0.5, 1), 
+        left 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+        -webkit-transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: 
+        width 0.4s cubic-bezier(0.25, 1, 0.5, 1), 
+        left 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+        -webkit-transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.osd-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+.osd-modal-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--jf-text-primary);
+}
+
+.osd-modal-close {
+    font-size: 16px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.lyrics-container {
+    flex: 1;
+    overflow-y: hidden;
+    position: relative;
+    /* Soft edges for scroll */
+    mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+}
+
+.lyrics-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 50vh 0; /* Padding allows the first and last line to be scrolled to the center */
+}
+
+.lyric-line {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.6;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+    transform-origin: center;
+    padding: 8px 16px;
+    margin: 4px 0;
+    border-radius: var(--jf-border-radius);
+    white-space: pre-wrap; /* Preserve line breaks from lyric text */
+    max-width: 90%;
+}
+
+.lyric-line.past {
+    color: rgba(255, 255, 255, 0.3);
+    transform: scale(0.95);
+}
+
+.lyric-line.future {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.lyric-line.current {
+    color: #fff;
+    transform: scale(1.1);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+html[data-light-music-player="true"] .lyric-line.current {
+    text-shadow: none !important;
+}
+
+.lyric-line.focused {
+    background: rgba(255, 255, 255, 0.15);
+    outline: 2px solid var(--jf-action-btn-active-border);
+}
+
+.lyric-line.current.focused {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.lyrics-empty, .lyrics-loading {
+    font-size: 24px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+/* ============================================================================
+   SyncPlay Notification Overlay
+   ============================================================================ */
+
+.osd-syncplay-notification {
+    position: absolute;
+    top: 15%; /* Positioned nicely in the upper visual center */
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 2000;
+    
+    /* Center its own contents */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.osd-syncplay-notification-glass {
+    background: rgba(30, 30, 30, 0.8);
+
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    
+    padding: 16px 32px 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: #fff;
+    
+    /* Animation origin */
+    transform-origin: center;
+}
+
+.osd-syncplay-notification-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--jf-accent);
+}
+
+.osd-syncplay-notification-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+.osd-syncplay-notification-text {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    -webkit-justify-content: center;
+    justify-content: center;
+}
+
+.osd-syncplay-notification-primary {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.osd-syncplay-notification-secondary {
+    font-size: 16px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.2;
+    margin-top: 4px;
+}
+
+/* 
+ * Visibility States and Animations
+ */
+.osd-syncplay-hidden .osd-syncplay-notification-glass {
+    opacity: 0;
+    transform: scale(0.85) translateY(-20px);
+    transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.3, 0, 0, 1);
+}
+
+.osd-syncplay-visible .osd-syncplay-notification-glass {
+    /* CSS Spring: overshoot and settle */
+    -webkit-animation: syncplay-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: syncplay-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@-webkit-keyframes syncplay-pop {
+    0% {
+        opacity: 0;
+        -webkit-transform: scale(0.8) translateY(-30px);
+        transform: scale(0.8) translateY(-30px);
+    }
+    100% {
+        opacity: 1;
+        -webkit-transform: scale(1) translateY(0);
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes syncplay-pop {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(-30px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+
+/* Special modifiers based on the data-action attribute */
+.osd-syncplay-notification[data-action="buffering"] .osd-syncplay-notification-icon svg {
+    -webkit-animation: syncplay-spin 2s linear infinite;
+    animation: syncplay-spin 2s linear infinite;
+}
+
+@-webkit-keyframes syncplay-spin {
+    0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+    100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
+@keyframes syncplay-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 
+ * ── Ultra-Legacy Overrides: OSD Layout (Chrome <47 / Tizen 2.x) ────────────
+ * Chromium 32 flexbox fails silently on complex hierarchies, causing 0x0
+ * layouts or completely hidden containers.
+ * We force a block/table based layout explicitly for the OSD structure.
+ */
+
+/* 1. Container & Header */
+html[data-layout-tier="ultra-legacy"] .player-osd {
+    /* Chrome 32: translateZ(0) on an absolute container destroys fixed descendants */
+    -webkit-transform: none !important;
+    transform: none !important;
+    /* Ensure text color is always bright white regardless of var() parsing */
+    color: #ffffff !important;
+    /* Force explicit full-screen sizing — Chrome 38 doesn't always resolve
+     * right:0/bottom:0 correctly on position:absolute inside position:fixed */
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+
+/* 2. Make osd-main fill its parent, disable opacity transitions (Chrome 38
+ *    fails to repaint opacity changes on composited layers), and use a hard
+ *    display:none toggle for show/hide instead. */
+html[data-layout-tier="ultra-legacy"] .osd-main {
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    /* No transitions on ultra-legacy — opacity animations cause no-repaint bugs */
+    -webkit-transition: none !important;
+    transition: none !important;
+    /* Force opacity to full so the hidden state is purely via display:none */
+    opacity: 1 !important;
+}
+
+/* 2.5 Force layout redraw on show/hide via display toggle.
+ *     This guarantees Chrome 38 repaints the subtree on every wake-up. */
+html[data-layout-tier="ultra-legacy"] .osd-main.osd-hidden {
+    display: none !important;
+}
+
+
+/* 3. Header */
+html[data-layout-tier="ultra-legacy"] .osd-header {
+    display: block !important;
+}
+html[data-layout-tier="ultra-legacy"] .osd-header-left {
+    float: left;
+}
+html[data-layout-tier="ultra-legacy"] .osd-header-right {
+    float: right;
+}
+html[data-layout-tier="ultra-legacy"] .osd-header::after {
+    content: "";
+    display: block;
+    clear: both;
+}
+
+/* 4. Bottom Container.
+ *    Changed from position:fixed (broken in Chrome 38 inside a composited
+ *    ancestor) to position:absolute. Explicit left/right/bottom anchoring
+ *    is required because width:100% on absolute only works when the
+ *    containing block has a known pixel width. */
+html[data-layout-tier="ultra-legacy"] .osd-bottom {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: auto !important;
+    box-sizing: border-box;
+}
+
+/* 5. Controls Row */
+html[data-layout-tier="ultra-legacy"] .osd-controls-row {
+    display: block !important;
+}
+html[data-layout-tier="ultra-legacy"] .osd-controls-left {
+    float: left;
+}
+html[data-layout-tier="ultra-legacy"] .osd-controls-right {
+    float: right;
+}
+html[data-layout-tier="ultra-legacy"] .osd-controls-row::after {
+    content: "";
+    display: block;
+    clear: both;
+}
+
+/* 6. Slider Row (Table layout is perfect for fixed-width sides and flexible center) */
+html[data-layout-tier="ultra-legacy"] .osd-slider-row {
+    display: table !important;
+    width: 100%;
+    table-layout: fixed;
+}
+html[data-layout-tier="ultra-legacy"] .osd-time,
+html[data-layout-tier="ultra-legacy"] .osd-slider-container {
+    display: table-cell !important;
+    vertical-align: middle;
+    float: none !important;
+}
+html[data-layout-tier="ultra-legacy"] .osd-time {
+    width: 5em;
+}
+
+/* 7. Inline Items inside the left/right containers */
+html[data-layout-tier="ultra-legacy"] .osd-header-left > *:not(.hidden),
+html[data-layout-tier="ultra-legacy"] .osd-header-right > *:not(.hidden),
+html[data-layout-tier="ultra-legacy"] .osd-controls-left > *:not(.hidden),
+html[data-layout-tier="ultra-legacy"] .osd-controls-right > *:not(.hidden) {
+    display: inline-block !important;
+    vertical-align: middle;
+}
+
+/* ============================================================================
+   OSD Button and Menu Vector State Toggles (Outline vs Filled SVG)
+   ============================================================================ */
+
+/* Hide the filled SVG design path state by default inside OSD, overlays, and modals. */
+.player-osd .icon-filled,
+.track-menu-overlay .icon-filled,
+.playback-info-overlay .icon-filled,
+.osd-modal .icon-filled,
+.syncplay-overlay .icon-filled {
+    display: none !important;
+}
+
+/* Display the outline SVG design path state by default inside OSD, overlays, and modals. */
+.player-osd .icon-outline,
+.track-menu-overlay .icon-outline,
+.playback-info-overlay .icon-outline,
+.osd-modal .icon-outline,
+.syncplay-overlay .icon-outline {
+    display: inline-block !important;
+}
+
+/* Switch visibility when parent button or menu item is actively focused, hovered, selected, or active. */
+.player-osd .focusable.focused .icon-outline,
+.player-osd .focusable:focus .icon-outline,
+.track-menu-overlay .track-option.focused .icon-outline,
+.track-menu-overlay .track-option.selected .icon-outline,
+.player-osd .osd-btn.focused .icon-outline,
+.player-osd .osd-btn:focus .icon-outline,
+.player-osd .osd-btn:hover .icon-outline,
+.player-osd .osd-btn.magic-hover .icon-outline,
+.player-osd .osd-btn.active .icon-outline,
+.player-osd .osd-btn.syncplay-active .icon-outline,
+.syncplay-overlay .syncplay-group-item:focus .icon-outline,
+.syncplay-overlay .syncplay-group-item.focused .icon-outline {
+    display: none !important;
+}
+
+/* Make filled vector design active when focus, hover, or active states match. */
+.player-osd .focusable.focused .icon-filled,
+.player-osd .focusable:focus .icon-filled,
+.track-menu-overlay .track-option.focused .icon-filled,
+.track-menu-overlay .track-option.selected .icon-filled,
+.player-osd .osd-btn.focused .icon-filled,
+.player-osd .osd-btn:focus .icon-filled,
+.player-osd .osd-btn:hover .icon-filled,
+.player-osd .osd-btn.magic-hover .icon-filled,
+.player-osd .osd-btn.active .icon-filled,
+.player-osd .osd-btn.syncplay-active .icon-filled,
+.syncplay-overlay .syncplay-group-item:focus .icon-filled,
+.syncplay-overlay .syncplay-group-item.focused .icon-filled {
+    display: inline-block !important;
+}
+
+
+/* If button is NOT active (i.e. not favorited): hide all favorite SVGs */
+.osd-btn#osdFavoriteBtn:not(.active) .icon-favorite {
+    display: none !important;
+}
+
+/* If button IS active (i.e. favorited): hide all unfavorite SVGs */
+.osd-btn#osdFavoriteBtn.active .icon-unfavorite {
+    display: none !important;
+}
+
+/* When active but NOT focused, show State 3 (outline favorite) and hide State 4 (filled favorite) */
+.osd-btn#osdFavoriteBtn.active .icon-favorite.icon-outline {
+    display: inline-block !important;
+}
+.osd-btn#osdFavoriteBtn.active .icon-favorite.icon-filled {
+    display: none !important;
+}
+
+/* Hide outline and show filled for unfavorite icon when focused/hovered in inactive state */
+.osd-btn#osdFavoriteBtn:not(.active).focused .icon-unfavorite.icon-outline,
+.osd-btn#osdFavoriteBtn:not(.active):focus .icon-unfavorite.icon-outline,
+.osd-btn#osdFavoriteBtn:not(.active):hover .icon-unfavorite.icon-outline,
+.osd-btn#osdFavoriteBtn:not(.active).magic-hover .icon-unfavorite.icon-outline {
+    display: none !important;
+}
+.osd-btn#osdFavoriteBtn:not(.active).focused .icon-unfavorite.icon-filled,
+.osd-btn#osdFavoriteBtn:not(.active):focus .icon-unfavorite.icon-filled,
+.osd-btn#osdFavoriteBtn:not(.active):hover .icon-unfavorite.icon-filled,
+.osd-btn#osdFavoriteBtn:not(.active).magic-hover .icon-unfavorite.icon-filled {
+    display: inline-block !important;
+}
+
+/* Hide outline and show filled for favorite icon when focused/hovered in active state */
+.osd-btn#osdFavoriteBtn.active.focused .icon-favorite.icon-outline,
+.osd-btn#osdFavoriteBtn.active:focus .icon-favorite.icon-outline,
+.osd-btn#osdFavoriteBtn.active:hover .icon-favorite.icon-outline,
+.osd-btn#osdFavoriteBtn.active.magic-hover .icon-favorite.icon-outline {
+    display: none !important;
+}
+.osd-btn#osdFavoriteBtn.active.focused .icon-favorite.icon-filled,
+.osd-btn#osdFavoriteBtn.active:focus .icon-favorite.icon-filled,
+.osd-btn#osdFavoriteBtn.active:hover .icon-favorite.icon-filled,
+.osd-btn#osdFavoriteBtn.active.magic-hover .icon-favorite.icon-filled {
+    display: inline-block !important;
+}
+
+/* ============================================================================
+   OSD BUTTONS BELOW SEEKBAR LAYOUT
+   ============================================================================ */
+.osd-bottom.buttons-below {
+    display: flex;
+    flex-direction: column;
+}
+.osd-bottom.buttons-below .osd-controls-row {
+    order: 2;
+    margin-top: 1.0em !important;
+    margin-bottom: 0 !important;
+}
+.osd-bottom.buttons-below .osd-slider-row {
+    order: 1;
+    margin-top: 0 !important;
+}
+
+/* ============================================================================
+   OSD CENTERED LAYOUT
+   ============================================================================ */
+.osd-bottom.osd-layout-centered .osd-controls-row {
+    position: relative !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    min-height: 86.4px !important;
+}
+.osd-bottom.osd-layout-centered .osd-ends-at {
+    margin-left: 0.6em !important;
+}
+.osd-bottom.osd-layout-centered .osd-controls-left {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+}
+.osd-bottom.osd-layout-centered .osd-controls-right {
+    display: flex !important;
+    align-items: center !important;
+}
+.osd-bottom.osd-layout-centered .osd-spacer {
+    display: none !important;
+}
+
+/* ============================================================================
+   OSD HDR Darker White Overrides
+   ----------------------------------------------------------------------------
+   Overrides bright white text, headers, icons, and muted elements with dark grey (#a9a9a9).
+   Prevents eye strain in high-brightness HDR modes.
+   Note: --osd-slider-progress is intentionally preserved so user/theme seek bar colors remain untouched.
+   ============================================================================ */
+.player-osd.hdr-darker-white {
+    /* Mute default white text color variables for high dynamic range */
+    --osd-text-color: #a9a9a9 !important;
+    /* Soften seek bar thumb background handle */
+    --osd-thumb-bg: #a9a9a9 !important;
+    /* Mute primary container text fallback */
+    --jf-text-primary: #a9a9a9 !important;
+    /* Adjust unfilled track background to subtle dark grey */
+    --osd-slider-bg: rgba(169, 169, 169, 0.3) !important;
+}
+
+.player-osd.hdr-darker-white .osd-time,
+.player-osd.hdr-darker-white .osd-clock,
+.player-osd.hdr-darker-white .osd-title,
+.player-osd.hdr-darker-white .osd-title-secondary,
+.player-osd.hdr-darker-white .osd-ends-at,
+.player-osd.hdr-darker-white .osd-seek-tooltip-text,
+.player-osd.hdr-darker-white .chapters-modal__title,
+.player-osd.hdr-darker-white .chapters-modal__count,
+.player-osd.hdr-darker-white .queue-modal__title,
+.player-osd.hdr-darker-white .queue-modal__count,
+.player-osd.hdr-darker-white .chapter-row__name,
+.player-osd.hdr-darker-white .chapter-row__time,
+.player-osd.hdr-darker-white .queue-row__name,
+.player-osd.hdr-darker-white .queue-row__subtitle,
+.player-osd.hdr-darker-white .queue-row__number,
+.player-osd.hdr-darker-white .track-menu-title,
+.player-osd.hdr-darker-white .osd-modal-header h2,
+.player-osd.hdr-darker-white .lyrics-modal h2,
+.player-osd.hdr-darker-white .lyrics-line,
+.player-osd.hdr-darker-white .description-modal h2,
+.player-osd.hdr-darker-white .description-overview,
+.player-osd.hdr-darker-white .playback-info-title,
+.player-osd.hdr-darker-white .playback-info-value,
+.player-osd.hdr-darker-white .setting-name,
+.player-osd.hdr-darker-white .setting-description,
+.player-osd.hdr-darker-white .track-option:not(.focused):not(.selected),
+.player-osd.hdr-darker-white .osd-btn:not(:focus):not(.focused):not(.magic-hover):not(.active) {
+    color: #a9a9a9 !important;
+}
+
+.player-osd.hdr-darker-white .osd-btn:not(:focus):not(.focused):not(.magic-hover):not(.active) svg,
+.player-osd.hdr-darker-white .osd-btn:not(:focus):not(.focused):not(.magic-hover):not(.active) .osd-icon {
+    fill: #a9a9a9 !important;
+    color: #a9a9a9 !important;
+}
+
+/* HDR overrides for body-level track-menu-overlay elements
+   (track menus are appended to document.body, not inside .player-osd) */
+body.hdr-darker-white .track-menu-overlay .track-option:not(.focused):not(.selected) {
+    color: #a9a9a9 !important;
+}
+body.hdr-darker-white .track-menu-overlay .track-option:not(.focused):not(.selected) svg {
+    fill: #a9a9a9 !important;
+    color: #a9a9a9 !important;
+}
+body.hdr-darker-white .track-menu-overlay .track-option:not(.focused):not(.selected) .track-badge {
+    color: #a9a9a9 !important;
+    border-color: rgba(169, 169, 169, 0.3) !important;
+    background: rgba(169, 169, 169, 0.1) !important;
+}
+body.hdr-darker-white .track-menu-overlay .track-option:not(.focused):not(.selected) .track-option-secondary,
+body.hdr-darker-white .track-menu-overlay .track-option:not(.focused):not(.selected) .track-badges,
+body.hdr-darker-white .track-menu-overlay .track-option:not(.focused):not(.selected) .sub-setting-label,
+body.hdr-darker-white .track-menu-overlay .track-option:not(.focused):not(.selected) .sub-setting-value {
+    color: #a9a9a9 !important;
+}
+body.hdr-darker-white .track-menu-overlay .track-menu-title {
+    color: #a9a9a9 !important;
+}
+.resume-profiles-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2147483647;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--jf-background, #000);
+}
+
+.resume-profiles-overlay.visible {
+    display: flex;
+}
+
+.resume-profiles-panel h1 {
+    margin: 0 0 64px;
+    color: var(--jf-text-primary);
+    font-size: 3.8rem;
+    text-align: center;
+}
+
+body.resume-profile-selection-active .jellyfin-video-player {
+    visibility: hidden !important;
+}
+
+.resume-profiles-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ============================================================================
+   STEALTH / ANTI-SPOILER OSD LAYOUT & TRANSIENT ACTION HUD
+   ============================================================================ */
+
+/* Main container state for stealth layout */
+/* Main container state for stealth layout: strictly suppress pointer events and hit-testing */
+.player-osd.osd-layout-hidden .osd-main.osd-hidden,
+.player-osd.osd-layout-hidden .osd-main.osd-hidden * {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
+
+/* Overlays (Layer 2: UpNextDialog, Skip Intro/Outro buttons, Modals) remain fully visible and active */
+.player-osd.osd-layout-hidden .osd-overlays {
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.player-osd.osd-layout-hidden .osd-overlays > * {
+    pointer-events: all;
+}
+
+/* ============================================================================
+   TRANSIENT ACTION HUD
+   ============================================================================ */
+.osd-stealth-hud {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    z-index: 950;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.22s ease-out, transform 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.osd-stealth-hud.hidden {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.82);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.osd-stealth-hud-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 20px 32px;
+    min-width: 96px;
+    min-height: 96px;
+    border-radius: 48px;
+    background: rgba(22, 22, 26, 0.78);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    backdrop-filter: blur(28px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    /* Strict rule adherence: No drop shadows or text shadows */
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    color: #ffffff;
+    box-sizing: border-box;
+}
+
+.osd-stealth-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.osd-stealth-icon-wrap svg {
+    width: 48px;
+    height: 48px;
+    display: block;
+    fill: currentColor;
+    color: #ffffff;
+    filter: none !important;
+}
+
+.osd-stealth-text {
+    font-family: var(--jf-font-family, sans-serif);
+    font-size: 1.55rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+/* ============================================================================
+   STEALTH 2-SECOND HOLD GESTURE INDICATOR
+   - Subtle bottom-docked capsule with radial SVG progress ring
+   - Smooth 2-second linear fill transition on active hold
+   ============================================================================ */
+.osd-hold-indicator {
+    position: absolute;
+    bottom: 72px;
+    left: 50%;
+    transform: translateX(-50%) scale(1);
+    z-index: 960;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 22px;
+    border-radius: 32px;
+    background: rgba(20, 20, 24, 0.82);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    opacity: 1;
+    transition: opacity 0.22s ease-out, transform 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.osd-hold-indicator.hidden {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.85);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.osd-hold-ring {
+    width: 32px;
+    height: 32px;
+    transform: rotate(-90deg);
+    flex-shrink: 0;
+}
+
+.osd-hold-ring-bg {
+    stroke: rgba(255, 255, 255, 0.18);
+    fill: none;
+    stroke-width: 3.5;
+}
+
+.osd-hold-ring-progress {
+    /* Dynamic theme accent color stroke */
+    stroke: var(--jf-accent, #00a4dc);
+    fill: none;
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-dasharray: 98;
+    stroke-dashoffset: 98;
+    transition: none;
+}
+
+.osd-hold-indicator.active .osd-hold-ring-progress {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 2s linear;
+}
+
+.osd-hold-label {
+    font-family: var(--jf-font-family, sans-serif);
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: rgba(255, 255, 255, 0.92);
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .osd-stealth-hud-pill {
+        padding: 14px 22px;
+        min-width: 76px;
+        min-height: 76px;
+        border-radius: 38px;
+        gap: 10px;
+    }
+
+    .osd-stealth-icon-wrap svg {
+        width: 36px;
+        height: 36px;
+    }
+
+    .osd-stealth-text {
+        font-size: 1.25rem;
+    }
+
+    .osd-hold-indicator {
+        bottom: 36px;
+        padding: 10px 18px;
+        gap: 10px;
+    }
+
+    .osd-hold-label {
+        font-size: 0.85rem;
+    }
+}
+
+/* ============================================================================
+ * MOBILE & TOUCH OSD MENUS & PANELS
+ * ============================================================================
+ * Compact layout adjustments for mobile phone and touch displays:
+ * 1. Dimensions & Padding: Replaces heavy TV 1.8em padding with compact 14px
+ *    padding. Eliminates 750px TV minimum width so menus fit mobile viewports.
+ * 2. Touch Targets: Option rows enforce 44px min-height touch targets.
+ * 3. Scrollability: Max-height expanded to 86vh with momentum touch scrolling.
+ * 4. Sliders: Subtitle appearance sliders wrap labels above slider tracks
+ *    on mobile viewports so controls remain fully visible without clipping.
+ * ============================================================================ */
+
+/* Primary Track and Settings Menus (Audio, Subtitles, Quality, Speed, Playback Mode) */
+html[data-litefin-scaled] .track-menu,
+html[data-litefin-touch] .track-menu {
+    min-width: 0 !important;
+    width: 92vw !important;
+    max-width: 520px !important;
+    max-height: 86vh !important;
+    padding: 14px 16px !important;
+    background: rgba(var(--jf-overlay-bg-rgb, 18, 18, 22), 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: var(--jf-border-radius-lg, 12px) !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+}
+
+/* Landscape orientation optimization: slightly wider and compact */
+@media (orientation: landscape) {
+    html[data-litefin-scaled] .track-menu,
+    html[data-litefin-touch] .track-menu {
+        max-height: 88vh !important;
+        max-width: 560px !important;
+        padding: 12px 18px !important;
+    }
+}
+
+/* Menu Header Title */
+html[data-litefin-scaled] .track-menu-title,
+html[data-litefin-touch] .track-menu-title {
+    font-size: 1.15rem !important;
+    letter-spacing: -0.01em !important;
+    margin-bottom: 10px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    text-align: center !important;
+}
+
+/* Compact spacing between options */
+html[data-litefin-scaled] .track-menu-options > * + *,
+html[data-litefin-touch] .track-menu-options > * + * {
+    margin-top: 5px !important;
+}
+
+/* Option Buttons: Touch target, compact padding & active feedback */
+html[data-litefin-scaled] .track-option,
+html[data-litefin-touch] .track-option {
+    padding: 10px 14px !important;
+    font-size: 0.95rem !important;
+    min-height: 44px !important;
+    border-radius: var(--jf-border-radius, 8px) !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+    transition: background 0.15s ease !important;
+}
+
+html[data-litefin-scaled] .track-option:active,
+html[data-litefin-touch] .track-option:active {
+    transform: scale(0.985) !important;
+}
+
+/* Compact Icon & Checkmark indicators */
+html[data-litefin-scaled] .track-option-check,
+html[data-litefin-touch] .track-option-check,
+html[data-litefin-scaled] .track-option-icon,
+html[data-litefin-touch] .track-option-icon {
+    width: 22px !important;
+    height: 22px !important;
+    margin-right: 8px !important;
+    flex-shrink: 0 !important;
+}
+
+/* Label and secondary metadata wrap cleanly */
+html[data-litefin-scaled] .track-option .track-label-text,
+html[data-litefin-touch] .track-option .track-label-text {
+    font-size: 0.95rem !important;
+    margin-right: 12px !important;
+}
+
+html[data-litefin-scaled] .track-option .track-badges,
+html[data-litefin-touch] .track-option .track-badges {
+    gap: 6px !important;
+}
+
+/* Subtitle Quick Appearance Settings Menu */
+html[data-litefin-scaled] .subtitle-setting-item,
+html[data-litefin-touch] .subtitle-setting-item {
+    padding: 10px 14px !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+}
+
+html[data-litefin-scaled] .sub-setting-label,
+html[data-litefin-touch] .sub-setting-label {
+    flex: 1 1 auto !important;
+    font-size: 0.92rem !important;
+    max-width: 100% !important;
+}
+
+html[data-litefin-scaled] .sub-setting-control,
+html[data-litefin-touch] .sub-setting-control {
+    flex: 1 1 auto !important;
+    justify-content: flex-end !important;
+}
+
+html[data-litefin-scaled] .sub-setting-slider-group,
+html[data-litefin-touch] .sub-setting-slider-group {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    gap: 12px !important;
+    margin-top: 4px !important;
+}
+
+html[data-litefin-scaled] .sub-setting-value,
+html[data-litefin-touch] .sub-setting-value {
+    font-size: 0.9rem !important;
+    margin-left: 8px !important;
+    min-width: 2.2em !important;
+}
+
+/* Lyrics Drawer on Mobile */
+html[data-litefin-scaled] .lyrics-modal,
+html[data-litefin-touch] .lyrics-modal {
+    width: 88vw !important;
+    max-width: 440px !important;
+    padding: 18px !important;
+    border-radius: 20px 0 0 20px !important;
+}
+
+/* Resume Profiles Overlay on Mobile */
+html[data-litefin-scaled] .resume-profiles-panel,
+html[data-litefin-touch] .resume-profiles-panel {
+    padding: 24px 16px !important;
+    max-width: 92vw !important;
+}
+
+html[data-litefin-scaled] .resume-profiles-panel h1,
+html[data-litefin-touch] .resume-profiles-panel h1 {
+    font-size: 1.8rem !important;
+    margin-bottom: 24px !important;
+}
+

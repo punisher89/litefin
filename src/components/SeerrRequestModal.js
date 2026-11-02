@@ -1,0 +1,797 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Jellyseerr Request Modal
+ * ============================================================================
+ * Detail sheet for a discovery item and request creation. For a series, loads
+ * the season list and lets the viewer pick which seasons to request.
+ * ============================================================================
+ */
+
+import { api } from '../api/ApiClient.js';
+import { seerr } from '../api/seerrClient.js';
+import { SEERR_STATUS, seerrStatusKey, seerrSeasonStatusKey, isSeerrAnimeItem } from '../api/seerrNormalize.js';
+import { focusManager } from '../ui/FocusManager.js';
+import { router } from '../core/Router.js';
+import { toast } from '../ui/Toast.js';
+import { i18n } from '../utils/i18n.js';
+import { logger } from '../utils/Logger.js';
+import { state } from '../core/StateManager.js';
+import { storage } from '../utils/StorageService.js';
+
+const log = logger.create('SeerrRequestModal');
+
+const OVERLAY_ID = 'seerr-request-modal';
+
+// Storage keys for preserving user-selected request defaults per media type
+const STORAGE_KEY_DEFAULT_SERVER = 'seerr:defaultServer:';
+const STORAGE_KEY_DEFAULT_PROFILE = 'seerr:defaultProfile:';
+const STORAGE_KEY_DEFAULT_FOLDER = 'seerr:defaultFolder:';
+
+function escapeHtml(value) {
+    if (!value) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+const DEFAULT_AVATAR_SVG = `<svg class="seerr-avatar-icon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+
+function getUserAvatarUrl(user) {
+    if (!user) return '';
+    if (user.jellyfinUserId) {
+        return api.getUserImageUrl(user.jellyfinUserId, { maxWidth: 64 });
+    }
+    if (
+        user.avatar &&
+        (user.avatar.startsWith('http://') || user.avatar.startsWith('https://') || user.avatar.startsWith('//'))
+    ) {
+        return user.avatar;
+    }
+    return '';
+}
+
+function renderUserAvatarHtml(user) {
+    const avatarUrl = getUserAvatarUrl(user);
+    if (avatarUrl) {
+        return `<img class="seerr-user-avatar-img" src="${escapeHtml(avatarUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"/>
+                <span style="display:none;">${DEFAULT_AVATAR_SVG}</span>`;
+    }
+    return DEFAULT_AVATAR_SVG;
+}
+
+class SeerrRequestModal {
+    /**
+     * @param {Object} item - Normalized item (see seerrNormalize)
+     * @param {Function} [onRequested] - Called with the new status on success
+     */
+    static async show(item, onRequested) {
+        const existing = document.getElementById(OVERLAY_ID);
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = OVERLAY_ID;
+        overlay.className = 'modal-overlay visible';
+        document.body.appendChild(overlay);
+
+        const isTv = item._mediaType === 'tv';
+        const isAvailable = item._seerrStatus === SEERR_STATUS.AVAILABLE;
+        const statusKey = seerrStatusKey(item._seerrStatus);
+
+        // Inside the modal the submit button always says "Request More" when
+        // the series has any active/pending request — the modal context makes
+        // the intent clear (season picker is shown). The outer details button
+        // is the one that says "View Request" for PENDING/PROCESSING.
+        const isPartiallyAvailableOrActive =
+            isTv &&
+            (item._seerrStatus === SEERR_STATUS.PARTIALLY_AVAILABLE ||
+                item._seerrStatus === SEERR_STATUS.PENDING ||
+                item._seerrStatus === SEERR_STATUS.PROCESSING);
+        const requestBtnLabel = i18n.t(isPartiallyAvailableOrActive ? 'SeerrRequestMore' : 'SeerrRequest');
+
+        const itemTitle = `${item.Name}${item.ProductionYear ? ` (${item.ProductionYear})` : ''}`;
+        const modalHeaderTitle = isTv ? `${i18n.t('SeerrRequestSeries')} - ${itemTitle}` : i18n.t('SeerrRequestMovie');
+
+        overlay.innerHTML = `
+            <div class="settings-modal seerr-modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h2>${modalHeaderTitle}</h2>
+                </div>
+                <div class="modal-options seerr-modal-body">
+                    ${!isTv ? `<h3 class="seerr-item-title">${itemTitle}</h3>` : ''}
+                    ${statusKey ? `<p class="seerr-modal-status">${i18n.t(statusKey)}</p>` : ''}
+                    <div class="seerr-seasons" id="seerr-seasons"></div>
+                    <div class="seerr-request-options" id="seerr-request-options"></div>
+                </div>
+                <div class="modal-actions">
+                    ${
+                        isAvailable
+                            ? ''
+                            : `<button class="modal-action-btn" id="btn-seerr-request" tabindex="0">${requestBtnLabel}</button>`
+                    }
+                    <button class="modal-action-btn" id="btn-seerr-close" tabindex="0">${i18n.t('ButtonBack')}</button>
+                </div>
+            </div>
+        `;
+
+        const panel = overlay.querySelector('.seerr-modal');
+        // pushTrap locks focus inside the modal and remembers the previous
+        // section and element; popTrap restores them.
+        focusManager.pushTrap(panel);
+
+        // The remote's hardware Back button is a separate event path from D-pad
+        // navigation (FocusManager's trap only blocks Up/Down/Left/Right). Without
+        // hijacking the current page's onBack, Back would fall through to page/router
+        // navigation while this trap stays registered, stranding focus — the same
+        // failure mode MediaInfoModal and DescriptionModal guard against.
+        const currentPage = router.getCurrentPage();
+        const oldOnBack = currentPage ? currentPage.onBack : null;
+
+        const close = () => {
+            if (currentPage && currentPage.onBack === myOnBack) currentPage.onBack = oldOnBack;
+            focusManager.popTrap();
+            overlay.remove();
+        };
+
+        const myOnBack = () => {
+            close();
+            return true;
+        };
+        if (currentPage) currentPage.onBack = myOnBack;
+
+        overlay.querySelector('#btn-seerr-close').addEventListener('click', close);
+
+        const requestBtn = overlay.querySelector('#btn-seerr-request');
+
+        // Series: load the seasons
+        let selectedSeasons = [];
+        if (isTv && !isAvailable) {
+            selectedSeasons = await SeerrRequestModal._renderSeasons(overlay, item, requestBtn);
+        }
+
+        const requestOptions = await SeerrRequestModal._renderRequestOptions(overlay, item);
+
+        if (requestBtn) {
+            requestBtn.addEventListener('click', async () => {
+                // Ensure at least one season is picked when requesting television series
+                if (isTv && selectedSeasons.length === 0) {
+                    const errorEl = overlay.querySelector('#seerr-season-error');
+                    if (errorEl) {
+                        errorEl.classList.remove('hidden');
+                        errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    return;
+                }
+                requestBtn.disabled = true;
+                try {
+                    // Extract advanced options safely with defensive fallback
+                    let extraOptions = {};
+                    if (typeof requestOptions === 'function') {
+                        try {
+                            extraOptions = requestOptions() || {};
+                        } catch (optErr) {
+                            // Non-fatal options extraction error: log warning and proceed with default request
+                            log.warn(
+                                'Could not serialize advanced request options, falling back to basic payload:',
+                                optErr
+                            );
+                        }
+                    }
+
+                    // Dispatch media request to Seerr via companion plugin
+                    const res = await seerr.createRequest({
+                        mediaType: item._mediaType,
+                        tmdbId: item._tmdbId,
+                        seasons: isTv ? selectedSeasons.slice() : undefined,
+                        ...extraOptions
+                    });
+
+                    // Notify user and propagate status update
+                    toast.show(i18n.t('SeerrRequestSent'));
+                    if (onRequested) onRequested(SEERR_STATUS.PENDING, res?.id);
+                    close();
+                } catch (err) {
+                    requestBtn.disabled = false;
+
+                    // 409 Conflict: media has already been requested by a user
+                    if (err.status === 409) {
+                        toast.show(i18n.t('SeerrAlreadyRequested'));
+                        if (onRequested) onRequested(SEERR_STATUS.PENDING);
+                        close();
+                        return;
+                    }
+
+                    // Log detailed diagnostic information to console
+                    log.error('Seerr media request failed:', err);
+
+                    // Surface exact server error message or status so TV user can see why it failed
+                    const detailMsg = err?.message || err?.statusText || (err?.status ? `HTTP ${err.status}` : null);
+                    const toastMsg = detailMsg
+                        ? `${i18n.t('SeerrRequestFailed')}: ${detailMsg}`
+                        : i18n.t('SeerrRequestFailed');
+                    toast.show(toastMsg);
+                }
+            });
+        }
+    }
+
+    static async _renderRequestOptions(overlay, item) {
+        const container = overlay.querySelector('#seerr-request-options');
+        let options;
+        let users = [];
+        try {
+            [options, users] = await Promise.all([seerr.requestOptions(item._mediaType), seerr.getUsers()]);
+        } catch (err) {
+            log.warn('Could not load advanced request options or users', err);
+            return () => ({});
+        }
+
+        // --------------------------------------------------------------------
+        // Check Admin Status (Seerr-side):
+        //
+        // We check the current user's OWN Seerr permissions — NOT the API key
+        // owner's permissions (`options.user` is always the admin key holder),
+        // and NOT Jellyfin's IsAdministrator flag (a user can be a Jellyfin
+        // admin without being a Seerr admin, e.g. BigTv).
+        //
+        // Strategy: match the current Jellyfin user ID against the `users` list
+        // (which we already fetched), then read their Seerr `permissions` bitmask.
+        // ADMIN = 2, MANAGE_REQUESTS = 8192.
+        // --------------------------------------------------------------------
+
+        // Normalize the current Jellyfin user ID for comparison (strip hyphens)
+        const currentJfId = (api.userId || '').replace(/-/g, '').toLowerCase();
+
+        // Find this user's Seerr account by matching their Jellyfin user ID
+        const currentSeerrUser = Array.isArray(users)
+            ? users.find((u) => {
+                  const uJfId = (u.jellyfinUserId || '').replace(/-/g, '').toLowerCase();
+                  return currentJfId && uJfId && uJfId === currentJfId;
+              }) || null
+            : null;
+
+        // Check if the current user's Seerr permissions include ADMIN (2) or MANAGE_REQUESTS (8192)
+        const isAdmin = !!((currentSeerrUser?.permissions || 0) & (2 | 8192));
+
+        // If user is not an administrator, disable advanced server options and user switching
+        const hasAdvancedOptions = isAdmin && options && options.servers && options.servers.length > 0;
+        const hasUsers = Array.isArray(users) && users.length > 0;
+
+        // --------------------------------------------------------------------
+        // Auto-Detect "Request As" User:
+        // We already matched the current Jellyfin user to their Seerr account
+        // above (`currentSeerrUser`). Use that directly, falling back to the
+        // first user in the list if no match was found.
+        // --------------------------------------------------------------------
+        let selectedUser = null;
+        if (hasUsers) {
+            // Primary match: exact Jellyfin user ID match (already resolved above)
+            // Secondary: match by username/display name in case jellyfinUserId wasn't set
+            selectedUser =
+                currentSeerrUser ||
+                users.find((u) => {
+                    const uJfName = (u.jellyfinUsername || '').trim().toLowerCase();
+                    const uName = (u.username || '').trim().toLowerCase();
+                    const uDisplay = (u.displayName || '').trim().toLowerCase();
+                    // Try to match against Jellyfin username from state if available
+                    const profile = state.get('user:profile') || state.get('user') || {};
+                    const currentUsername = (profile.Name || profile.name || '').trim().toLowerCase();
+                    return (
+                        currentUsername &&
+                        (uJfName === currentUsername || uName === currentUsername || uDisplay === currentUsername)
+                    );
+                }) ||
+                users[0];
+        }
+
+        // For non-admin users, all advanced parameters (including explicitly specifying userId)
+        // are forbidden by Seerr. Seerr Controller automatically identifies and attributes the request
+        // to the authenticated user via X-Api-User header derived from their Jellyfin session.
+        if (!isAdmin) {
+            return () => ({});
+        }
+
+        if (!hasAdvancedOptions && !hasUsers) return () => ({});
+
+        // --------------------------------------------------------------------
+        // Auto-Detect Default Server, Profile, and Root Folder:
+        // Based on media type ('movie' vs 'tv'), the anime sub-type for TV
+        // series (Seerr routes anime to its dedicated profile/directory),
+        // and cached user preferences.
+        // --------------------------------------------------------------------
+        const mediaType = item._mediaType || 'movie';
+        const isAnime = isSeerrAnimeItem(item);
+        const subType = isAnime ? 'anime' : mediaType;
+        const savedServerId = storage.getItem(`${STORAGE_KEY_DEFAULT_SERVER}${mediaType}`);
+
+        let selectedServer = null;
+        if (hasAdvancedOptions) {
+            // Check if user previously picked a preferred server for this media type
+            if (savedServerId != null) {
+                selectedServer = options.servers.find((s) => String(s.id) === String(savedServerId));
+            }
+            // Fall back to default non-4K server configured in Seerr, or first available server
+            if (!selectedServer) {
+                selectedServer =
+                    options.servers.find((server) => server.isDefault && !server.is4k) || options.servers[0];
+            }
+        }
+
+        let selectedProfile = null;
+        let selectedRootFolder = null;
+
+        let html = '';
+
+        if (hasUsers) {
+            html += `
+                <div class="seerr-request-as-group">
+                    <label class="seerr-option-label" data-i18n="SeerrRequestAs">${i18n.t('SeerrRequestAs')}</label>
+                    <button class="modal-option-btn seerr-user-select-btn" id="seerr-user-select" tabindex="0">
+                        <div class="seerr-user-preview">
+                            <div class="seerr-user-avatar-wrap">
+                                ${renderUserAvatarHtml(selectedUser)}
+                            </div>
+                            <div class="seerr-user-title">
+                                <span class="seerr-user-name">${escapeHtml(selectedUser.displayName || selectedUser.jellyfinUsername || selectedUser.username || selectedUser.email)}</span>
+                                ${selectedUser.email ? `<span class="seerr-user-email">(${escapeHtml(selectedUser.email)})</span>` : ''}
+                            </div>
+                        </div>
+                        <span class="seerr-chevron-icon">⌵</span>
+                    </button>
+                </div>
+            `;
+        }
+
+        if (hasAdvancedOptions) {
+            html += `
+                <button class="modal-option-btn seerr-option-select" id="seerr-server" tabindex="0">
+                    <span>${i18n.t('SeerrServer')}</span><span class="seerr-option-value"></span>
+                </button>
+                <button class="modal-option-btn seerr-option-select" id="seerr-profile" tabindex="0">
+                    <span>${i18n.t('SeerrQualityProfile')}</span><span class="seerr-option-value"></span>
+                </button>
+                <button class="modal-option-btn seerr-option-select" id="seerr-root-folder" tabindex="0">
+                    <span>${i18n.t('SeerrRootFolder')}</span><span class="seerr-option-value"></span>
+                </button>
+            `;
+        }
+
+        container.innerHTML = html;
+
+        const userButton = container.querySelector('#seerr-user-select');
+        const serverButton = container.querySelector('#seerr-server');
+        const profileButton = container.querySelector('#seerr-profile');
+        const rootButton = container.querySelector('#seerr-root-folder');
+
+        if (userButton) {
+            userButton.addEventListener('click', async () => {
+                const choice = await SeerrRequestModal._chooseUser(i18n.t('SeerrRequestAs'), users, selectedUser);
+                if (choice) {
+                    selectedUser = choice;
+                    const previewEl = userButton.querySelector('.seerr-user-preview');
+                    if (previewEl) {
+                        const disp =
+                            selectedUser.displayName ||
+                            selectedUser.jellyfinUsername ||
+                            selectedUser.username ||
+                            selectedUser.email;
+                        const sub = selectedUser.email;
+                        previewEl.innerHTML = `
+                            <div class="seerr-user-avatar-wrap">
+                                ${renderUserAvatarHtml(selectedUser)}
+                            </div>
+                            <div class="seerr-user-title">
+                                <span class="seerr-user-name">${escapeHtml(disp)}</span>
+                                ${sub ? `<span class="seerr-user-email">(${escapeHtml(sub)})</span>` : ''}
+                            </div>
+                        `;
+                    }
+                }
+            });
+        }
+
+        if (hasAdvancedOptions) {
+            // ----------------------------------------------------------------
+            // Synchronize Selected Profile and Root Folder for Current Server:
+            // Safely finds server details from options.details regardless of
+            // whether the response is nested (entry.server) or flat (entry).
+            // ----------------------------------------------------------------
+            const sync = () => {
+                if (!selectedServer) return;
+
+                // Match server detail entry either via nested server.id or direct id
+                const detail = (options?.details || []).find((entry) => {
+                    if (!entry) return false;
+                    const entryId = entry.server?.id ?? entry.id;
+                    return entryId === selectedServer.id;
+                });
+
+                // Resolve the server configuration object (handles both schemas)
+                const serverObj = detail?.server || detail;
+                const serverId = selectedServer.id;
+
+                // 1. Quality Profile: check cached preference for this server, then server active profile, then first.
+                // Anime series prefer the server's dedicated anime profile when one is configured.
+                const savedProfileId = storage.getItem(`${STORAGE_KEY_DEFAULT_PROFILE}${subType}:${serverId}`);
+                const activeProfileId = (isAnime && serverObj?.activeAnimeProfileId) || serverObj?.activeProfileId;
+                selectedProfile =
+                    (savedProfileId != null
+                        ? detail?.profiles?.find((p) => String(p.id) === String(savedProfileId))
+                        : null) ||
+                    detail?.profiles?.find((profile) => profile.id === activeProfileId) ||
+                    detail?.profiles?.[0] ||
+                    null;
+
+                // 2. Root Folder: check cached preference for this server, then server active directory, then first.
+                // Anime series prefer the server's dedicated anime directory when one is configured.
+                const savedFolder = storage.getItem(`${STORAGE_KEY_DEFAULT_FOLDER}${subType}:${serverId}`);
+                const activeDirectory = (isAnime && serverObj?.activeAnimeDirectory) || serverObj?.activeDirectory;
+                selectedRootFolder =
+                    (savedFolder ? detail?.rootFolders?.find((f) => f.path === savedFolder) : null) ||
+                    detail?.rootFolders?.find((folder) => folder.path === activeDirectory) ||
+                    detail?.rootFolders?.[0] ||
+                    null;
+
+                // Update UI button displays with active server and path information
+                serverButton.querySelector('.seerr-option-value').textContent =
+                    `${selectedServer.name}${selectedServer.is4k ? ' (4K)' : ''}`;
+                profileButton.querySelector('.seerr-option-value').textContent = selectedProfile?.name || '-';
+                rootButton.querySelector('.seerr-option-value').textContent = selectedRootFolder?.path || '-';
+                profileButton.disabled = !selectedProfile;
+                rootButton.disabled = !selectedRootFolder;
+            };
+
+            // Server selection click listener
+            serverButton.addEventListener('click', async () => {
+                const choice = await SeerrRequestModal._chooseOption(
+                    i18n.t('SeerrServer'),
+                    options.servers.map((server) => ({
+                        value: server,
+                        label: `${server.name}${server.is4k ? ' (4K)' : ''}`,
+                        selected: server.id === selectedServer.id
+                    }))
+                );
+                if (choice) {
+                    selectedServer = choice;
+                    // Persist selected server preference for this media type
+                    storage.setItem(`${STORAGE_KEY_DEFAULT_SERVER}${mediaType}`, String(selectedServer.id));
+                    sync();
+                }
+            });
+
+            // Quality profile selection click listener
+            profileButton.addEventListener('click', async () => {
+                const detail = (options?.details || []).find((entry) => {
+                    if (!entry) return false;
+                    const entryId = entry.server?.id ?? entry.id;
+                    return entryId === selectedServer?.id;
+                });
+                const choice = await SeerrRequestModal._chooseOption(
+                    i18n.t('SeerrQualityProfile'),
+                    (detail?.profiles || []).map((profile) => ({
+                        value: profile,
+                        label: profile.name,
+                        selected: profile.id === selectedProfile?.id
+                    }))
+                );
+                if (choice) {
+                    selectedProfile = choice;
+                    // Persist selected quality profile preference for this server and media type
+                    storage.setItem(`${STORAGE_KEY_DEFAULT_PROFILE}${subType}:${selectedServer.id}`, String(choice.id));
+                    profileButton.querySelector('.seerr-option-value').textContent = choice.name;
+                }
+            });
+
+            // Root folder destination selection click listener
+            rootButton.addEventListener('click', async () => {
+                const detail = (options?.details || []).find((entry) => {
+                    if (!entry) return false;
+                    const entryId = entry.server?.id ?? entry.id;
+                    return entryId === selectedServer?.id;
+                });
+                const choice = await SeerrRequestModal._chooseOption(
+                    i18n.t('SeerrRootFolder'),
+                    (detail?.rootFolders || []).map((folder) => ({
+                        value: folder,
+                        label: folder.path,
+                        selected: folder.path === selectedRootFolder?.path
+                    }))
+                );
+                if (choice) {
+                    selectedRootFolder = choice;
+                    // Persist selected root folder preference for this server and media type
+                    storage.setItem(`${STORAGE_KEY_DEFAULT_FOLDER}${subType}:${selectedServer.id}`, choice.path);
+                    rootButton.querySelector('.seerr-option-value').textContent = choice.path;
+                }
+            });
+
+            sync();
+        }
+
+        focusManager.invalidateCache('__trap__');
+
+        // --------------------------------------------------------------------
+        // Request Options Supplier Closure:
+        // Invoked upon pressing the Request button to assemble the final payload.
+        // --------------------------------------------------------------------
+        return () => {
+            // Check if the viewer selected a different user than their own account
+            // Only send userId when requesting on behalf of someone else
+            const isDifferentUser = selectedUser && currentSeerrUser && selectedUser.id !== currentSeerrUser.id;
+            const targetUserId = isDifferentUser ? selectedUser.id : undefined;
+
+            // If advanced server targeting is not available, return minimal payload
+            if (!hasAdvancedOptions || !selectedServer) {
+                return {
+                    userId: targetUserId
+                };
+            }
+
+            // Locate matching server configuration safely
+            const detail = (options?.details || []).find((entry) => {
+                if (!entry) return false;
+                const entryId = entry.server?.id ?? entry.id;
+                return entryId === selectedServer.id;
+            });
+            const serverObj = detail?.server || detail;
+
+            // Anime series prefer the server's dedicated anime language profile when one is configured
+            const activeLanguageProfileId =
+                (isAnime && serverObj?.activeAnimeLanguageProfileId) || serverObj?.activeLanguageProfileId;
+
+            // Return fully resolved request payload attributes
+            return {
+                serverId: selectedServer.id,
+                profileId: selectedProfile?.id,
+                rootFolder: selectedRootFolder?.path,
+                languageProfileId: activeLanguageProfileId,
+                is4k: !!(serverObj?.is4k ?? selectedServer.is4k),
+                userId: targetUserId
+            };
+        };
+    }
+
+    static _chooseUser(title, users, selectedUser) {
+        return new Promise((resolve) => {
+            const opener = document.activeElement;
+            const subOverlay = document.createElement('div');
+            subOverlay.className = 'modal-overlay visible';
+            subOverlay.innerHTML = `
+                <div class="settings-modal seerr-option-modal" role="dialog" aria-modal="true">
+                    <div class="modal-header"><h2>${escapeHtml(title)}</h2></div>
+                    <div class="modal-options">
+                        ${users
+                            .map((user, index) => {
+                                const isSelected = selectedUser && selectedUser.id === user.id;
+                                const displayName =
+                                    user.displayName || user.jellyfinUsername || user.username || user.email || 'User';
+                                const subText =
+                                    user.email || (user.username && user.username !== displayName ? user.username : '');
+                                return `
+                            <button class="modal-option-btn seerr-user-choice-btn ${isSelected ? 'selected' : ''}"
+                                    data-index="${index}" tabindex="0">
+                                <span class="seerr-user-check">${isSelected ? '✓' : ''}</span>
+                                <div class="seerr-user-avatar-wrap">
+                                    ${renderUserAvatarHtml(user)}
+                                </div>
+                                <div class="seerr-user-info">
+                                    <span class="seerr-user-name">${escapeHtml(displayName)}</span>
+                                    ${subText ? `<span class="seerr-user-sub">(${escapeHtml(subText)})</span>` : ''}
+                                </div>
+                            </button>`;
+                            })
+                            .join('')}
+                    </div>
+                </div>`;
+            document.body.appendChild(subOverlay);
+
+            const currentPage = router.getCurrentPage();
+            const oldOnBack = currentPage ? currentPage.onBack : null;
+            const close = (value) => {
+                if (currentPage && currentPage.onBack === onBack) currentPage.onBack = oldOnBack;
+                focusManager.popTrap();
+                subOverlay.remove();
+                const parentPanel = document.querySelector(`#${OVERLAY_ID} .seerr-modal`);
+                if (parentPanel) {
+                    focusManager.register('__trap__', parentPanel, {
+                        orientation: 'grid',
+                        leaveUp: null,
+                        leaveDown: null,
+                        leaveLeft: null,
+                        leaveRight: null
+                    });
+                    focusManager.setActiveSection('__trap__');
+                }
+                if (opener && document.body.contains(opener)) {
+                    focusManager.focusElement(opener);
+                }
+                resolve(value);
+            };
+            const onBack = () => {
+                close(null);
+                return true;
+            };
+            if (currentPage) currentPage.onBack = onBack;
+
+            focusManager.pushTrap(subOverlay.querySelector('.seerr-option-modal'));
+            subOverlay.querySelectorAll('.seerr-user-choice-btn').forEach((button) => {
+                button.addEventListener('click', () => close(users[parseInt(button.dataset.index, 10)]));
+            });
+            const initial = subOverlay.querySelector('.seerr-user-choice-btn.selected, .seerr-user-choice-btn');
+            if (initial) focusManager.focusElement(initial);
+        });
+    }
+
+    static _chooseOption(title, choices) {
+        return new Promise((resolve) => {
+            const opener = document.activeElement;
+            const subOverlay = document.createElement('div');
+            subOverlay.className = 'modal-overlay visible';
+            subOverlay.innerHTML = `
+                <div class="settings-modal seerr-option-modal" role="dialog" aria-modal="true">
+                    <div class="modal-header"><h2></h2></div>
+                    <div class="modal-options">
+                        ${choices
+                            .map(
+                                (choice, index) => `
+                            <button class="modal-option-btn ${choice.selected ? 'selected' : ''}"
+                                    data-index="${index}" tabindex="0"></button>`
+                            )
+                            .join('')}
+                    </div>
+                </div>`;
+            subOverlay.querySelector('h2').textContent = title;
+            subOverlay.querySelectorAll('.modal-option-btn').forEach((button) => {
+                button.textContent = choices[parseInt(button.dataset.index, 10)].label;
+            });
+            document.body.appendChild(subOverlay);
+
+            const currentPage = router.getCurrentPage();
+            const oldOnBack = currentPage ? currentPage.onBack : null;
+            const close = (value) => {
+                if (currentPage && currentPage.onBack === onBack) currentPage.onBack = oldOnBack;
+                focusManager.popTrap();
+                subOverlay.remove();
+                const parentPanel = document.querySelector(`#${OVERLAY_ID} .seerr-modal`);
+                if (parentPanel) {
+                    focusManager.register('__trap__', parentPanel, {
+                        orientation: 'grid',
+                        leaveUp: null,
+                        leaveDown: null,
+                        leaveLeft: null,
+                        leaveRight: null
+                    });
+                    focusManager.setActiveSection('__trap__');
+                }
+                if (opener && document.body.contains(opener)) {
+                    focusManager.focusElement(opener);
+                }
+                resolve(value);
+            };
+            const onBack = () => {
+                close(null);
+                return true;
+            };
+            if (currentPage) currentPage.onBack = onBack;
+
+            focusManager.pushTrap(subOverlay.querySelector('.seerr-option-modal'));
+            subOverlay.querySelectorAll('.modal-option-btn').forEach((button) => {
+                button.addEventListener('click', () => close(choices[parseInt(button.dataset.index, 10)].value));
+            });
+            const initial = subOverlay.querySelector('.modal-option-btn.selected, .modal-option-btn');
+            if (initial) focusManager.focusElement(initial);
+        });
+    }
+
+    /**
+     * Loads and renders the season list. Returns the live array of selected
+     * season numbers.
+     * @returns {Promise<Array<number>>}
+     * @private
+     */
+    static async _renderSeasons(overlay, item, requestBtn) {
+        const container = overlay.querySelector('#seerr-seasons');
+        const selected = [];
+
+        let seasons = [];
+        try {
+            seasons = await seerr.tvSeasons(item._tmdbId);
+        } catch (err) {
+            log.warn('Could not load seasons', err);
+            return selected;
+        }
+
+        if (seasons.length === 0) return selected;
+
+        // A season is locked only if it is already available, pending, or processing.
+        // Seasons with NOT_REQUESTED, UNKNOWN (unmonitored/missing), PARTIALLY_AVAILABLE,
+        // or DELETED status remain requestable by the user.
+        const isLocked = (s) =>
+            s.status === SEERR_STATUS.AVAILABLE ||
+            s.status === SEERR_STATUS.PENDING ||
+            s.status === SEERR_STATUS.PROCESSING;
+
+        // Hide the request button if all seasons are already locked (available or requested)
+        if (seasons.every((s) => isLocked(s)) && requestBtn) {
+            requestBtn.classList.add('hidden');
+            requestBtn.tabIndex = -1;
+        }
+
+        container.innerHTML = `
+            <button class="seerr-season-row" id="seerr-season-all" tabindex="0">
+                ${i18n.t('SeerrAllSeasons')}
+            </button>
+            ${seasons
+                .map((s) => {
+                    const locked = isLocked(s);
+                    const statusKey = seerrSeasonStatusKey(s.status);
+                    const statusText = i18n.t(statusKey);
+                    return `
+                <button class="seerr-season-row ${locked ? 'is-locked' : ''}"
+                        data-season="${s.seasonNumber}" tabindex="0" ${locked ? 'disabled' : ''}>
+                    <span class="seerr-season-name">${s.name}</span>
+                    <span class="seerr-season-meta">
+                        <span class="seerr-season-episodes">${i18n.t('SeerrSeasonEpisodes', [s.episodeCount])}</span>
+                        <span class="seerr-season-badge seerr-season-badge--${s.status}">${statusText}</span>
+                    </span>
+                </button>
+            `;
+                })
+                .join('')}
+            <div class="seerr-season-error hidden" id="seerr-season-error">
+                <span>${i18n.t('SeerrMustSelectSeason')}</span>
+            </div>
+        `;
+
+        const syncRequestBtn = () => {
+            const errorEl = container.querySelector('#seerr-season-error');
+            if (errorEl && selected.length > 0) {
+                errorEl.classList.add('hidden');
+            }
+        };
+
+        const toggle = (btn, seasonNumber) => {
+            const idx = selected.indexOf(seasonNumber);
+            if (idx === -1) {
+                selected.push(seasonNumber);
+                btn.classList.add('is-selected');
+            } else {
+                selected.splice(idx, 1);
+                btn.classList.remove('is-selected');
+            }
+            syncRequestBtn();
+        };
+
+        container.querySelectorAll('.seerr-season-row[data-season]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+                toggle(btn, parseInt(btn.dataset.season, 10));
+            });
+        });
+
+        const allBtn = container.querySelector('#seerr-season-all');
+        allBtn.addEventListener('click', () => {
+            const selectable = Array.prototype.slice
+                .call(container.querySelectorAll('.seerr-season-row[data-season]'))
+                .filter((b) => !b.disabled);
+            const selectAll = selected.length !== selectable.length;
+
+            selected.length = 0;
+            selectable.forEach((b) => {
+                b.classList.toggle('is-selected', selectAll);
+                if (selectAll) selected.push(parseInt(b.dataset.season, 10));
+            });
+            syncRequestBtn();
+        });
+
+        // Seasons arrive after the initial pushTrap, so the trap has to pick up
+        // the newly focusable elements.
+        focusManager.invalidateCache('__trap__');
+
+        return selected;
+    }
+}
+
+export default SeerrRequestModal;

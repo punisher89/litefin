@@ -1,0 +1,176 @@
+import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("rust")
+}
+
+val tauriProperties = Properties().apply {
+    val propFile = file("tauri.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+android {
+    compileSdk = 37
+    namespace = "org.litefin.app"
+    defaultConfig {
+        manifestPlaceholders["usesCleartextTraffic"] = "true"
+        applicationId = "org.litefin.app"
+        minSdk = 24
+        targetSdk = 37
+        versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
+        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                val path = keystoreProperties.getProperty("storeFile")
+                if (path != null) {
+                    storeFile = rootProject.file(path)
+                    storePassword = keystoreProperties.getProperty("storePassword")
+                    keyAlias = keystoreProperties.getProperty("keyAlias")
+                    keyPassword = keystoreProperties.getProperty("keyPassword")
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // APK Packaging Configuration
+    // -------------------------------------------------------------------------
+    // Exclude redundant license manifests and strip unneeded native symbols.
+    // -------------------------------------------------------------------------
+    packaging {
+        resources {
+            excludes += listOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0",
+                "META-INF/*.kotlin_module"
+            )
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            isDebuggable = true
+            isJniDebuggable = true
+            isMinifyEnabled = false
+            packaging {
+                jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
+                jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
+                jniLibs.keepDebugSymbols.add("*/x86/*.so")
+                jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
+            }
+        }
+        getByName("release") {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+
+            // -----------------------------------------------------------------
+            // R8 Code Shrinking & Tree-Shaking
+            // -----------------------------------------------------------------
+            // Strips unused Java/Kotlin classes and methods from ExoPlayer,
+            // OkHttp, AndroidX, and runtime dependencies.
+            // -----------------------------------------------------------------
+            isMinifyEnabled = true
+
+            // -----------------------------------------------------------------
+            // Unused Resource Shrinking
+            // -----------------------------------------------------------------
+            // Eliminates unreferenced layouts, drawables, and strings.
+            // -----------------------------------------------------------------
+            isShrinkResources = true
+
+            optimization {
+               enable = true
+            }
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                *fileTree(".") {
+                  include("**/*.pro")
+                  exclude("build/**")
+                }.files.toTypedArray()
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    buildFeatures {
+        buildConfig = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
+rust {
+    rootDirRel = "../../../"
+}
+
+dependencies {
+    implementation("androidx.webkit:webkit:1.17.1")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.activity:activity-ktx:1.13.0")
+    implementation("com.google.android.material:material:1.14.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.11.0")
+
+    // -------------------------------------------------------------------------
+    // Media3 ExoPlayer Suite
+    // -------------------------------------------------------------------------
+    // High-performance hardware media playback pipeline utilizing native
+    // MediaCodec decoder instances and zero-copy SurfaceView rendering.
+    // Provides Direct Play for MKV, MP4, WebM, and TS containers with HEVC,
+    // AV1, VP9, H.264, AC-3, E-AC-3, DTS, TrueHD, FLAC, and Opus.
+    // -------------------------------------------------------------------------
+    val media3Version = "1.11.1"
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-dash:$media3Version")
+    implementation("androidx.media3:media3-ui:$media3Version")
+    implementation("androidx.media3:media3-session:$media3Version")
+    implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+
+    // -------------------------------------------------------------------------
+    // Media3 FFmpeg Audio Decoder Extension (Prebuilt Binaries via Jellyfin)
+    // -------------------------------------------------------------------------
+    // Bundles prebuilt native FFmpeg shared libraries (libffmpeg.so) across all
+    // targeted Android ABIs (armeabi-v7a, arm64-v8a, x86, x86_64).
+    // Provides seamless client-side software decoding fallback for proprietary
+    // multi-channel audio codecs (AC-3, E-AC-3, DTS, DTS-HD, and TrueHD)
+    // when native hardware MediaCodec decoders or bitstream passthrough are
+    // missing on the Android device, preventing playback failure or server transcoding.
+    // -------------------------------------------------------------------------
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
+
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.4")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
+}
+
+apply(from = file("tauri.build.gradle.kts"))

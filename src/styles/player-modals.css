@@ -1,0 +1,685 @@
+/**
+ * ============================================================================
+ * Player Modals: Chapters & Queue
+ * ============================================================================
+ * Overlay styles for the two new OSD modals.
+ * Updated for Tizen compatibility:
+ * - Uses absolute positioning relative to .osd-overlays.
+ * - Replaces 'inset' with top/left/right/bottom.
+ * - Replaces 'gap' with margins.
+ * - Adds -webkit- prefixes for older TV engines.
+ * - Explicitly sets box-sizing for all elements.
+ * - USES ABSOLUTE POSITIONING FOR PANELS TO PREVENT LAYOUT SHIFTS.
+ * ============================================================================
+ */
+
+/* ============================================================================
+   Shared modal overlay — covers the full screen with a dark translucent backdrop
+   ============================================================================ */
+
+.chapters-modal-overlay,
+.queue-modal-overlay {
+    /* Full screen absolute positioning within .osd-overlays */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    
+    /* 
+     * IMPORTANT: We use overflow: hidden here to ensure the panel (which 
+     * is translated 100% off screen) does not expand the viewport or 
+     * cause the browser to center the "available" content.
+     */
+    overflow: hidden;
+    
+    /*
+     * Solid dark background — backdrop-filter: blur() is intentionally omitted.
+     * On WebOS (Chrome 108), combining backdrop-filter with an animating opacity
+     * causes the GPU compositor to re-capture the background layer on every frame,
+     * producing visible flickering as the modal opens. The semi-transparent solid
+     * background is visually equivalent and renders without artifacts.
+     */
+    background: rgba(var(--jf-overlay-bg-rgb, 0, 0, 0), var(--osd-track-menu-bg-opacity, 0.85));
+    z-index: 9999;
+
+    /*
+     * Hidden by default — opacity only, no z-axis translate3d for GPU promotion.
+     * The translate3d(0,0,100px) trick on the OVERLAY itself was previously used
+     * to force a compositor layer, but it creates a stacking context that interferes
+     * with the inner panel's own transform animation — causing layer conflict flicker.
+     * The inner .queue-modal / .chapters-modal already gets GPU-promoted via their
+     * own transform animation, so promoting the parent is redundant and harmful.
+     */
+    opacity: 0;
+    pointer-events: none;
+    -webkit-transition: opacity 0.2s ease-out;
+    transition: opacity 0.2s ease-out;
+}
+
+.chapters-modal-overlay.visible,
+.queue-modal-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* ============================================================================
+   Shared panel card
+   ============================================================================ */
+
+.chapters-modal,
+.queue-modal {
+    /* Side-panel dimensions */
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 40vw;
+    min-width: 480px;
+    max-width: 640px;
+    
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    
+    /* Internal layout still uses Flexbox */
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+
+    /* Glass look */
+    background: rgba(10, 10, 18, 0.9);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
+
+    /*
+     * Slide-in from the right — using a WebOS-safe ease-out, NOT a spring bezier.
+     * cubic-bezier values with y > 1.0 (overshoot springs) are mishandled by
+     * WebOS Chrome 108: the renderer rapidly oscillates the transform trying to
+     * settle the overshoot, which creates the "10Hz flickering / open-close" effect
+     * reported by users. cubic-bezier(0.2, 0, 0, 1) is a crisp Material Design
+     * sharp ease-out: fast initial movement, smooth deceleration, no overshoot.
+     */
+    -webkit-transform: translate3d(100%, 0, 0);
+    transform: translate3d(100%, 0, 0);
+    -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.chapters-modal-overlay.visible .chapters-modal,
+.queue-modal-overlay.visible .queue-modal {
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+}
+
+
+
+/* ============================================================================
+   Modal header
+   ============================================================================ */
+
+.chapters-modal__header,
+.queue-modal__header {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    
+    padding: 1.6em 2em 1.2em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+
+/* Spacing fallback for flex header */
+.chapters-modal__header > * + *,
+.queue-modal__header > * + * {
+    margin-left: 2em;
+}
+
+.chapters-modal__title,
+.queue-modal__title {
+    font-size: 1.5em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #fff;
+    margin: 0;
+}
+
+.chapters-modal__count,
+.queue-modal__count {
+    font-size: 0.95em;
+    opacity: 0.45;
+    color: #fff;
+}
+
+/* ============================================================================
+   Scrollable list area
+   ============================================================================ */
+
+.chapters-modal__list,
+.queue-modal__list {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.6em 0;
+    
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+
+    /* Custom thin scrollbar - mostly for web debug */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.chapters-modal__list::-webkit-scrollbar,
+.queue-modal__list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.chapters-modal__list::-webkit-scrollbar-thumb,
+.queue-modal__list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: var(--jf-border-radius);
+}
+
+/* Empty state */
+.chapters-modal__empty,
+.queue-modal__empty {
+    padding: 2em;
+    text-align: center;
+    opacity: 0.4;
+    font-style: italic;
+    color: #fff;
+}
+
+/* ============================================================================
+   Chapter rows
+   ============================================================================ */
+
+.chapter-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    
+    padding: 0.65em 1.6em;
+    cursor: pointer;
+    -webkit-transition: background 0.15s ease, -webkit-transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: background 0.15s ease, transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 0;
+    position: relative;
+    
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+
+/* Spacing fallbacks instead of gap */
+.chapter-row > * + * {
+    margin-left: 1.25em;
+}
+
+/* Hover/focus highlight */
+.chapter-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.chapter-row.focused {
+    background: rgba(var(--jf-accent-rgb, 0, 164, 220), 0.3);  /* Theme accent tint */
+    -webkit-transform: scaleX(1.01);
+    transform: scaleX(1.01);
+    -webkit-transform-origin: left;
+    transform-origin: left;
+}
+
+/* Active (currently playing) chapter */
+.chapter-row--active {
+    background: rgba(var(--jf-accent-rgb), 0.12);
+}
+
+.chapter-row--active .chapter-row__name {
+    color: var(--jf-accent);
+    font-weight: 700;
+}
+
+/* Chapter thumbnail */
+.chapter-row__thumb-wrap {
+    position: relative;
+    width: 108px;
+    height: 60px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    border-radius: var(--jf-border-radius);
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* OSD Fallback Overrides (Tighter scaling for small thumbnails) */
+.chapter-row__thumb-wrap .media-fallback,
+.queue-row__thumb-wrap .media-fallback {
+    padding: 4px;
+    border-radius: 0; /* Let parent clip */
+}
+
+.chapter-row__thumb-wrap .media-fallback-initials,
+.queue-row__thumb-wrap .media-fallback-initials {
+    font-size: 1.4rem;
+    margin-bottom: 0;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.chapter-row__thumb-wrap .media-fallback-name,
+.queue-row__thumb-wrap .media-fallback-name {
+    display: none !important; /* Redundant in list view */
+}
+
+.chapter-row__thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.chapter-row__thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Small pulsing dot indicating the active chapter */
+.chapter-row__playing-dot {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--jf-accent);
+    -webkit-animation: playing-dot-pulse 1.4s ease-in-out infinite;
+    animation: playing-dot-pulse 1.4s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(var(--jf-accent-rgb), 0.8);
+}
+
+.chapter-row > .chapter-row__playing-dot {
+    position: absolute;
+    right: 1.6em;
+    top: 50%;
+    bottom: auto;
+    -webkit-transform: translateY(-50%);
+    transform: translateY(-50%);
+}
+
+/* Standard keyframes for Tizen performance */
+@-webkit-keyframes playing-dot-pulse {
+    0%, 100% { opacity: 1; -webkit-transform: scale(1); transform: scale(1); }
+    50%       { opacity: 0.5; -webkit-transform: scale(0.75); transform: scale(0.75); }
+}
+
+@keyframes playing-dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.75); }
+}
+
+
+.chapter-row__info {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    
+    min-width: 0;   /* Allow text truncation */
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+}
+
+/* Spacing fallbacks instead of gap */
+.chapter-row__info > * + * {
+    margin-top: 0.3em;
+}
+
+.chapter-row__name {
+    font-size: 1.05em;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+}
+
+.chapter-row__time {
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.5;
+    color: #fff;
+    margin: 0;
+}
+
+/* ============================================================================
+   Queue rows
+   ============================================================================ */
+
+.queue-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    
+    padding: 0.55em 1.6em;
+    cursor: pointer;
+    -webkit-transition: background 0.15s ease, -webkit-transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: background 0.15s ease, transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+
+/* Spacing fallbacks instead of gap */
+.queue-row > * + * {
+    margin-left: 1.1em;
+}
+
+.queue-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.queue-row.focused {
+    background: rgba(var(--jf-accent-rgb), 0.3);
+    -webkit-transform: scaleX(1.01);
+    transform: scaleX(1.01);
+    -webkit-transform-origin: left;
+    transform-origin: left;
+}
+
+/* Currently playing item */
+.queue-row--active {
+    background: rgba(var(--jf-accent-rgb), 0.12);
+}
+
+.queue-row--active .queue-row__name {
+    color: var(--jf-accent);
+    font-weight: 700;
+}
+
+/* Position badge (1, 2, 3 …) */
+.queue-row__number {
+    width: 2em;
+    text-align: right;
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.35;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    color: #fff;
+}
+
+/* Poster thumbnail (Landscape ratio as requested) */
+.queue-row__thumb-wrap {
+    position: relative;
+    width: 108px;
+    height: 60px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    border-radius: var(--jf-border-radius);
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.queue-row__thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Animated equaliser overlay when playing */
+.queue-row__playing-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: end;
+    -webkit-align-items: flex-end;
+    align-items: flex-end;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.45);
+    
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+
+/* Spacing fallback for indicator */
+.queue-row__playing-indicator > * + * {
+    margin-left: 2px;
+}
+
+.queue-row__playing-indicator {
+    background: -webkit-linear-gradient(
+        270deg,
+        transparent 50%,
+        rgba(var(--jf-accent-rgb), 0.6) 100%
+    );
+    background: linear-gradient(
+        180deg,
+        transparent 50%,
+        rgba(var(--jf-accent-rgb), 0.6) 100%
+    );
+}
+
+/* Item metadata */
+.queue-row__info {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    
+    min-width: 0;
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+}
+
+/* Spacing fallbacks instead of gap */
+.queue-row__info > * + * {
+    margin-top: 0.3em;
+}
+
+.queue-row__name {
+    font-size: 1em;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+}
+
+.queue-row__subtitle {
+    font-size: 0.82em;
+    opacity: 0.5;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+}
+
+/* ============================================================================
+   Confirm Exit Player Modal Styles
+   ============================================================================ */
+
+.confirm-exit-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease-out;
+}
+
+.confirm-exit-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.confirm-exit-modal {
+    width: 540px;
+    max-width: 90%;
+    background: #161618;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--jf-border-radius-lg, 14px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.confirm-exit-header {
+    padding: 24px 28px 12px;
+    background: transparent;
+    text-align: center;
+}
+
+.confirm-exit-header h2 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+}
+
+.confirm-exit-body {
+    padding: 24px 28px 24px;
+    text-align: center;
+}
+
+.confirm-exit-message {
+    margin: 0;
+    font-size: 1.15rem;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.5;
+}
+
+.confirm-exit-actions {
+    padding: 16px 28px 24px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.confirm-exit-actions .modal-action-btn {
+    min-width: 130px;
+    padding: 12px 28px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    border-radius: var(--jf-border-radius-lg, 10px);
+    cursor: pointer;
+    text-align: center;
+}
+
+/* ============================================================================
+ * MOBILE & TOUCH PANELS & DRAWERS
+ * ============================================================================
+ * Compact slide-over side drawer adjustments for mobile phone viewports:
+ * 1. Compact panel width (86vw max 440px) replacing wide TV 480px-640px layouts.
+ * 2. Touch target row heights (min-height 44px on items).
+ * 3. Smooth touch scrolling (-webkit-overflow-scrolling: touch).
+ * ============================================================================ */
+html[data-litefin-scaled] .chapters-modal,
+html[data-litefin-scaled] .queue-modal,
+html[data-litefin-touch] .chapters-modal,
+html[data-litefin-touch] .queue-modal {
+    width: 86vw !important;
+    min-width: 0 !important;
+    max-width: 440px !important;
+    border-radius: var(--jf-border-radius-lg, 12px) 0 0 var(--jf-border-radius-lg, 12px) !important;
+    background: rgba(var(--jf-overlay-bg-rgb, 10, 10, 18), 0.95) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+html[data-litefin-scaled] .chapters-modal__header,
+html[data-litefin-scaled] .queue-modal__header,
+html[data-litefin-touch] .chapters-modal__header,
+html[data-litefin-touch] .queue-modal__header {
+    padding: 14px 18px !important;
+}
+
+html[data-litefin-scaled] .chapters-modal__title,
+html[data-litefin-scaled] .queue-modal__title,
+html[data-litefin-touch] .chapters-modal__title,
+html[data-litefin-touch] .queue-modal__title {
+    font-size: 1.2rem !important;
+}
+
+html[data-litefin-scaled] .chapter-row,
+html[data-litefin-scaled] .queue-row,
+html[data-litefin-touch] .chapter-row,
+html[data-litefin-touch] .queue-row {
+    padding: 8px 14px !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+}
+
+html[data-litefin-scaled] .queue-row__thumb-wrap,
+html[data-litefin-touch] .queue-row__thumb-wrap {
+    width: 80px !important;
+    height: 45px !important;
+}
+
+html[data-litefin-scaled] .confirm-exit-actions .modal-action-btn,
+html[data-litefin-touch] .confirm-exit-actions .modal-action-btn {
+    min-width: 100px !important;
+    padding: 10px 20px !important;
+    font-size: 0.95rem !important;
+}

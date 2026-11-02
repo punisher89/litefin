@@ -1,0 +1,1618 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Auth Manager
+ * ============================================================================
+ * Handles user authentication, session management, and credential storage.
+ *
+ * Multi-User Architecture:
+ * ------------------------
+ * All sessions are stored in a single JSON array under `litefin:sessions`.
+ * The currently active user is tracked by `litefin:activeUserId`.
+ * ApiClient remains a thin transport layer — AuthManager orchestrates which
+ * user's credentials are fed to it at any given time.
+ *
+ * Session Object Shape:
+ *   {
+ *     userId: string,
+ *     accessToken: string,
+ *     userName: string,
+ *     primaryImageTag: string|null
+ *   }
+ *
+ * Backward Compatibility:
+ * When old single-user keys (litefin:accessToken, litefin:userId, etc.) are
+ * detected on first launch, they are automatically migrated to the new sessions
+ * array and the old keys are pruned.
+ * ============================================================================
+ */
+
+import { eventBus } from '../core/EventBus.js';
+import { state } from '../core/StateManager.js';
+import { api, ServerUnreachableError, sendWakeOnLan } from './ApiClient.js';
+import { tizenAdapter } from '../tizen/TizenAdapter.js';
+import { webosAdapter } from '../webos/WebOSAdapter.js';
+import { desktopAdapter } from '../desktop/DesktopAdapter.js';
+import { webAdapter } from '../web/WebAdapter.js';
+import { platformInfo } from '../utils/PlatformInfo.js';
+import { storage } from '../utils/StorageService.js';
+import { buildJellyfinProfile, clearCapabilitiesCache } from './DeviceProfile.js';
+import { focusManager } from '../ui/FocusManager.js';
+import { imageCache } from '../utils/ImageCache.js';
+import { customHeaders } from '../utils/CustomHeaders.js';
+import { logger } from '../utils/Logger.js';
+
+const log = logger.create('AuthManager');
+
+// ============================================================================
+// Storage Keys
+// ============================================================================
+const STORAGE_KEYS = {
+    SERVER_URL: 'litefin:serverUrl',
+    DEVICE_ID: 'litefin:deviceId',
+
+    // --- Active user marker ---
+    /** userId string of the currently active session */
+    ACTIVE_USER: 'litefin:activeUserId',
+
+    // --- Per-server session map ---
+    /**
+     * JSON object mapping server URL → array of session objects.
+     * Shape: { "https://server.com": [{userId, accessToken, userName, primaryImageTag}] }
+     * This replaces the old flat litefin:sessions array.
+     */
+    SERVER_SESSIONS: 'litefin:serverSessions',
+
+    // --- Legacy flat sessions (migration reference only — do not write to this after migration) ---
+    SESSIONS: 'litefin:sessions',
+
+    // --- Server names map ---
+    /** Maps serverUrl -> serverName for displaying friendlier names in saved servers */
+    SERVER_NAMES: 'litefin:serverNames'
+};
+
+/**
+ * Maximum number of user sessions stored simultaneously.
+ * A TV is a shared device, but we keep this sane.
+ */
+const MAX_SESSIONS = 8;
+
+/**
+ * Shared capabilities block sent to the server after every login / session
+ * restore. Extracted as a constant to avoid copy-pasting the same array
+ * in four places throughout this file.
+ */
+const SUPPORTED_CAPABILITIES = {
+    DeviceProfile: null, // Filled in at call time via buildJellyfinProfile()
+    PlayableMediaTypes: ['Video', 'Audio'],
+    SupportedCommands: [
+        'MoveUp',
+        'MoveDown',
+        'MoveLeft',
+        'MoveRight',
+        'ToggleOsd',
+        'Select',
+        'Back',
+        'SendKey',
+        'SendString',
+        'GoHome',
+        'GoToSettings',
+        'VolumeUp',
+        'VolumeDown',
+        'Mute',
+        'Unmute',
+        'ToggleMute',
+        'SetVolume',
+        'SetAudioStreamIndex',
+        'SetSubtitleStreamIndex',
+        'DisplayContent',
+        'GoToSearch',
+        'DisplayMessage',
+        'SetRepeatMode',
+        'SetShuffleQueue',
+        'ChannelUp',
+        'ChannelDown',
+        'PlayMediaSource'
+    ],
+    SupportsMediaControl: true,
+    SupportsPersistentIdentifier: true
+};
+
+// ============================================================================
+// AuthManager Class
+// ============================================================================
+class AuthManager {
+    constructor() {
+        // Bind methods that are wired to external event sources
+        this._onUnauthorized = this._onUnauthorized.bind(this);
+        this._onWebosDeviceInfo = this._onWebosDeviceInfo.bind(this);
+
+        // Track active login/probe lifecycle to prevent candidate credential
+        // failures (such as empty-password checks) from invalidating existing sessions.
+        this._isLoggingIn = false;
+
+        // Listen for unauthorized events from API
+        eventBus.on('api:unauthorized', this._onUnauthorized);
+        eventBus.on('webos:deviceInfoReady', this._onWebosDeviceInfo);
+
+        // Splash-hide coordination for deferred boot handshakes.
+        // The webOS adapter resolves device info asynchronously during boot
+        // and _onWebosDeviceInfo used to re-report session capabilities
+        // immediately - claiming an HTTP/1.1 socket in the cold-boot window
+        // when the entry page needs every connection for its data fetches.
+        // When the splash screen is still up, the report is parked and
+        // flushed by this listener (App emits app:hideSplash exactly once,
+        // after the entry page's data is on the wire).
+        this._splashHidden = false;
+        this._pendingCapsAfterSplash = false;
+        eventBus.on('app:hideSplash', () => {
+            this._splashHidden = true;
+            if (this._pendingCapsAfterSplash) {
+                this._pendingCapsAfterSplash = false;
+                log.info('Splash hidden - flushing deferred capabilities report');
+                this._reportCapabilitiesNow();
+            }
+        });
+    }
+
+    // ========================================================================
+    // Initialization
+    // ========================================================================
+
+    /**
+     * Initialize auth manager.
+     * - Ensures device ID exists
+     * - Migrates flat litefin:sessions → per-server litefin:serverSessions (one-time)
+     * - Attempts to restore the last active session
+     *
+     * @returns {Promise<boolean>} True if a session was successfully restored
+     */
+    async init() {
+        log.info('Initializing...');
+
+        // Ensure a unique device ID is registered with the API
+        await this._ensureDeviceId();
+
+        // One-time migration: lift flat sessions array → per-server keyed map
+        this._migrateServerSessions();
+
+        // Restore the last active session from the per-server sessions map
+        const restored = await this._restoreSession();
+
+        if (restored) {
+            log.info('Session restored');
+            eventBus.emit('auth:restored');
+        }
+
+        return restored;
+    }
+
+    /**
+     * Ensure we have a unique device ID registered with ApiClient.
+     * @private
+     */
+    async _ensureDeviceId() {
+        let deviceId = storage.getItem(STORAGE_KEYS.DEVICE_ID);
+
+        if (!deviceId) {
+            // Generate UUID v4 for first launch
+            deviceId = this._generateUUID();
+            storage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
+            log.info('Generated new device ID');
+        }
+
+        // NOTE: AndroidAdapter is lazily imported inside the platform dispatch
+        // below - it is Android-only code that does not belong in the boot
+        // bundle parsed by TV tiers.
+
+        // Resolve device name from the corresponding platform adapter
+        let deviceName;
+        if (platformInfo.isWebOS) {
+            // LG webOS TV device name (e.g., "LG OLED55...")
+            deviceName = webosAdapter.getDeviceName();
+        } else if (platformInfo.isAndroid) {
+            // Android / Fire TV device model name — adapter is loaded on
+            // demand so TV tiers never parse the Android-only module.
+            const { androidAdapter } = await import('../android/AndroidAdapter.js');
+            deviceName = androidAdapter.getDeviceName();
+        } else if (platformInfo.isDesktop) {
+            // Desktop Tauri client (e.g., "Litefin Desktop (Windows)")
+            deviceName = desktopAdapter.getDeviceName();
+        } else if (platformInfo.isTizen) {
+            // Samsung Tizen TV model name
+            deviceName = tizenAdapter.getDeviceName();
+        } else {
+            // Generic browser client (e.g., "Litefin Web (Chrome)")
+            deviceName = webAdapter.getDeviceName();
+        }
+
+        log.info(`Identification check: platform=${platformInfo.platformString}, deviceName="${deviceName}"`);
+        api.setDevice(deviceId, deviceName);
+    }
+
+    /**
+     * One-time migration: lift the old flat litefin:sessions array into the
+     * new per-server keyed map (litefin:serverSessions).
+     *
+     * Old format: litefin:sessions = [{userId, accessToken, ...}]
+     * New format: litefin:serverSessions = { "https://server.com": [{...}] }
+     *
+     * This runs once on the first launch with the new code. After that,
+     * SERVER_SESSIONS already exists and this is a no-op on subsequent boots.
+     * The old litefin:sessions key is cleaned up after migration.
+     * @private
+     */
+    _migrateServerSessions() {
+        // Already on the new format — nothing to do
+        if (storage.getItem(STORAGE_KEYS.SERVER_SESSIONS) !== null) return;
+
+        const serverUrl = storage.getItem(STORAGE_KEYS.SERVER_URL);
+        const flatSessionRaw = storage.getItem(STORAGE_KEYS.SESSIONS);
+
+        const initialMap = {};
+
+        if (flatSessionRaw && serverUrl) {
+            // Existing users: lift the flat sessions array into the server's slot
+            try {
+                const flatSessions = JSON.parse(flatSessionRaw);
+                if (Array.isArray(flatSessions) && flatSessions.length > 0) {
+                    log.info(`Migrating ${flatSessions.length} session(s) for ${serverUrl} to per-server format`);
+                    initialMap[serverUrl] = flatSessions;
+                }
+            } catch (e) {
+                log.error('Failed to parse legacy sessions during migration:', e);
+            }
+        }
+
+        // Write the new keyed map (may be empty on fresh installs)
+        storage.setItem(STORAGE_KEYS.SERVER_SESSIONS, JSON.stringify(initialMap));
+
+        // Remove the old flat key — it is superseded by SERVER_SESSIONS
+        storage.removeItem(STORAGE_KEYS.SESSIONS);
+
+        log.info('Per-server session migration complete');
+    }
+
+    /**
+     * Attempt to restore the last active session from the sessions array.
+     * Validates the token by calling the server; clears the specific session
+     * on 401/403 so stale entries don't accumulate.
+     *
+     * @returns {Promise<boolean>} True if the session was valid and restored
+     * @private
+     */
+    async _restoreSession() {
+        log.info('_restoreSession() called');
+
+        const serverUrl = storage.getItem(STORAGE_KEYS.SERVER_URL);
+        const sessions = this._loadSessions();
+        const activeUserId = storage.getItem(STORAGE_KEYS.ACTIVE_USER);
+
+        log.debug('Restore check:', {
+            hasServerUrl: !!serverUrl,
+            sessionCount: sessions.length,
+            hasActiveUserId: !!activeUserId
+        });
+
+        if (!serverUrl || sessions.length === 0 || !activeUserId) {
+            log.info('Missing credentials — cannot restore');
+            // Publish session count so App.js routing can make decisions
+            state.set('user:sessionCount', sessions.length);
+            return false;
+        }
+
+        // Find the session that was active when we last quit
+        const session = sessions.find((s) => s.userId === activeUserId);
+        if (!session) {
+            log.warn('Active user ID not found in sessions array — clearing activeUserId');
+            storage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+            state.set('user:sessionCount', sessions.length);
+            return false;
+        }
+
+        // Arm ApiClient with the saved credentials
+        api.setServer(serverUrl);
+        api.setAuth(session.accessToken, session.userId);
+        log.info('API configured with saved credentials');
+
+        // =====================================================================
+        // WAKE-ON-LAN (WOL) INVOCATION
+        // =====================================================================
+        // If Wake-on-LAN on startup is enabled and a server MAC address exists
+        // in settings, we broadcast the Magic Packet early to wake up the
+        // server, then take the BLOCKING validation path: the user explicitly
+        // asked the app to wait for a sleeping server to boot, so there is
+        // nothing useful to render optimistically.
+        // =====================================================================
+        const enableWol = storage.getItem('pref:enableWolOnStartup') === 'true';
+        const wolMac = storage.getItem('pref:wolMacAddress');
+
+        if (enableWol && wolMac) {
+            log.info(`Wake-on-LAN on startup is active. Sending Magic Packet to ${wolMac}...`);
+            // Fire packet asynchronously and don't block the startup pipeline.
+            // If the server was already running, the connection will succeed instantly.
+            // If it was asleep, our retry loop below will wait for it to boot.
+            sendWakeOnLan(wolMac).catch((err) => {
+                log.warn('Failed to send WOL magic packet:', err);
+            });
+
+            return this._blockingRestoreSession(session, sessions, activeUserId);
+        }
+
+        // =====================================================================
+        // OPTIMISTIC SESSION RESTORE
+        // =====================================================================
+        // With credentials armed, publish the authenticated state straight from
+        // storage and let App route to /home immediately - no GET /Users/{id},
+        // no GET /System/Info/Public round-trip serializing in front of first
+        // paint. Token validation continues in the background
+        // (_verifyRestoredSession):
+        //   • success     → the stored session is refreshed with the server's
+        //                   user record (name / image tag may have changed);
+        //   • 401 / 403   → the existing _onUnauthorized() machinery prunes the
+        //                   session and routes to /login (or /profiles);
+        //   • unreachable → App routes to /offline, matching the old
+        //                   pre-route behavior.
+        //
+        // Wake-on-LAN launches were already diverted to the blocking path
+        // above; this optimistic path is the default.
+
+        // Publish the stored identity without any server round-trip. The
+        // background verification replaces user:data with the authoritative
+        // server record once it arrives.
+        state.set('user:data', {
+            Id: session.userId,
+            Name: session.userName || '',
+            PrimaryImageTag: session.primaryImageTag || null
+        });
+        state.set('user:authenticated', true);
+        state.set('server:connected', true);
+        state.set('server:offline', false);
+        state.set('user:sessionCount', sessions.length);
+        log.info('Session restored optimistically from storage — validating token in background');
+
+        // Fire-and-forget background verification
+        this._verifyRestoredSession(session);
+
+        return true;
+    }
+
+    /**
+     * Network-unreachability predicate shared by both restore paths.
+     * @param {Error} error
+     * @returns {boolean} True when the error represents a down/asleep server
+     * rather than a definitive auth rejection.
+     * @private
+     */
+    _isUnreachableError(error) {
+        return (
+            error instanceof ServerUnreachableError ||
+            (error.status === undefined && error.message && error.message.toLowerCase().includes('fetch'))
+        );
+    }
+
+    /**
+     * Wake-on-LAN restore path: blocking token validation with the retry loop
+     * (up to ~18s, or ~90s with Extended Wait) while the server boots. On
+     * success the session is committed with the authoritative user record.
+     *
+     * Capabilities reporting and the WebSocket open are NOT done here - App
+     * calls {@link establishSessionTelemetry} once the splash screen hides so
+     * the handshake requests never contend with first-paint data fetches on
+     * Chromium 38's 6-connection HTTP/1.1 pool.
+     *
+     * @param {Object} session - Stored active session
+     * @param {Array<Object>} sessions - All stored sessions
+     * @param {string} activeUserId - Active user ID
+     * @returns {Promise<boolean>} True when the session validated
+     * @private
+     */
+    async _blockingRestoreSession(session, sessions, activeUserId) {
+        // Read Extended Wait preference key to allow cold shutdown server boots (~90s total)
+        const extendedWait = storage.getItem('pref:enableWolExtendedWait') === 'true';
+
+        // WOL is guaranteed active on this path: 25 attempts (~90s) with Extended Wait, else 6 (~18s)
+        const maxAttempts = extendedWait ? 25 : 6;
+        const retryDelayMs = 3000;
+
+        // Active authenticated user object resolved from validation probe
+        let user = null;
+
+        try {
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    log.info(`Validating token by fetching current user (attempt ${attempt}/${maxAttempts})...`);
+
+                    // Fire getPublicInfo in parallel with getCurrentUser.
+                    // We use shorter timeouts on retries to fail-fast and move onto the next try.
+                    const currentTimeout = attempt === 1 ? 5000 : 3000;
+                    const userPromise = api.getCurrentUser({ timeout: currentTimeout });
+
+                    const serverInfoPromise = api
+                        .getPublicInfo()
+                        .then((info) => {
+                            state.set('server:info', info);
+                        })
+                        .catch((e) => log.warn(`Failed to fetch server info on attempt ${attempt}:`, e));
+
+                    // Await user profiles check first
+                    user = await userPromise;
+                    log.info('Token valid, user:', user?.Name);
+
+                    // Wait for the parallel server info check to settle too
+                    try {
+                        await serverInfoPromise;
+                    } catch (_) {}
+
+                    // Break out of the retry loop upon successful connection
+                    break;
+                } catch (error) {
+                    log.warn(`Token validation failed on attempt ${attempt}/${maxAttempts}:`, error);
+
+                    const isUnreachable = this._isUnreachableError(error);
+
+                    // If this is the last allowed attempt, or the error is a definitive failure
+                    // (like 401/403 Unauthorized which won't change on retry), propagate it.
+                    if (attempt === maxAttempts || !isUnreachable) {
+                        throw error;
+                    }
+
+                    // Wait for the defined cooldown interval before attempting another probe
+                    log.info(`Server is unreachable. Waiting ${retryDelayMs}ms for Wake-on-LAN boot cycle...`);
+                    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+                }
+            }
+
+            // Sync the stored session with fresh user data from the server
+            this._saveSession({
+                userId: user.Id,
+                accessToken: session.accessToken,
+                userName: user.Name || '',
+                primaryImageTag: user.PrimaryImageTag || null
+            });
+
+            // Publish authenticated state
+            state.set('user:data', user);
+            state.set('user:authenticated', true);
+            state.set('server:connected', true);
+            state.set('server:offline', false);
+            state.set('user:sessionCount', this._loadSessions().length);
+
+            return true;
+        } catch (error) {
+            if (error instanceof ServerUnreachableError) {
+                // Server unreachable — keep credentials for when it comes back
+                log.warn('Server unreachable during restore. Preserving credentials for retry.');
+                state.set('server:connected', false);
+                state.set('server:offline', true);
+                state.set('user:authenticated', false);
+                state.set('user:sessionCount', sessions.length);
+                return false;
+            }
+
+            if (error.status === 401 || error.status === 403) {
+                // Token explicitly rejected by server — prune this specific session
+                log.warn('Session expired or unauthorized. Removing this session from storage.');
+                this._removeSession(activeUserId);
+                storage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+                api.clearAuth();
+            } else {
+                // Unexpected error (500, parse failure) — don't nuke the session
+                log.warn(`Unexpected restore error (status ${error.status ?? '??'}) — preserving session.`, error);
+            }
+
+            state.set('user:sessionCount', this._loadSessions().length);
+            return false;
+        }
+    }
+
+    /**
+     * Background token verification for an optimistically restored session
+     * (non-WOL path). Runs entirely off the boot critical path:
+     *   • success: refreshes the stored session + user:data with the
+     *     authoritative server record;
+     *   • 401/403: delegates to _onUnauthorized() which prunes the dead
+     *     session and emits auth:expired / auth:switchToProfiles (App then
+     *     routes to /login or /profiles);
+     *   • unreachable: flags server:offline and emits auth:server-unreachable
+     *     (App routes to the OfflinePage, matching the old pre-route check);
+     *   • other errors (5xx, parse): preserve the session, stay on home.
+     *
+     * @param {Object} session - Stored active session used for the restore
+     * @private
+     */
+    _verifyRestoredSession(session) {
+        api.getCurrentUser({ timeout: 8000 })
+            .then((user) => {
+                log.info('Background token validation succeeded:', user?.Name);
+                this._saveSession({
+                    userId: user.Id,
+                    accessToken: session.accessToken,
+                    userName: user.Name || '',
+                    primaryImageTag: user.PrimaryImageTag || null
+                });
+                state.set('user:data', user);
+                state.set('user:sessionCount', this._loadSessions().length);
+                eventBus.emit('auth:verified');
+            })
+            .catch((error) => {
+                if (error.status === 401 || error.status === 403) {
+                    log.warn('Optimistically restored session was rejected — pruning session.');
+                    this._onUnauthorized();
+                } else if (this._isUnreachableError(error)) {
+                    log.warn('Server unreachable during background session validation.');
+                    state.set('server:connected', false);
+                    state.set('server:offline', true);
+                    eventBus.emit('auth:server-unreachable');
+                } else {
+                    log.warn(
+                        `Unexpected background validation error (status ${error.status ?? '??'}) — preserving session.`,
+                        error
+                    );
+                }
+            });
+    }
+
+    /**
+     * Report session capabilities and open the real-time WebSocket for the
+     * active session.
+     *
+     * Both handshakes are deferred by App until after the initial splash
+     * screen hides: on Chromium 38 (Tizen 3.0) the HTTP/1.1 connection pool
+     * has only 6 sockets, and during cold boot every one of them is needed by
+     * the entry page's data fetches (Views / Resume / NextUp). Firing the
+     * capabilities POST and WebSocket upgrade during that window directly
+     * delays first paint.
+     *
+     * Safe to call multiple times per boot; no-ops when unauthenticated.
+     * @public
+     */
+    establishSessionTelemetry() {
+        if (!this.isAuthenticated()) return;
+
+        api.reportCapabilities({
+            ...SUPPORTED_CAPABILITIES,
+            DeviceProfile: buildJellyfinProfile()
+        }).catch((e) => log.error('✗ Failed to report capabilities on restore:', e));
+
+        api.openWebSocket();
+    }
+
+    // ========================================================================
+    // Server Connection
+    // ========================================================================
+
+    /**
+     * Connect to a Jellyfin server.
+     * =========================================================================
+     * Configures the ApiClient target server URL and fetches server metadata.
+     * If Wake-on-LAN is enabled and a target MAC address is set in preferences,
+     * this method automatically dispatches a UDP magic packet and retries the
+     * connection probe up to 6 times (~15 seconds) to allow sleeping servers
+     * time to boot up.
+     * =========================================================================
+     * @param {string} serverUrl - Target server URL
+     * @param {Array<{key: string, value: string, enabled: boolean}>} [headers] - Optional custom HTTP headers
+     * @returns {Promise<Object>} Server public info object
+     */
+    async connectToServer(serverUrl, headers = null) {
+        log.info(`Connecting to ${serverUrl}`);
+
+        // Persist custom proxy headers immediately if provided during connection flow
+        if (headers && Array.isArray(headers)) {
+            customHeaders.setServerHeaders(serverUrl, headers);
+        }
+
+        api.setServer(serverUrl);
+
+        // Diagnostic log: confirm presence of active custom proxy headers
+        const activeHeaders = customHeaders.getNormalizedHeaders(serverUrl);
+        const headerKeys = Object.keys(activeHeaders);
+        if (headerKeys.length > 0) {
+            log.info(`Active reverse proxy headers for ${serverUrl}: [${headerKeys.join(', ')}]`);
+        }
+
+        // =====================================================================
+        // WAKE-ON-LAN (WOL) INVOCATION FOR CONNECT TO SERVER
+        // =====================================================================
+        // Read Wake-on-LAN preference settings directly from global storage
+        const enableWol = storage.getItem('pref:enableWolOnStartup') === 'true';
+        const wolMac = storage.getItem('pref:wolMacAddress');
+
+        if (enableWol && wolMac) {
+            log.info(`Wake-on-LAN is enabled. Triggering Magic Packet for server connect to ${wolMac}...`);
+            sendWakeOnLan(wolMac).catch((err) => {
+                log.warn('Failed to send WOL magic packet during connectToServer:', err);
+            });
+        }
+
+        // Read Extended Wait preference key to allow cold shutdown server boots (~90s total)
+        const extendedWait = storage.getItem('pref:enableWolExtendedWait') === 'true';
+
+        // Set max retry attempts: 25 attempts (~90s) if Extended Wait is active, else 6 attempts (~18s)
+        const maxAttempts = enableWol && wolMac ? (extendedWait ? 25 : 6) : 1;
+        const retryDelayMs = 3000;
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                log.info(`Attempting server connection probe (attempt ${attempt}/${maxAttempts})...`);
+
+                // Short timeout per probe so UI doesn't lock up on dead addresses
+                const currentTimeout = attempt === 1 ? 5000 : 3000;
+                const info = await api.getPublicInfo({ timeout: currentTimeout });
+
+                // Persist the server URL
+                storage.setItem(STORAGE_KEYS.SERVER_URL, serverUrl);
+
+                // Persist the server name for friendly display in saved servers list
+                if (info && info.ServerName) {
+                    try {
+                        let namesMap = {};
+                        const rawNames = storage.getItem(STORAGE_KEYS.SERVER_NAMES);
+                        if (rawNames) namesMap = JSON.parse(rawNames);
+                        namesMap[serverUrl] = info.ServerName;
+                        storage.setItem(STORAGE_KEYS.SERVER_NAMES, JSON.stringify(namesMap));
+                    } catch (e) {
+                        log.warn('Failed to save server name to map', e);
+                    }
+                }
+
+                state.set('server:connected', true);
+                state.set('server:offline', false);
+                state.set('server:info', info);
+
+                eventBus.emit('auth:serverConnected', info);
+
+                log.info(`Connected to ${info.ServerName} (v${info.Version})`);
+                return info;
+            } catch (error) {
+                lastError = error;
+                log.warn(`Connection attempt ${attempt}/${maxAttempts} failed:`, error);
+
+                // Wait before next retry iteration if more attempts remain
+                if (attempt < maxAttempts) {
+                    log.info(`Waiting ${retryDelayMs}ms for server to boot before next retry probe...`);
+                    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+                }
+            }
+        }
+
+        state.set('server:connected', false);
+        throw new Error(`Failed to connect: ${lastError ? lastError.message : 'Server unreachable'}`);
+    }
+
+    /**
+     * Lightweight check to see if the server is reachable.
+     * @returns {Promise<boolean>} True if reachable
+     */
+    async checkServerStatus() {
+        const url = this.getSavedServerUrl();
+        if (!url) return false;
+
+        try {
+            // Very short timeout for background polling
+            await api.getPublicInfo({ timeout: 3000 });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * ========================================================================
+     * Saved Server URL Resolution
+     * ========================================================================
+     * Retrieves the active or persisted server URL from persistent storage.
+     * When running inside a browser environment (such as when hosted directly
+     * by the Litefin Web Jellyfin server plugin), if no explicit server URL has
+     * been entered yet, we automatically resolve the origin from the browser's
+     * current window location. This allows seamless zero-configuration access
+     * when users navigate to http://jellyfin:8096/litefin.
+     *
+     * @returns {string|null} Server URL or null
+     */
+    getSavedServerUrl() {
+        // ====================================================================
+        // 1. Explicitly Persisted Server Configuration
+        // ====================================================================
+        // First check if the user has manually connected to and persisted a
+        // Jellyfin server URL in persistent storage.
+        const saved = storage.getItem(STORAGE_KEYS.SERVER_URL);
+        if (saved) {
+            return saved;
+        }
+
+        // ====================================================================
+        // 2. Embedded Jellyfin Server Plugin Auto-Detection
+        // ====================================================================
+        // In browser environments, infer the parent Jellyfin server origin
+        // ONLY when running embedded inside the Jellyfin Server Plugin.
+        // The server plugin strictly routes Litefin web assets under /litefin.
+        // Standalone web builds and local dev servers (e.g., webpack serve
+        // at localhost:8080/ or localhost:8081/) are not Jellyfin instances
+        // and must fall through to show the server connection prompt.
+        if (
+            typeof window !== 'undefined' &&
+            window.location &&
+            window.location.origin &&
+            typeof window.location.protocol === 'string' &&
+            window.location.protocol.startsWith('http')
+        ) {
+            // Check if the application is running under the /litefin plugin route
+            // (e.g., http://jellyfin:8096/litefin or http://example.com/prefix/litefin)
+            const pathname = window.location.pathname || '';
+            const litefinIdx = pathname.toLowerCase().indexOf('/litefin');
+
+            // Only auto-resolve the server origin if running within the plugin route
+            if (litefinIdx !== -1) {
+                // Strip the /litefin routing segment while preserving any upstream reverse proxy path
+                const subpath = litefinIdx > 0 ? pathname.substring(0, litefinIdx) : '';
+                const detected = `${window.location.origin}${subpath}`.replace(/\/+$/, '');
+
+                log.info(`Auto-detected server URL from Jellyfin plugin route: ${detected}`);
+                return detected;
+            }
+        }
+
+        // No server saved and not running under a Jellyfin plugin route
+        return null;
+    }
+
+    // ========================================================================
+    // User Management
+    // ========================================================================
+
+    /**
+     * Get list of public users from the server.
+     * Ensures an Array is always returned to prevent rendering errors.
+     *
+     * @returns {Promise<Array>} Public users array
+     */
+    async getPublicUsers() {
+        // =====================================================================
+        // Public User Retrieval
+        // =====================================================================
+        // Query the ApiClient for publicly displayed users. If the server
+        // returns an invalid or non-array payload, return an empty array to
+        // keep profile selection and login screens from crashing.
+        // =====================================================================
+        const users = await api.getPublicUsers();
+        return Array.isArray(users) ? users : [];
+    }
+
+    /**
+     * Authenticate a user by username and password.
+     * On success the session is *added* to the sessions array (not overwritten),
+     * and the new user is set as the active session.
+     *
+     * @param {string} username - Jellyfin username (case-insensitive on most servers)
+     * @param {string} [password=''] - Password; empty string for passwordless users
+     * @param {Object} [options={}] - Optional request configurations (e.g. silent probe)
+     * @returns {Promise<Object>} Authentication result from the server
+     */
+    async login(username, password = '', options = {}) {
+        // Emit debug log for silent probes and info log for interactive user sign-ins
+        if (!options.silent) {
+            log.info(`Logging in as "${username}"`);
+        } else {
+            log.debug(`Silent probe login as "${username}"`);
+        }
+
+        // Save in-memory credentials so we can restore them if this login fails
+        // (prevents the app from being half-logged-out on a wrong password)
+        const prevToken = api.accessToken;
+        const prevUserId = api.userId;
+
+        // Arm the authentication guard flag to shield existing stored sessions
+        // from unexpected session invalidation events while probing credentials.
+        this._isLoggingIn = true;
+
+        try {
+            // Clear in-memory token so ApiClient doesn't send a stale one in the header
+            api.setAuth(null, null);
+
+            // Call the Jellyfin authenticate endpoint.
+            // Explicitly mark the request with suppressUnauthorized so candidate credential
+            // failures do not cascade into global session expiry events.
+            const result = await api.post(
+                '/Users/AuthenticateByName',
+                {
+                    Username: username,
+                    Pw: password,
+                    // Newer Jellyfin versions (10.9+) strictly validate IAuthenticationRequest
+                    // parameters in the POST body rather than relying on the Auth header
+                    App: api.clientName,
+                    Device: api.deviceName,
+                    DeviceId: api.deviceId,
+                    Version: api.clientVersion
+                },
+                {
+                    suppressUnauthorized: true,
+                    silent: Boolean(options.silent),
+                    warnOnError: Boolean(options.silent || options.warnOnError)
+                }
+            );
+
+            // Unpack response
+            const accessToken = result.AccessToken || result.accessToken;
+            const user = result.User || result.user;
+            const userId = user?.Id || user?.id;
+
+            if (!accessToken || !userId) {
+                log.error('Invalid login response structure', result);
+                throw new Error('Invalid server response');
+            }
+
+            // --- Persist the new session ---
+            // We add-or-update so the same user can upgrade their token
+            // (e.g., they were added before and are logging in again)
+            this._saveSession({
+                userId,
+                accessToken,
+                userName: user.Name || '',
+                primaryImageTag: user.PrimaryImageTag || null
+            });
+            storage.setItem(STORAGE_KEYS.ACTIVE_USER, userId);
+
+            // Arm the API client
+            api.setAuth(accessToken, userId);
+
+            // Establish session capabilities
+            try {
+                await api.reportCapabilities({
+                    ...SUPPORTED_CAPABILITIES,
+                    DeviceProfile: buildJellyfinProfile()
+                });
+            } catch (capError) {
+                log.warn('Non-fatal: Failed to report capabilities after login:', capError);
+            }
+
+            api.openWebSocket();
+
+            // Update app state
+            state.set('user:authenticated', true);
+            state.set('user:data', user);
+            state.set('user:sessionCount', this._loadSessions().length);
+
+            eventBus.emit('auth:login', user);
+            log.info(`Login successful for "${user.Name || username}"`);
+
+            return result;
+        } catch (error) {
+            // Log as error for interactive failures, debug for silent candidate probes
+            if (!options.silent) {
+                log.error('Login request failed:', error);
+            } else {
+                log.debug('Silent login probe failed (password required):', error.message || error);
+            }
+
+            // Restore previous in-memory credentials on failure
+            if (prevToken && prevUserId) {
+                log.info('Restoring previous in-memory credentials after failed login attempt');
+                api.setAuth(prevToken, prevUserId);
+            }
+
+            throw error;
+        } finally {
+            // Always disarm the authentication guard flag once the request completes
+            this._isLoggingIn = false;
+        }
+    }
+
+    /**
+     * Login with a public user object.
+     *
+     * On JF 10.10 / 10.11 we honour the HasPassword field to decide whether
+     * to send an empty string or the real password.  On JF 12+ HasPassword is
+     * always hard-coded to `true` and carries no meaningful information, so we
+     * skip that check and send the supplied password directly (empty string for
+     * passwordless users, real password for everyone else).
+     *
+     * @param {Object} user - User object from getPublicUsers()
+     * @param {string} [password=''] - Password (or empty string for passwordless)
+     * @param {Object} [options={}] - Additional request configurations
+     * @returns {Promise<Object>} Authentication result
+     */
+    async loginWithUser(user, password = '', options = {}) {
+        // On legacy servers HasPassword correctly indicates whether a password
+        // is needed; on JF12+ it's always true so we just pass through as-is.
+        const pw = api.isJF12Plus() ? password : user.HasPassword ? password : '';
+        return this.login(user.Name, pw, options);
+    }
+
+    /**
+     * Complete login using an authorized Quick Connect secret.
+     * Follows the exact same session-persistence path as login().
+     *
+     * @param {string} secret - Authorized Quick Connect secret
+     * @param {Object} [options={}] - Additional request configurations
+     * @returns {Promise<Object>} Authentication result (same shape as login())
+     */
+    async loginWithQuickConnect(secret, options = {}) {
+        log.info('Completing login via Quick Connect...');
+
+        // Preserve current active credentials to prevent accidental partial sign-out
+        const prevToken = api.accessToken;
+        const prevUserId = api.userId;
+
+        // Guard active session against spurious session-expiry events during secret exchange
+        this._isLoggingIn = true;
+
+        try {
+            // Clear in-memory token while negotiating secret exchange
+            api.setAuth(null, null);
+
+            // Exchange the authorized secret for a real access token
+            const result = await api.authenticateWithQuickConnect(secret, {
+                suppressUnauthorized: true,
+                ...options
+            });
+
+            const accessToken = result.AccessToken || result.accessToken;
+            const user = result.User || result.user;
+            const userId = user?.Id || user?.id;
+
+            if (!accessToken || !userId) {
+                log.error('Invalid Quick Connect auth response structure', result);
+                throw new Error('Invalid server response from Quick Connect');
+            }
+
+            // Persist — same add-or-update path as manual login
+            this._saveSession({
+                userId,
+                accessToken,
+                userName: user.Name || '',
+                primaryImageTag: user.PrimaryImageTag || null
+            });
+            storage.setItem(STORAGE_KEYS.ACTIVE_USER, userId);
+
+            // Arm ApiClient
+            api.setAuth(accessToken, userId);
+
+            // Report capabilities
+            try {
+                await api.reportCapabilities({
+                    ...SUPPORTED_CAPABILITIES,
+                    DeviceProfile: buildJellyfinProfile()
+                });
+            } catch (capError) {
+                log.warn('Non-fatal: Failed to report capabilities after Quick Connect login:', capError);
+            }
+
+            // Establish WebSocket presence
+            api.openWebSocket();
+
+            // Update app state
+            state.set('user:authenticated', true);
+            state.set('user:data', user);
+            state.set('user:sessionCount', this._loadSessions().length);
+
+            eventBus.emit('auth:login', user);
+
+            log.info(`Quick Connect login successful for "${user.Name}"`);
+            return result;
+        } catch (error) {
+            log.error('Quick Connect login failed:', error);
+
+            // Restore in-memory credentials if exchange failed
+            if (prevToken && prevUserId) {
+                log.info('Restoring previous in-memory credentials after failed Quick Connect login');
+                api.setAuth(prevToken, prevUserId);
+            }
+
+            throw error;
+        } finally {
+            // Release login guard
+            this._isLoggingIn = false;
+        }
+    }
+
+    // ========================================================================
+    // Session Switching
+    // ========================================================================
+
+    /**
+     * Clears the Seerr client response cache after a login or user switch so
+     * user-scoped requests and watchlist data are refetched. The module is
+     * dynamically imported: seerrClient is only ever needed by the Seerr
+     * feature pages and UI probes, so keeping this reference lazy lets the
+     * bundler drop it (and its normalize/genre helpers) out of the initial
+     * main bundle on TV tiers.
+     *
+     * @private
+     */
+    _clearSeerrCache() {
+        import('./seerrClient.js')
+            .then((module) => module.seerr.clearCache())
+            .catch(() => {
+                /* seerr plugin not configured for this server — nothing to clear */
+            });
+    }
+
+    /**
+     * Switch the active user to another stored session without requiring
+     * a password. The ApiClient credentials are swapped, capabilities are
+     * re-reported, and the WebSocket is reset to the new user's token.
+     *
+     * If the token for the target session has expired, the error is surfaced
+     * to the caller and the bad session is pruned automatically.
+     *
+     * @param {string} userId - The userId of the session to switch to
+     * @returns {Promise<Object>} The user's current profile from the server
+     */
+    async switchUser(userId) {
+        log.info(`Switching to user ${userId}...`);
+
+        /*
+         * ====================================================================
+         * FULL USER-SCOPED STATE & CACHE INVALIDATION
+         * ====================================================================
+         * When switching user accounts, we MUST wipe all cached view models,
+         * row structures, details pages, search results, and focus positions
+         * associated with the previous session. Each Jellyfin user has different
+         * library permissions, watched indicators, and custom row orderings.
+         * Failure to clear all prefixes causes cross-account state contamination.
+         * ====================================================================
+         */
+        state.clearByPrefix('home:');
+        state.clearByPrefix('library:');
+        state.clearByPrefix('details:');
+        state.clearByPrefix('favorites:');
+        state.clearByPrefix('search:');
+        state.clearByPrefix('person:');
+        state.clearByPrefix('player:');
+        state.clearByPrefix('discover:');
+
+        // Wipe Seerr client response cache so user-scoped requests and watchlist are refetched
+        this._clearSeerrCache();
+
+        // Clear focus memory so old user's spatial focus targets don't persist
+        focusManager.clearMemory();
+
+        // Abort in-flight prewarm requests and clear image cache
+        imageCache.clear();
+
+        const sessions = this._loadSessions();
+        const session = sessions.find((s) => s.userId === userId);
+
+        if (!session) {
+            throw new Error(`No stored session found for user ${userId}`);
+        }
+
+        // Close the previous user's WebSocket (marks old user offline on server)
+        api.closeWebSocket();
+
+        // Swap ApiClient to the new user's credentials
+        api.setAuth(session.accessToken, session.userId);
+
+        try {
+            // Validate and fetch fresh profile data in one call
+            const user = await api.getCurrentUser();
+
+            // Update the session with fresher data (image tag may have changed)
+            this._saveSession({
+                userId: user.Id,
+                accessToken: session.accessToken,
+                userName: user.Name || '',
+                primaryImageTag: user.PrimaryImageTag || null
+            });
+            storage.setItem(STORAGE_KEYS.ACTIVE_USER, userId);
+
+            // Report capabilities for the new session
+            try {
+                await api.reportCapabilities({
+                    ...SUPPORTED_CAPABILITIES,
+                    DeviceProfile: buildJellyfinProfile()
+                });
+                log.info('✓ Capabilities reported for switched user');
+            } catch (e) {
+                log.warn('Non-fatal: Failed to report capabilities on user switch:', e);
+            }
+
+            // Establish new WebSocket for the switched-to user
+            api.openWebSocket();
+
+            // Update global state to reflect the new active user
+            state.set('user:authenticated', true);
+            state.set('user:data', user);
+            state.set('user:sessionCount', sessions.length);
+
+            eventBus.emit('auth:login', user);
+            log.info(`Switched to user "${user.Name}"`);
+
+            return user;
+        } catch (error) {
+            if (error.status === 401 || error.status === 403) {
+                // Token is dead — remove the stale session from storage
+                log.warn(`Token for user ${userId} is expired. Pruning session.`);
+                this._removeSession(userId);
+                state.set('user:sessionCount', this._loadSessions().length);
+            }
+            throw error;
+        }
+    }
+
+    // ========================================================================
+    // Logout
+    // ========================================================================
+
+    /**
+     * Log out the current active user.
+     *
+     * If other sessions remain, the app emits `auth:switchToProfiles` so the
+     * caller (App.js) can navigate to the "Who's Watching" screen instead of
+     * the login page. If this was the last session, `auth:logout` is emitted
+     * and the app resets to the login page.
+     *
+     * The server is always notified via /Sessions/Logout (best-effort).
+     */
+    async logout() {
+        log.info('Logging out current user...');
+
+        /*
+         * ====================================================================
+         * FULL USER-SCOPED STATE & CACHE INVALIDATION
+         * ====================================================================
+         * Wipe all stored session state and focus memories for the user being logged out.
+         * ====================================================================
+         */
+        state.clearByPrefix('home:');
+        state.clearByPrefix('library:');
+        state.clearByPrefix('details:');
+        state.clearByPrefix('favorites:');
+        state.clearByPrefix('search:');
+        state.clearByPrefix('person:');
+        state.clearByPrefix('player:');
+        state.clearByPrefix('discover:');
+
+        // Wipe Seerr client response cache so user-scoped requests and watchlist are refetched
+        this._clearSeerrCache();
+
+        // Clear focus manager memory
+        focusManager.clearMemory();
+
+        // Abort in-flight prewarm requests and clear image cache
+        imageCache.clear();
+
+        const activeUserId = storage.getItem(STORAGE_KEYS.ACTIVE_USER);
+        const sessions = this._loadSessions();
+        const session = sessions.find((s) => s.userId === activeUserId);
+
+        // Close WebSocket immediately (marks this user offline on the dashboard)
+        api.closeWebSocket();
+
+        // Notify the server while we still have valid credentials (best-effort)
+        if (session && api._serverUrl) {
+            const url = `${api._serverUrl}/Sessions/Logout`;
+            const authHeader = api.getAuthHeader(session.accessToken);
+
+            log.info('Notifying server of logout...');
+            try {
+                /*
+                 * Construct appropriate headers for the logout request.
+                 * If we are connected to an Emby server, we must supply
+                 * the token in the dedicated 'X-Emby-Token' header.
+                 */
+                const headers = {
+                    Authorization: authHeader,
+                    'Content-Type': 'application/json'
+                };
+
+                if (api.isEmby()) {
+                    headers['X-Emby-Token'] = session.accessToken;
+                }
+
+                await fetch(url, {
+                    method: 'POST',
+                    headers: headers
+                });
+                log.info('Server notified of logout');
+            } catch (e) {
+                log.warn('Server logout request failed (best-effort):', e.message);
+            }
+        }
+
+        // Remove only this user's session from storage
+        if (activeUserId) {
+            this._removeSession(activeUserId);
+            storage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+        }
+
+        // Clear ApiClient credentials for this user
+        api.clearAuth();
+        state.set('user:authenticated', false);
+        state.set('user:data', null);
+
+        const remaining = this._loadSessions();
+        state.set('user:sessionCount', remaining.length);
+
+        if (remaining.length > 0) {
+            /*
+             * Other users are still logged in — go to the profiles screen
+             * instead of the login page. App.js listens for this event.
+             */
+            log.info(`Logout complete. ${remaining.length} session(s) remain — routing to profiles.`);
+            eventBus.emit('auth:switchToProfiles');
+        } else {
+            // This was the last session — fall back to the login page
+            log.info('Logout complete. No remaining sessions — routing to login.');
+            eventBus.emit('auth:logout');
+        }
+    }
+
+    /**
+     * Disconnect from the current server AND wipe all stored sessions for it.
+     *
+     * Used by the destructive "Sign Out" action on the profiles screen.
+     * This effectively "forgets" the server entirely.
+     */
+    async logoutAndForgetServer() {
+        log.info('Signing out and forgetting current server...');
+
+        const serverUrl = storage.getItem(STORAGE_KEYS.SERVER_URL);
+        if (serverUrl) {
+            // Load the full map
+            let sessionMap = {};
+            try {
+                sessionMap = JSON.parse(storage.getItem(STORAGE_KEYS.SERVER_SESSIONS) || '{}');
+            } catch (e) {
+                log.error('Failed to parse sessions map during forgetServer:', e);
+            }
+
+            // Remove this server's entry entirely
+            if (sessionMap[serverUrl]) {
+                delete sessionMap[serverUrl];
+                storage.setItem(STORAGE_KEYS.SERVER_SESSIONS, JSON.stringify(sessionMap));
+                log.info(`Wiped ${serverUrl} from saved sessions.`);
+            }
+        }
+
+        // Now perform the standard disconnect (clears pointers, resets state)
+        await this.logoutAll();
+    }
+
+    /**
+     * Disconnect from the current server without wiping stored credentials.
+     *
+     * Used by "Switch Server" on the profiles screen. Sessions for ALL servers
+     * (including the current one) are intentionally preserved in
+     * litefin:serverSessions so the user can return later without re-login.
+     *
+     * Only the active server pointer and active user marker are cleared.
+     */
+    async logoutAll() {
+        log.info('Disconnecting from current server (all server sessions preserved)...');
+
+        // Close WebSocket cleanly before dropping credentials
+        api.closeWebSocket();
+
+        // Clear the active server + user pointers — sessions themselves are kept
+        // intact inside litefin:serverSessions for future reconnection.
+        storage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+        storage.removeItem(STORAGE_KEYS.SERVER_URL);
+
+        // Detach the API client so it doesn't auto-reconnect with stale credentials
+        api.clearAuth();
+        api.setServer('');
+
+        // Reset application state
+        state.set('user:authenticated', false);
+        state.set('user:data', null);
+        state.set('user:sessionCount', 0);
+        state.set('server:connected', false);
+
+        // Route to login page
+        eventBus.emit('auth:logout');
+        log.info('Disconnected from server. Saved sessions for all servers are intact.');
+    }
+
+    // ========================================================================
+    // Session Accessors
+    // ========================================================================
+
+    /**
+     * Return all stored sessions as an array.
+     * Callers should treat this as read-only; use _saveSession/_removeSession
+     * to mutate.
+     *
+     * @returns {Array<{userId, accessToken, userName, primaryImageTag}>}
+     */
+    getSessions() {
+        return this._loadSessions();
+    }
+
+    /**
+     * Return the session object for the currently active user, or null if none.
+     * @returns {{userId, accessToken, userName, primaryImageTag}|null}
+     */
+    getActiveSession() {
+        const activeUserId = storage.getItem(STORAGE_KEYS.ACTIVE_USER);
+        if (!activeUserId) return null;
+        const sessions = this._loadSessions();
+        return sessions.find((s) => s.userId === activeUserId) || null;
+    }
+
+    /**
+     * Return the number of stored sessions for the current server.
+     * @returns {number}
+     */
+    getSessionCount() {
+        return this._loadSessions().length;
+    }
+
+    /**
+     * Return all servers that have at least one stored session.
+     * Useful for building a server-picker UI in a future iteration.
+     *
+     * @returns {Array<{serverUrl: string, sessions: Array}>}
+     */
+    getSavedServers() {
+        const map = this._loadAllServerSessions();
+        let namesMap = {};
+        try {
+            const rawNames = storage.getItem(STORAGE_KEYS.SERVER_NAMES);
+            if (rawNames) namesMap = JSON.parse(rawNames);
+        } catch (e) {
+            log.warn('Failed to parse SERVER_NAMES', e);
+        }
+
+        return Object.entries(map)
+            .filter(([, sessions]) => Array.isArray(sessions) && sessions.length > 0)
+            .map(([serverUrl, sessions]) => ({
+                serverUrl,
+                sessions,
+                serverName: namesMap[serverUrl] || null
+            }));
+    }
+
+    // ========================================================================
+    // Event Handlers
+    // ========================================================================
+
+    /**
+     * Handle 401 Unauthorized from ApiClient.
+     * Clears only the current session (not all sessions) so the user is
+     * routed to the profiles screen to pick a different, still-valid one.
+     * @private
+     */
+    _onUnauthorized() {
+        // ====================================================================
+        // Guard 1: Active Login / Candidate Probe Shield
+        // ====================================================================
+        // If a login attempt or empty-password probe is currently in flight,
+        // a 401 error signifies that the candidate credentials were rejected,
+        // NOT that our currently signed-in profile has expired. Never evict here.
+        if (this._isLoggingIn) {
+            log.debug('Ignoring 401 unauthorized event during active login attempt');
+            return;
+        }
+
+        // ====================================================================
+        // Guard 2: Missing Session Token Shield
+        // ====================================================================
+        // A session can only legitimately expire if ApiClient was actually
+        // configured with an active session token when the rejection occurred.
+        // If no token was loaded into memory, no active session was on the wire.
+        if (!api.accessToken) {
+            log.debug('Ignoring 401 unauthorized event — no active session token present in ApiClient');
+            return;
+        }
+
+        log.warn('Unauthorized — session expired');
+
+        const activeUserId = storage.getItem(STORAGE_KEYS.ACTIVE_USER);
+
+        // Prune the dead session
+        if (activeUserId) {
+            this._removeSession(activeUserId);
+            storage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+        }
+
+        api.clearAuth();
+        state.set('user:authenticated', false);
+        state.set('user:data', null);
+
+        const remaining = this._loadSessions();
+        state.set('user:sessionCount', remaining.length);
+
+        // Route back to profiles if other sessions remain, otherwise login page
+        if (remaining.length > 0) {
+            eventBus.emit('auth:switchToProfiles');
+        } else {
+            eventBus.emit('auth:expired');
+        }
+    }
+
+    /**
+     * Update the device name and capabilities once webOS reports the hardware
+     * (it arrives asynchronously after startup). Fixes "LG WebOS TV" generic
+     * names, and a profile built from the startup fallbacks: until deviceInfo
+     * arrives a 4K panel looks like 1080p (40 Mbps, H.264 level 4.1) and Dolby
+     * Vision is off. The capability cache is dropped first, so the re-report
+     * carries the real profile instead of the cached fallback one; the
+     * PrewarmManager drops a PlaybackInfo prewarmed with it on the same event.
+     * @param {Object} info - Device info from webOS adapter
+     * @private
+     */
+    _onWebosDeviceInfo(info) {
+        if (!info || !platformInfo.isWebOS) return;
+
+        clearCapabilitiesCache();
+
+        const deviceId = storage.getItem(STORAGE_KEYS.DEVICE_ID);
+        if (!deviceId) return;
+
+        if (info.modelName) {
+            log.info(`Updating API device name to WebOS model: ${info.modelName}`);
+            api.setDevice(deviceId, info.modelName);
+        }
+
+        // Re-report so the server and dashboard see the real device name and profile.
+        // Deferred until after the initial splash screen hides when boot is
+        // still in the cold-start window: on Chromium 38 (Tizen 3.0 / old
+        // webOS) the HTTP/1.1 pool has only 6 sockets and the entry page's
+        // data fetches (Views / Resume / NextUp) need every one of them.
+        if (this.isAuthenticated()) {
+            if (this._splashHidden) {
+                this._reportCapabilitiesNow();
+            } else {
+                this._pendingCapsAfterSplash = true;
+            }
+        }
+    }
+
+    /**
+     * Report session capabilities with the current device profile.
+     * ApiClient deduplicates bursts (4s guard), so this is safe to race
+     * with the establishSessionTelemetry() call in App's splash handler.
+     * @private
+     */
+    _reportCapabilitiesNow() {
+        api.reportCapabilities({
+            ...SUPPORTED_CAPABILITIES,
+            DeviceProfile: buildJellyfinProfile()
+        }).catch((e) => log.warn('Failed to report capabilities:', e));
+    }
+
+    // ========================================================================
+    // Private — Per-Server Sessions CRUD
+    // ========================================================================
+
+    /**
+     * Load the full per-server session map from storage.
+     * Always returns a plain object — never throws.
+     *
+     * @returns {{ [serverUrl: string]: Array }} The full keyed map
+     * @private
+     */
+    _loadAllServerSessions() {
+        try {
+            const raw = storage.getItem(STORAGE_KEYS.SERVER_SESSIONS);
+            if (!raw) return {};
+            const parsed = JSON.parse(raw);
+            // Guard against corrupt / unexpected data shapes
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        } catch (e) {
+            log.error('Failed to parse serverSessions from storage — returning empty map:', e);
+            return {};
+        }
+    }
+
+    /**
+     * Load sessions for the currently active server.
+     * Safe: always returns an array even if storage is empty or corrupted.
+     *
+     * @returns {Array<{userId, accessToken, userName, primaryImageTag}>}
+     * @private
+     */
+    _loadSessions() {
+        const serverUrl = storage.getItem(STORAGE_KEYS.SERVER_URL);
+        // Cannot scope sessions without a server URL
+        if (!serverUrl) return [];
+
+        const map = this._loadAllServerSessions();
+        const sessions = map[serverUrl];
+        return Array.isArray(sessions) ? sessions : [];
+    }
+
+    /**
+     * Persist the sessions array for the currently active server.
+     * Other servers' sessions remain untouched.
+     *
+     * @param {Array} sessions - Updated sessions for the active server
+     * @private
+     */
+    _writeSessions(sessions) {
+        const serverUrl = storage.getItem(STORAGE_KEYS.SERVER_URL);
+        if (!serverUrl) {
+            log.warn('_writeSessions: no active server URL — sessions not saved');
+            return;
+        }
+
+        // Read the full map, update only the active server's slot, then write back
+        const map = this._loadAllServerSessions();
+        map[serverUrl] = sessions;
+        storage.setItem(STORAGE_KEYS.SERVER_SESSIONS, JSON.stringify(map));
+    }
+
+    /**
+     * Add a new session or update an existing one (matched by userId).
+     * Enforces the MAX_SESSIONS cap by removing the oldest entry when full.
+     *
+     * @param {{userId, accessToken, userName, primaryImageTag}} session
+     * @private
+     */
+    _saveSession(session) {
+        const sessions = this._loadSessions();
+
+        // Find and replace an existing entry for the same user
+        const existingIdx = sessions.findIndex((s) => s.userId === session.userId);
+
+        if (existingIdx !== -1) {
+            sessions[existingIdx] = session;
+        } else {
+            // Enforce cap before adding a brand-new entry
+            if (sessions.length >= MAX_SESSIONS) {
+                const removed = sessions.shift(); // Remove oldest (front of array)
+                log.warn(`Session cap (${MAX_SESSIONS}) reached — evicted oldest session for ${removed.userName}`);
+            }
+            sessions.push(session);
+        }
+
+        this._writeSessions(sessions);
+    }
+
+    /**
+     * Remove a session by userId.
+     * @param {string} userId
+     * @private
+     */
+    _removeSession(userId) {
+        const sessions = this._loadSessions();
+        const filtered = sessions.filter((s) => s.userId !== userId);
+        this._writeSessions(filtered);
+        log.debug(`Session removed for user ${userId}. Remaining: ${filtered.length}`);
+    }
+
+    // ========================================================================
+    // Utilities
+    // ========================================================================
+
+    /**
+     * Generate UUID v4
+     * @returns {string}
+     * @private
+     */
+    _generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+        });
+    }
+
+    // ========================================================================
+    // Getters
+    // ========================================================================
+
+    /**
+     * Get the current active user's profile data from app state.
+     * @returns {Object|null} User data
+     */
+    getCurrentUser() {
+        return state.get('user:data');
+    }
+
+    /**
+     * Check if there is an active authenticated session.
+     * @returns {boolean}
+     */
+    isAuthenticated() {
+        return state.get('user:authenticated', false);
+    }
+}
+
+// Export singleton
+export const auth = new AuthManager();
+
+export default AuthManager;

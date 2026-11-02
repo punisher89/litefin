@@ -1,0 +1,1238 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Sidebar Styles
+ * ============================================================================
+ */
+
+:root {
+    --sidebar-width-collapsed: 100px;
+    --sidebar-width-expanded: 350px;
+    --sidebar-bg: var(--jf-background-alt, #101010);
+    --sidebar-transition: width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+
+    /* Logo Colors */
+    --jf-logo-fill: var(--jf-accent);
+}
+
+.sidebar {
+    position: absolute;
+    /* Using absolute inside #sidebar-container to fill it */
+    top: 0;
+    left: 0;
+    bottom: 0;
+    /* Performant Animation: Use Transform instead of Width to avoid reflows */
+    /* Resilient physical fallback for Chrome 32/38 engines lacking CSS variables */
+    width: 350px;
+    width: var(--sidebar-width-expanded, 350px);
+    /* Start at full width internally with dark background fallback */
+    background-color: #101010;
+    background-color: var(--sidebar-bg, #101010);
+    display: flex;
+    flex-direction: column;
+    z-index: 200;
+
+    /* GPU-accelerated transition */
+    -webkit-transition: -webkit-transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+
+
+
+    overflow: hidden;
+    /* Hide overflow text when collapsed */
+    padding: 20px 0;
+    white-space: nowrap;
+    will-change: transform;
+    -webkit-transform: translate3d(-250px, 0, 0);
+    transform: translate3d(-250px, 0, 0);
+    /* Start collapsed via translate */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+/* 
+ * Transparent Collapsed Sidebar:
+ * Provides true transparent background across all theme modes (Classic Dark,
+ * Classic Light, Tinted, Ambient, etc.). Eliminates the hardcoded black gradient
+ * that caused an artificial dark bar on non-ambient pages such as the library.
+ */
+.sidebar.transparent-collapsed:not(.expanded):not(:hover),
+body.sidebar-mode-collapsed .sidebar.transparent-collapsed,
+body.sidebar-mode-hidden .sidebar.transparent-collapsed {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+/* Semi-transparent collapsed sidebar with glassmorphic blur */
+.sidebar.semi-transparent-collapsed:not(.expanded):not(:hover),
+body.sidebar-mode-collapsed .sidebar.semi-transparent-collapsed,
+body.sidebar-mode-hidden .sidebar.semi-transparent-collapsed {
+    background: rgba(16, 16, 16, 0.4) !important;
+    background-color: rgba(16, 16, 16, 0.4) !important;
+    background-image: none !important;
+}
+
+/* Tinted semi-transparent collapsed sidebar */
+.sidebar.tinted-semi-collapsed:not(.expanded):not(:hover),
+body.sidebar-mode-collapsed .sidebar.tinted-semi-collapsed,
+body.sidebar-mode-hidden .sidebar.tinted-semi-collapsed {
+    background: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.85) !important;
+    background-color: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.85) !important;
+    background-image: none !important;
+}
+
+/* Transparent expanded sidebar */
+.sidebar.transparent-expanded.expanded,
+.sidebar.transparent-expanded:hover,
+body.sidebar-mode-hidden .sidebar.transparent-expanded {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+/* Semi-transparent expanded sidebar */
+.sidebar.semi-transparent-expanded.expanded,
+.sidebar.semi-transparent-expanded:hover,
+body.sidebar-mode-hidden .sidebar.semi-transparent-expanded {
+    background: rgba(16, 16, 16, 0.4) !important;
+    background-color: rgba(16, 16, 16, 0.4) !important;
+    background-image: none !important;
+}
+
+/* Tinted semi-transparent expanded sidebar */
+.sidebar.tinted-semi-expanded.expanded,
+.sidebar.tinted-semi-expanded:hover,
+body.sidebar-mode-hidden .sidebar.tinted-semi-expanded {
+    background: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.85) !important;
+    background-color: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.85) !important;
+    background-image: none !important;
+}
+
+/* Black collapsed sidebar */
+.sidebar.black-collapsed:not(.expanded):not(:hover),
+body.sidebar-mode-collapsed .sidebar.black-collapsed,
+body.sidebar-mode-hidden .sidebar.black-collapsed {
+    background: #000000 !important;
+    background-color: #000000 !important;
+    background-image: none !important;
+}
+
+/* Black expanded sidebar */
+.sidebar.black-expanded.expanded,
+.sidebar.black-expanded:hover,
+body.sidebar-mode-hidden .sidebar.black-expanded {
+    background: #000000 !important;
+    background-color: #000000 !important;
+    background-image: none !important;
+}
+
+/* Fully hidden state */
+.sidebar.hidden {
+    display: none !important;
+    -webkit-transform: translate3d(-100%, 0, 0) !important;
+    transform: translate3d(-100%, 0, 0) !important;
+}
+
+.sidebar.expanded,
+.sidebar:hover {
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+    /* Shift to reveal full sidebar */
+}
+
+body.sidebar-mode-collapsed .sidebar.expanded,
+body.sidebar-mode-collapsed .sidebar:hover {
+    -webkit-transform: translate3d(-250px, 0, 0) !important;
+    transform: translate3d(-250px, 0, 0) !important;
+}
+
+body.sidebar-mode-collapsed .sidebar.transparent-collapsed.expanded,
+body.sidebar-mode-collapsed .sidebar.transparent-collapsed:hover {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+body.sidebar-mode-collapsed .sidebar.semi-transparent-collapsed.expanded,
+body.sidebar-mode-collapsed .sidebar.semi-transparent-collapsed:hover {
+    background: rgba(16, 16, 16, 0.4) !important;
+}
+
+body.sidebar-mode-collapsed .sidebar.tinted-semi-collapsed.expanded,
+body.sidebar-mode-collapsed .sidebar.tinted-semi-collapsed:hover {
+    background: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.65) !important;
+}
+
+body.sidebar-mode-collapsed .sidebar.black-collapsed.expanded,
+body.sidebar-mode-collapsed .sidebar.black-collapsed:hover {
+    background: #000000 !important;
+}
+
+/* 
+ * Ambient Theme Specific Overrides: Ensure unexpanded sidebar is fully transparent
+ * letting atmospheric glows bleed through, while allowing expanded state to follow theme.
+ * Custom collapsed color overrides (black, semi, tinted) take strict precedence.
+ */
+html[data-theme-mode="ambient"] body:not(.sidebar-mode-hidden) .sidebar:not(.expanded):not(:hover):not(.black-collapsed):not(.semi-transparent-collapsed):not(.tinted-semi-collapsed),
+html[data-theme-mode="ambient"] body:not(.sidebar-mode-hidden) .sidebar.transparent-collapsed:not(.expanded):not(:hover),
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed:not(.sidebar-mode-hidden) .sidebar:not(.black-collapsed):not(.semi-transparent-collapsed):not(.tinted-semi-collapsed),
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed:not(.sidebar-mode-hidden) .sidebar.transparent-collapsed {
+    /* Pure transparency for ambient glow backdrop penetration when collapsed in normal mode */
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed .sidebar.semi-transparent-collapsed.expanded,
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed .sidebar.semi-transparent-collapsed:hover {
+    background: rgba(16, 16, 16, 0.4) !important;
+}
+
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed .sidebar.tinted-semi-collapsed.expanded,
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed .sidebar.tinted-semi-collapsed:hover {
+    background: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.65) !important;
+}
+
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed .sidebar.black-collapsed.expanded,
+html[data-theme-mode="ambient"] body.sidebar-mode-collapsed .sidebar.black-collapsed:hover {
+    background: #000000 !important;
+}
+
+/*
+ * ── Always Collapsed Mode Text Suppression ────────────────────────────────
+ * Enforces total concealment of text labels, subtitles, and section headers
+ * across all states (default, hovered, expanded) in Always Collapsed mode.
+ * Enforces a clean, uncluttered visual rhythm in compact viewports.
+ */
+body.sidebar-mode-collapsed .sidebar .logo-text,
+body.sidebar-mode-collapsed .sidebar .item-text,
+body.sidebar-mode-collapsed .sidebar .sidebar-user-name,
+body.sidebar-mode-collapsed .sidebar .sidebar-syncplay-label,
+body.sidebar-mode-collapsed .sidebar #section-header,
+body.sidebar-mode-collapsed .sidebar .sidebar-section-header,
+body.sidebar-mode-collapsed #section-header,
+body.sidebar-mode-collapsed .sidebar-section-header {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/* Ensure focused item text/icon uses high-contrast text color when focused in collapsed state */
+body.sidebar-mode-collapsed .sidebar-item.focused,
+body.sidebar-mode-collapsed .sidebar-item:focus {
+    color: var(--jf-primary-btn-color) !important;
+}
+
+body.sidebar-mode-collapsed .sidebar .logo-icon,
+body.sidebar-mode-collapsed .sidebar .item-icon {
+    -webkit-transform: translate3d(250px, 0, 0) !important;
+    transform: translate3d(250px, 0, 0) !important;
+}
+
+/* Rounded square focus indicator overrides for Always Collapsed mode */
+body.sidebar-mode-collapsed .sidebar-focus-indicator {
+    width: 56px !important;
+    height: 56px !important;
+    left: 272px !important;
+    margin-top: 8px !important;
+    border-radius: 14px !important;
+}
+
+/* Instant Mode: Remove all transitions when disabled in settings */
+.sidebar.no-animation,
+.sidebar.no-animation *,
+.sidebar.no-animation *::before,
+.sidebar.no-animation *::after {
+    -webkit-transition: none !important;
+    transition: none !important;
+}
+
+/* Sidebar Mode: Always Hidden - Completely off-screen by default (omit :focus-within for Chromium <63) */
+body.sidebar-mode-hidden .sidebar:not(.expanded):not(.has-focus) {
+    -webkit-transform: translate3d(-100%, 0, 0);
+    transform: translate3d(-100%, 0, 0);
+}
+
+/* 
+ * Magic Cursor / Focus Reveal: Even if hidden, hovering the trigger zone,
+ * hovering the sidebar itself, or focusing any element inside the sidebar
+ * will smoothly slide it fully into view.
+ * We use high specificity here to override the hidden state without !important,
+ * and only target non-expanded state to prevent animation re-triggering.
+ */
+body.sidebar-mode-hidden .sidebar-hover-trigger:hover + .sidebar:not(.expanded),
+body.sidebar-mode-hidden .sidebar:hover:not(.expanded),
+body.sidebar-mode-hidden .sidebar.has-focus,
+body.sidebar-mode-hidden .sidebar:focus-within {
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+}
+
+/* 
+ * Disable trigger once sidebar is active to prevent animation re-triggering loops 
+ * when the mouse is moving during the transition.
+ */
+.sidebar.expanded + .sidebar-hover-trigger,
+.sidebar:hover + .sidebar-hover-trigger {
+    pointer-events: none !important;
+}
+
+/* Invisible 50px strip on the left edge of the screen to trigger the sidebar */
+.sidebar-hover-trigger {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 50px;
+    z-index: 199; /* Just below .sidebar (200) to avoid re-triggering when sidebar is visible */
+    background: transparent;
+    pointer-events: all;
+}
+
+/* Sliding Focus Indicator - Snappy, GPU-accelerated highlight */
+.sidebar-focus-indicator {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    /* Removed fixed height so JS can calculate it dynamically for targets of different sizes */
+    /* Resilient solid color fallback for early engines lacking CSS custom properties */
+    background: #007acc;
+    background: var(--jf-accent, #007acc);
+    z-index: 5; /* Above sidebar background, behind icons/text */
+    pointer-events: none;
+    opacity: 0;
+    /* Default: No transform transition while hidden/inactive to prevent "reset" slides */
+    -webkit-transition: -webkit-transform 0s, opacity 0.15s ease;
+    transition: transform 0s, opacity 0.15s ease;
+
+
+    will-change: transform, opacity;
+}
+
+.sidebar.expanded .sidebar-focus-indicator,
+.sidebar:hover .sidebar-focus-indicator {
+    /* Smooth sliding only when expanded and already visible */
+    -webkit-transition: -webkit-transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s ease;
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s ease;
+}
+
+.sidebar.expanded.has-focus .sidebar-focus-indicator,
+.sidebar:hover.has-focus .sidebar-focus-indicator {
+    opacity: 1;
+}
+
+/* User profile has a different height, handle it via transform-scale if needed,
+   or just let it be 72px (which matches the profile button height) */
+#sidebar-user .sidebar-focus-indicator {
+    height: 72px;
+}
+
+/* Compensate for translation on ALL content elements to keep them visible at the screen edge.
+   Only do this when the sidebar is NOT in a full-hidden mode, otherwise they slide weirdly. 
+   Also disable this compensation when the sidebar is hovered (expanding via CSS). */
+body:not(.sidebar-mode-hidden) .sidebar.collapsed:not(:hover) .logo-icon,
+body:not(.sidebar-mode-hidden) .sidebar.collapsed:not(:hover) .item-icon {
+    -webkit-transform: translate3d(250px, 0, 0);
+    transform: translate3d(250px, 0, 0);
+}
+
+/* ----------------------------------------------------------------------------
+ * Navigation Back Control for Desktop & Web
+ * ----------------------------------------------------------------------------
+ * Implements a sleek, fluid, translucent circular back button.
+ * Features a subtle glass backdrop, smooth hover state transitions,
+ * and fluid spring cubic-bezier timing.
+ * ---------------------------------------------------------------------------- */
+.sidebar-back-btn {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    height: 52px;
+    min-height: 52px;
+    display: none;
+    align-items: center;
+    position: relative;
+    box-sizing: border-box;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    z-index: 15;
+    -webkit-transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        -webkit-transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Glassmorphic circular icon container centered in the 100px sidebar rail */
+.sidebar-back-btn .back-icon {
+    width: 100px;
+    width: var(--sidebar-width-collapsed, 100px);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+}
+
+/* Translucent Circular Capsule */
+.sidebar-back-btn .back-icon svg {
+    width: 36px;
+    height: 36px;
+    padding: 7px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    /* Unified resting state: flat by default without drop shadow */
+    box-shadow: none;
+    /* PERFORMANCE: Avoid GPU framebuffer readback blur on embedded/TV hardware */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    -webkit-transition: background-color 0.25s cubic-bezier(0.2, 0, 0, 1),
+                        border-color 0.25s cubic-bezier(0.2, 0, 0, 1),
+                        color 0.2s ease,
+                        box-shadow 0.25s ease,
+                        -webkit-transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: background-color 0.25s cubic-bezier(0.2, 0, 0, 1),
+                border-color 0.25s cubic-bezier(0.2, 0, 0, 1),
+                color 0.2s ease,
+                box-shadow 0.25s ease,
+                transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Hover and Focus interaction states: Elevated glow and spring scale */
+.sidebar-back-btn:hover .back-icon svg,
+.sidebar-back-btn:focus .back-icon svg,
+.sidebar-back-btn.focused .back-icon svg {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+    -webkit-transform: scale(1.08);
+    transform: scale(1.08);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3), 0 0 16px rgba(var(--jf-accent-rgb, 0, 164, 220), 0.35);
+}
+
+/* Active / Pressed state: tactile bounce feedback */
+.sidebar-back-btn:active .back-icon svg {
+    -webkit-transform: scale(0.92);
+    transform: scale(0.92);
+}
+
+/* Typography label for expanded state */
+.sidebar-back-btn .back-text {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: rgba(255, 255, 255, 0.85);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease, color 0.15s ease;
+    margin-left: 2px;
+}
+
+.sidebar.expanded .sidebar-back-btn .back-text,
+.sidebar:hover .sidebar-back-btn .back-text {
+    opacity: 1;
+    visibility: visible;
+}
+
+.sidebar-back-btn:hover .back-text,
+.sidebar-back-btn:focus .back-text,
+.sidebar-back-btn.focused .back-text {
+    color: #ffffff;
+}
+
+/* Entrance spring animation when back button surfaces */
+@keyframes backButtonEntrance {
+    0% {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.85);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Entrance animation for the back control (rendered below the brand logo) */
+.sidebar.has-back-button .sidebar-back-btn {
+    animation: backButtonEntrance 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* RTL layout orientation: reflect back arrow */
+[dir="rtl"] .sidebar-back-btn .back-icon svg {
+    transform: rotate(180deg);
+}
+
+[dir="rtl"] .sidebar-back-btn:hover .back-icon svg,
+[dir="rtl"] .sidebar-back-btn:focus .back-icon svg,
+[dir="rtl"] .sidebar-back-btn.focused .back-icon svg {
+    transform: rotate(180deg) scale(1.08);
+}
+
+[dir="rtl"] .sidebar-back-btn:active .back-icon svg {
+    transform: rotate(180deg) scale(0.92);
+}
+
+/* ============================================================================
+ * OPTIONAL SIDEBAR ICON SHADOWS
+ * ============================================================================
+ * When enabled via user settings, injects soft, unified drop shadows across all
+ * icons in the sidebar rail (navigation items, Litefin brand logo, user avatar,
+ * and circular back button capsule) for elevated visual depth and contrast.
+ * ============================================================================ */
+html[data-sidebar-icon-shadows="true"] .sidebar-back-btn .back-icon svg,
+html[data-sidebar-icon-shadows="shadow"] .sidebar-back-btn .back-icon svg,
+.sidebar.has-icon-shadows .sidebar-back-btn .back-icon svg {
+    /* Restore elevated capsule depth for the back button when shadows enabled */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    -webkit-filter: none;
+    filter: none;
+}
+
+html[data-sidebar-icon-shadows="true"] .sidebar .item-icon svg,
+html[data-sidebar-icon-shadows="shadow"] .sidebar .item-icon svg,
+html[data-sidebar-icon-shadows="true"] .sidebar .logo-icon svg,
+html[data-sidebar-icon-shadows="shadow"] .sidebar .logo-icon svg,
+html[data-sidebar-icon-shadows="true"] .sidebar-logo-img,
+html[data-sidebar-icon-shadows="shadow"] .sidebar-logo-img,
+html[data-sidebar-icon-shadows="true"] .sidebar .sidebar-chevron svg,
+html[data-sidebar-icon-shadows="shadow"] .sidebar .sidebar-chevron svg,
+html[data-sidebar-icon-shadows="true"] .sidebar .user-avatar-container img,
+html[data-sidebar-icon-shadows="shadow"] .sidebar .user-avatar-container img,
+html[data-sidebar-icon-shadows="true"] .sidebar .user-avatar-container svg,
+html[data-sidebar-icon-shadows="shadow"] .sidebar .user-avatar-container svg,
+.sidebar.has-icon-shadows .item-icon svg,
+.sidebar.has-icon-shadows .logo-icon svg,
+.sidebar.has-icon-shadows .sidebar-logo-img,
+.sidebar.has-icon-shadows .sidebar-chevron svg,
+.sidebar.has-icon-shadows .user-avatar-container img,
+.sidebar.has-icon-shadows .user-avatar-container svg {
+    /* Crisp drop shadow tailored to vector glyph geometry and PNG alpha channels */
+    -webkit-filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+}
+
+/* Header / Logo */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    height: 80px;
+    margin-bottom: 20px;
+    min-height: 80px;
+    padding-left: 0;
+    /* Centered in collapsed via flex */
+    justify-content: flex-start;
+    -webkit-transition: margin 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        -webkit-transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: margin 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.logo-icon {
+    /* Fixed 100px width fallback for Chrome <49 */
+    width: 100px;
+    width: var(--sidebar-width-collapsed, 100px);
+    height: 100%; /* Match parent height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Center in the column */
+    flex-shrink: 0;
+    color: var(--jf-accent);
+    -webkit-transition: -webkit-transform 0.25s cubic-bezier(0.2, 0, 0, 1), color 0.15s ease;
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), color 0.15s ease;
+    will-change: transform;
+    position: relative;
+    z-index: 10;
+}
+
+.sidebar-header.focused .logo-icon,
+.sidebar-header.focused .logo-text {
+    color: inherit;
+}
+
+.logo-icon svg,
+.sidebar-logo-img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.sidebar-logo-img {
+    display: none;
+    -webkit-transition: -webkit-transform 0.25s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s ease;
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s ease;
+}
+
+/* Toggle visibility between Icon Colors (PNG image) and SVG path logo colors */
+html[data-sidebar-logo-color="icon-colors"] .sidebar-logo-img,
+html:not([data-sidebar-logo-color]) .sidebar-logo-img {
+    display: block !important;
+}
+
+html[data-sidebar-logo-color="icon-colors"] .sidebar-logo-svg,
+html:not([data-sidebar-logo-color]) .sidebar-logo-svg {
+    display: none !important;
+}
+
+html[data-sidebar-logo-color]:not([data-sidebar-logo-color="icon-colors"]) .sidebar-logo-img {
+    display: none !important;
+}
+
+html[data-sidebar-logo-color]:not([data-sidebar-logo-color="icon-colors"]) .sidebar-logo-svg {
+    display: block !important;
+}
+
+.sidebar-logo-svg path {
+    fill: currentColor;
+    transition: fill 0.15s ease;
+}
+
+/* Sidebar Logo Color Customization (Follow Theme, White, Black) */
+html[data-sidebar-logo-color="follow-theme"] #sidebar-logo-header:not(:focus):not(.focused) .logo-icon,
+html[data-sidebar-logo-color="follow-theme"] .sidebar-header:not(:focus):not(.focused) .logo-icon {
+    color: var(--jf-accent) !important;
+}
+
+html[data-sidebar-logo-color="white"] #sidebar-logo-header:not(:focus):not(.focused) .logo-icon,
+html[data-sidebar-logo-color="white"] .sidebar-header:not(:focus):not(.focused) .logo-icon {
+    color: #ffffff !important;
+}
+
+html[data-sidebar-logo-color="black"] #sidebar-logo-header:not(:focus):not(.focused) .logo-icon,
+html[data-sidebar-logo-color="black"] .sidebar-header:not(:focus):not(.focused) .logo-icon {
+    color: #000000 !important;
+}
+
+.logo-text {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--jf-text-primary);
+    line-height: normal;
+    opacity: 0;
+    visibility: hidden;
+    /* Instant hidden state to avoid sliding under icons */
+    transition: opacity 0s, visibility 0s;
+    margin-left: 0px;
+    position: relative;
+    z-index: 6;
+}
+
+/*
+ * Force display: none on collapsed logo-text across all legacy engines
+ * to prevent overlapping artifacts with page titles or media section headers.
+ */
+.sidebar:not(.expanded):not(:hover) .logo-text {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+.sidebar.expanded .logo-text,
+.sidebar:hover .logo-text {
+    display: inline-block !important;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.5s ease-out, visibility 0s;
+    margin-left: 15px;
+}
+
+/* Base logo action tooltip: hidden by default in normal layouts */
+.logo-tooltip {
+    display: none;
+}
+
+/* Items */
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    height: 72px;
+    min-height: 72px; /* Prevent squishing */
+    flex-shrink: 0;
+    /* Large touch targets */
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--jf-text-secondary);
+    cursor: pointer;
+    padding: 0;
+    outline: none;
+    text-align: left;
+    position: relative;
+}
+
+.sidebar-item:focus,
+.sidebar.expanded .sidebar-item.focused,
+.sidebar:hover .sidebar-item.focused {
+    background: transparent;
+    color: var(--jf-primary-btn-color);
+}
+
+.sidebar-item:hover {
+    transform: scale(1.03);
+    will-change: transform;
+}
+
+/* 
+ * ── Sidebar Selected Item Customizations ──────────────────────────────────
+ * Sets the color of active sidebar items (icons and text) based on settings.
+ */
+html[data-sidebar-selected-color="white"] .sidebar-item.active,
+html[data-sidebar-selected-color="white"] .sidebar-item.active .item-icon {
+    color: #ffffff !important;
+}
+
+html[data-sidebar-selected-color="black"] .sidebar-item.active,
+html[data-sidebar-selected-color="black"] .sidebar-item.active .item-icon {
+    color: #000000 !important;
+}
+
+html[data-sidebar-selected-color="accent"] .sidebar-item.active,
+html[data-sidebar-selected-color="accent"] .sidebar-item.active .item-icon {
+    color: var(--jf-accent) !important;
+}
+
+html[data-sidebar-selected-color="grey"] .sidebar-item.active,
+html[data-sidebar-selected-color="grey"] .sidebar-item.active .item-icon {
+    color: var(--jf-text-secondary) !important;
+}
+
+/* 
+ * ── Sidebar Unselected Item Customizations ──────────────────────────────────
+ * Sets the color of unselected sidebar items (icons and text) based on settings.
+ * Hovered, focused, or active items are bypassed to maintain standard feedback.
+ */
+html[data-sidebar-unselected-color="white"] .sidebar-item:not(.active):not(:focus):not(.focused):not(:hover) {
+    color: #ffffff !important;
+}
+
+html[data-sidebar-unselected-color="black"] .sidebar-item:not(.active):not(:focus):not(.focused):not(:hover) {
+    color: #000000 !important;
+}
+
+html[data-sidebar-unselected-color="accent"] .sidebar-item:not(.active):not(:focus):not(.focused):not(:hover) {
+    color: var(--jf-accent) !important;
+}
+
+html[data-sidebar-unselected-color="grey"] .sidebar-item:not(.active):not(:focus):not(.focused):not(:hover) {
+    color: #bcbebf !important;
+}
+
+.sidebar.expanded .sidebar-item:hover,
+.sidebar:hover .sidebar-item:hover {
+    transform: none;
+    will-change: unset;
+    color: var(--jf-accent);
+}
+
+.sidebar.expanded .sidebar-item.active:focus,
+.sidebar.expanded .sidebar-item.active.focused,
+.sidebar:hover .sidebar-item.active:focus,
+.sidebar:hover .sidebar-item.active.focused,
+.sidebar.expanded .sidebar-item.focused,
+.sidebar:hover .sidebar-item.focused {
+    color: var(--jf-primary-btn-color) !important;
+    transform: none;
+    will-change: unset;
+}
+
+/* Update icon background to match item state when focused */
+html[data-sidebar-selected-color] .sidebar-item:focus .item-icon,
+html[data-sidebar-selected-color] .sidebar.expanded .sidebar-item.focused .item-icon,
+html[data-sidebar-selected-color] .sidebar:hover .sidebar-item.focused .item-icon,
+.sidebar-item:focus .item-icon,
+.sidebar.expanded .sidebar-item.focused .item-icon,
+.sidebar:hover .sidebar-item.focused .item-icon {
+    background: transparent; /* Indicator handles the background */
+    color: inherit !important;
+}
+
+/* Icon Container - Fixed width for alignment */
+.item-icon {
+    /* Fixed 100px width fallback for Chrome <49 */
+    width: 100px;
+    width: var(--sidebar-width-collapsed, 100px);
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    -webkit-transition: -webkit-transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+    will-change: transform;
+    position: relative;
+    z-index: 10;
+}
+
+.item-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+/*
+ * ── Ultra-Legacy Overrides: Sidebar (Chrome <47 / Tizen 2.x) ───────────────
+ * Flex centering is unreliable in Chrome 32 for fixed-height items.
+ * Use the ghost (::before) + inline-block technique instead.
+ * SVGs are centered with absolute position as flex can't be relied upon.
+ */
+html[data-layout-tier="ultra-legacy"] .sidebar {
+    width: 350px !important;
+    background-color: #101010 !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .sidebar-header {
+    display: block;
+    white-space: nowrap;
+}
+
+html[data-layout-tier="ultra-legacy"] .sidebar-header::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .logo-icon {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .logo-icon svg,
+html[data-layout-tier="ultra-legacy"] .sidebar-logo-img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    -webkit-transform: translate(-50%, -50%);
+}
+
+html[data-layout-tier="ultra-legacy"] .sidebar-item {
+    display: block;
+    white-space: nowrap;
+}
+
+html[data-layout-tier="ultra-legacy"] .sidebar-item::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .item-icon {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .item-icon svg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    -webkit-transform: translate(-50%, -50%);
+}
+
+/*
+ * Chrome 32 paint pipeline fails to hide transformed inline-block elements
+ * when only opacity: 0 and visibility: hidden are set. Force display: none
+ * while unexpanded to guarantee zero visual leakage over page content.
+ *
+ * Keep focused and currently active keyboard/d-pad navigation items visible
+ * so that spatial navigation retains accessible tooltip and label cues
+ * even while the sidebar container itself is unexpanded and unhovered.
+ */
+html[data-layout-tier="ultra-legacy"] .sidebar:not(.expanded):not(:hover) .sidebar-item:not(#sidebar-sub-libraries *):not(:focus):not(.focused) .item-text,
+html[data-layout-tier="ultra-legacy"] .sidebar:not(.expanded):not(:hover) #sidebar-logo-header:not(:focus):not(.focused) .logo-text,
+html[data-layout-tier="ultra-legacy"] .sidebar:not(.expanded):not(:hover) .logo-text:not(:focus):not(.focused),
+html[data-layout-tier="ultra-legacy"] .sidebar:not(.expanded):not(:hover) #section-header,
+html[data-layout-tier="ultra-legacy"] .sidebar:not(.expanded):not(:hover) .sidebar-section-header {
+    display: none !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .sidebar.expanded .item-text,
+html[data-layout-tier="ultra-legacy"] .sidebar:hover .item-text {
+    display: inline-block !important;
+    vertical-align: middle;
+    line-height: normal;
+}
+
+
+/* Icon toggle: outline by default, filled when active */
+.item-icon .icon-outline {
+    display: block;
+}
+
+.item-icon .icon-filled {
+    display: none;
+}
+
+.sidebar-item.active .item-icon .icon-outline,
+.sidebar.expanded .sidebar-item.focused .item-icon .icon-outline,
+.sidebar:hover .sidebar-item.focused .item-icon .icon-outline,
+.sidebar-item:focus .item-icon .icon-outline,
+.sidebar-item.sidebar-syncplay-btn.syncplay-active .item-icon .icon-outline {
+    display: none;
+}
+
+.sidebar-item.active .item-icon .icon-filled,
+.sidebar.expanded .sidebar-item.focused .item-icon .icon-filled,
+.sidebar:hover .sidebar-item.focused .item-icon .icon-filled,
+.sidebar-item:focus .item-icon .icon-filled,
+.sidebar-item.sidebar-syncplay-btn.syncplay-active .item-icon .icon-filled {
+    display: block;
+}
+
+.sidebar-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid transparent;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    -webkit-transform: translate(-50%, -50%);
+}
+
+.sidebar-item:focus .sidebar-avatar,
+.sidebar.expanded .sidebar-item.focused .sidebar-avatar,
+.sidebar:hover .sidebar-item.focused .sidebar-avatar {
+    border-color: var(--jf-primary-btn-color, #fff);
+}
+
+/* Text - Hidden when collapsed */
+.item-text {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 1.4rem;
+    font-weight: 500;
+    line-height: normal;
+    opacity: 0;
+    visibility: hidden;
+    /* Instant hidden state to avoid sliding under icons */
+    transition: opacity 0s, visibility 0s;
+    padding-right: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    position: relative;
+    z-index: 6;
+}
+
+/*
+ * Force display: none on collapsed labels across older WebKit and legacy GPU layers
+ * to eradicate ghosting, bleed-through, and clipping artifacts.
+ *
+ * Exclude items that currently hold focus (:focus or .focused) so that
+ * keyboard, remote control, and spatial navigation reliably render the label
+ * tooltips across compact and modern collapsed layouts without requiring mouse hover.
+ */
+.sidebar:not(.expanded):not(:hover) .sidebar-item:not(#sidebar-sub-libraries *):not(:focus):not(.focused) .item-text,
+.sidebar:not(.expanded):not(:hover) > .item-text:not(:focus):not(.focused),
+.sidebar:not(.expanded):not(:hover) .sidebar-item:not(:focus):not(.focused) .sidebar-user-name,
+.sidebar:not(.expanded):not(:hover) .sidebar-item:not(:focus):not(.focused) .sidebar-syncplay-label,
+.sidebar:not(.expanded):not(:hover) .sidebar-user-name:not(:focus):not(.focused),
+.sidebar:not(.expanded):not(:hover) .sidebar-syncplay-label:not(:focus):not(.focused) {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+.sidebar.expanded .item-text,
+.sidebar:hover .item-text {
+    display: inline-block !important;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.5s ease-out, visibility 0s;
+}
+
+.sidebar .sidebar-user-name {
+    margin-top: 0;
+}
+
+/* Navigation & Libraries Container */
+/* Kept without position: relative so floating submenus anchor to root sidebar */
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.sidebar-content::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.sidebar.align-center .sidebar-content {
+    justify-content: center !important;
+}
+
+.sidebar.align-bottom .sidebar-content {
+    justify-content: flex-end !important;
+}
+
+/* Sidebar Footer (Pinned at bottom) */
+.sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-top: auto;
+    flex-shrink: 0;
+    z-index: 5;
+}
+
+html[data-sidebar-family="modern"] .sidebar-footer {
+    display: flex;
+    margin-top: auto;
+    padding-bottom: 16px;
+}
+
+html:not([data-layout-sidebar^="modern"]):not([data-layout-sidebar="floating-buttons"]):not([data-layout-sidebar="floating-island"]) .sidebar-footer:empty {
+    display: none;
+}
+
+.sidebar-libraries {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.sidebar-section-header {
+    padding: 24px 24px 8px 24px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--jf-text-tertiary);
+    font-weight: 600;
+    opacity: 0.7;
+    flex-shrink: 0;
+    
+    /* -------------------------------------------------------------------------
+       LAYOUT SHIFT PREVENTATIVE SMOOTH TRANSITIONS
+       -------------------------------------------------------------------------
+       Enforces smooth transition properties across the header bounding box.
+       This prevents jumping and cumulative layout shifts (CLS) when morphing
+       from a minimalist horizontal separation line to a full text label.
+       ------------------------------------------------------------------------- */
+    border-top: 1px solid transparent;
+    margin: 0;
+    height: auto;
+    transition: margin 0.25s cubic-bezier(0.2, 0, 0, 1),
+                padding 0.25s cubic-bezier(0.2, 0, 0, 1),
+                border-color 0.25s cubic-bezier(0.2, 0, 0, 1),
+                opacity 0.25s cubic-bezier(0.2, 0, 0, 1),
+                font-size 0.25s cubic-bezier(0.2, 0, 0, 1),
+                color 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sidebar:not(.expanded):not(:hover) .sidebar-section-header {
+    /* 
+       Morph the header into a gorgeous horizontal divider line.
+       Occupies the exact same total vertical height (45px) as the expanded state
+       to completely eliminate layout shifting. Spans the full visible 100px width
+       of the collapsed sidebar by shifting margins (margin-left: 250px).
+    */
+    height: auto;
+    border-top: 1px solid hsla(0, 0%, 100%, .15);
+    opacity: 0.6;
+    overflow: hidden;
+    visibility: hidden;
+}
+
+.sidebar:not(.expanded):not(:hover) .sidebar-section-header,
+.sidebar:not(.expanded):not(:hover) #section-header,
+.sidebar:not(.expanded):not(:hover):not(.show-lib-icons-collapsed) .library-item {
+    display: none !important;
+}
+
+/* Hide divider as we use the header now */
+.sidebar-divider {
+    display: none;
+}
+
+.library-item {
+    height: 72px;
+    min-height: 72px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.library-item .item-text {
+    font-size: 1.4rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar.expanded .library-item .item-text,
+.sidebar:hover .library-item .item-text {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Page Pushing */
+/* This is controlled by LayoutManager or Base CSS usually, but we define the width var here */
+
+/* ============================================================================
+   SyncPlay Sidebar Button
+   ============================================================================
+   The SyncPlay button lives above the user profile. When the user is in a
+   group, a pulsing green dot appears top-right of the icon and the label
+   changes to the group name. The button itself gets a subtle green accent.
+   ============================================================================ */
+
+/*
+ * The icon container needs relative positioning so we can absolutely
+ * place the status dot inside it without affecting the layout.
+ */
+.sidebar-syncplay-icon-wrap {
+    position: relative;
+}
+
+/*
+ * The pulsing activity dot — hidden by default, shown with .visible
+ * class when SyncPlay is active. Positioned in the top-right corner
+ * of the icon area, matching the style of the SyncPlayGroupMenu badge dot.
+ */
+.sidebar-syncplay-dot {
+    position: absolute;
+    top: 16px;
+    right: 22px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #32D74B; /* Accent green */
+    border: 2px solid var(--sidebar-bg, #101010); /* Knockout border to sit above bg */
+    opacity: 0;
+    -webkit-transform: scale(0.9);
+    transform: scale(0.9);
+    -webkit-transition: opacity 0.2s ease, -webkit-transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+}
+
+/* Dot becomes visible when a group is active */
+.sidebar-syncplay-dot.visible {
+    opacity: 1;
+    -webkit-transform: scale(1);
+    transform: scale(1);
+    -webkit-animation: sidebar-syncplay-dot-pulse 2s ease-in-out infinite;
+    animation: sidebar-syncplay-pulse 2s ease-in-out infinite;
+}
+
+@-webkit-keyframes sidebar-syncplay-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(50, 215, 75, 0.5); }
+    50%       { box-shadow: 0 0 0 5px rgba(50, 215, 75, 0); }
+}
+
+
+@keyframes sidebar-syncplay-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(50, 215, 75, 0.5); }
+    50%       { box-shadow: 0 0 0 5px rgba(50, 215, 75, 0); }
+}
+
+/* Active state: tint the icon and label green to indicate live session */
+.sidebar-item.sidebar-syncplay-btn.syncplay-active {
+    color: #32D74B;
+}
+
+.sidebar-item.sidebar-syncplay-btn.syncplay-active:focus,
+.sidebar-item.sidebar-syncplay-btn.syncplay-active.focused {
+    /* Keep the standard focus inversion but keep the dot visible */
+    color: var(--jf-primary-btn-color);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Random Button (Shuffle action)
+   ────────────────────────────────────────────────────────────────────────── */
+#sidebar-random:focus .item-icon svg,
+#sidebar-random.focused .item-icon svg {
+    -webkit-animation: sidebar-random-spin 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: sidebar-random-spin 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@-webkit-keyframes sidebar-random-spin {
+    from { -webkit-transform: rotate(0deg) scale(1); }
+    50%  { -webkit-transform: rotate(180deg) scale(1.3); }
+    to   { -webkit-transform: rotate(360deg) scale(1); }
+}
+
+@-webkit-keyframes sidebar-random-spin {
+    from { -webkit-transform: rotate(0deg) scale(1); }
+    50%  { -webkit-transform: rotate(180deg) scale(1.3); }
+    to   { -webkit-transform: rotate(360deg) scale(1); }
+}
+
+@keyframes sidebar-random-spin {
+    from { transform: rotate(0deg) scale(1); }
+    50%  { transform: rotate(180deg) scale(1.3); }
+    to   { transform: rotate(360deg) scale(1); }
+}
+
+
+/* ==========================================================================
+   Ultra-Legacy Specialized Spin:
+   Must include translate(-50%, -50%) in every frame to maintain centering.
+   ========================================================================== */
+
+@-webkit-keyframes sidebar-random-spin-ultra-legacy {
+    from { -webkit-transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+    50%  { -webkit-transform: translate(-50%, -50%) rotate(180deg) scale(1.3); }
+    to   { -webkit-transform: rotate(360deg) translate(-50%, -50%) scale(1); } /* Note: transform order matters on older WebKit */
+}
+
+@keyframes sidebar-random-spin-ultra-legacy {
+    from { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+    50%  { transform: translate(-50%, -50%) rotate(180deg) scale(1.3); }
+    to   { transform: translate(-50%, -50%) rotate(360deg) scale(1); }
+}
+
+html[data-layout-tier="ultra-legacy"] #sidebar-random:focus .item-icon svg,
+html[data-layout-tier="ultra-legacy"] #sidebar-random.focused .item-icon svg {
+    -webkit-animation: sidebar-random-spin-ultra-legacy 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: sidebar-random-spin-ultra-legacy 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+
+/* The group name label should truncate cleanly if the name is very long */
+.sidebar-syncplay-label {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Hide Modern-specific libraries accordion in classic sidebar layout */
+html:not([data-layout-sidebar^="modern"]):not([data-layout-sidebar="floating-buttons"]):not([data-layout-sidebar="floating-island"]) #sidebar-libraries,
+html:not([data-layout-sidebar^="modern"]):not([data-layout-sidebar="floating-buttons"]):not([data-layout-sidebar="floating-island"]) .sidebar-sub-libraries {
+    display: none !important;
+}

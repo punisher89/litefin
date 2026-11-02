@@ -1,0 +1,7318 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Details Page
+ * ============================================================================
+ * Item details with metadata, play button, and related content.
+ * Handles movies, series, seasons, and episodes.
+ * ============================================================================
+ */
+
+// Page-scoped styles - loads with this module's chunk instead of the boot bundle
+import '../styles/details.css';
+import '../styles/season.css';
+
+import Page from './Page.js';
+import { api } from '../api/index.js';
+import { router } from '../core/Router.js';
+import { eventBus } from '../core/EventBus.js';
+import { state } from '../core/StateManager.js';
+import { focusManager } from '../ui/FocusManager.js';
+import { imageService } from '../utils/ImageService.js';
+
+import FavoriteButton from '../components/FavoriteButton.js';
+import { seerr } from '../api/seerrClient.js';
+import { renderWatchProviders, watchProviderRegion, watchProviderTarget } from '../utils/WatchProviders.js';
+import SubtitleEditorModal from '../components/SubtitleEditorModal.js';
+import { IdentifyModal } from '../components/IdentifyModal.js';
+import { ImageEditorModal } from '../components/ImageEditorModal.js';
+import MediaGrid from '../components/MediaGrid.js';
+import MediaInfoModal from '../components/MediaInfoModal.js';
+import TrailerDialog from '../components/TrailerDialog.js';
+import { TrailerPlayer } from '../components/TrailerPlayer.js';
+import AddToTargetModal from '../components/AddToTargetModal.js';
+import DescriptionModal from '../components/DescriptionModal.js';
+import { RichMetadataTable } from '../components/RichMetadataTable.js';
+
+import BackdropManager from '../utils/BackdropManager.js';
+import { customHeaders } from '../utils/CustomHeaders.js';
+import { PlayerSettings } from '../utils/PlayerSettings.js';
+import {
+    resolveBestAudioStream,
+    resolveSubtitleStream,
+    isForcedStream,
+    getEffectiveSubtitleMode
+} from '../player/core/StreamUtils.js';
+import { MediaHelper } from '../player/core/MediaHelper.js';
+import { lazyLoader } from '../utils/LazyLoader.js';
+import { prewarmManager } from '../player/core/PrewarmManager.js';
+import { VirtualCardRow } from '../components/VirtualCardRow.js';
+import { logger } from '../utils/Logger.js';
+import { toast } from '../ui/Toast.js';
+import { i18n } from '../utils/i18n.js';
+import { timeManager } from '../utils/TimeManager.js';
+import CardRenderer from '../utils/CardRenderer.js';
+import { shouldShowScore } from '../utils/visibility.js';
+import { storage } from '../utils/StorageService.js';
+import { languageManager } from '../utils/LanguageManager.js';
+import { formatDate } from '../utils/TimeUtils.js';
+import { themeSongPlayer } from '../utils/ThemeSongPlayer.js';
+import { detailsIcons } from '../utils/Icons.js';
+import {
+    escapeHtml,
+    getOverviewClampClass,
+    shouldAlwaysShowOverviewButton,
+    getOverviewButtonText
+} from '../utils/Utils.js';
+
+const log = logger.create('DetailsPage');
+
+class DetailsPage extends Page {
+    constructor() {
+        super();
+
+        this._itemId = null;
+        this._item = null;
+        this._nextUp = null;
+        this._seasons = null;
+        this._episodes = null;
+        this._people = null;
+
+        this._similar = null;
+        this._seerrRecommendations = null;
+
+        // ====================================================================
+        // Backdrop Image Cache Preservation
+        // ====================================================================
+        // Cache the exact backdrop URL loaded during _loadImages to guarantee
+        // an instant browser cache hit and 100% parameter parity when launching
+        // playback or trailers into PlayerPage.
+        // ====================================================================
+        this._backdropUrl = null;
+
+        // Track/Version selection state
+        this._selectedMediaSourceId = null;
+        this._selectedAudioIndex = undefined;
+        this._selectedSubtitleIndex = undefined;
+
+        // Mark as async page for Navigation State
+        this._isAsyncPage = true;
+
+        // Adjacent episode navigation targets
+        this._prevEpisode = null;
+        this._nextEpisode = null;
+
+        // Deferred loading flag: when set, the loading overlay stays visible
+        // until focus restoration completes, preventing a visible "focus jump"
+        // on back-navigation where the page content appears and then focus
+        // snaps to a restored card.
+        this._deferredLoading = false;
+    }
+
+    /**
+     * Override _renderMediaCard to provide a default context for all
+     * related content rows (Similar, Next Up, Cast).
+     */
+    _renderMediaCard(item, isLandscape, type, options = {}) {
+        // Default to 'details-row' which maps to the 'home' preset (228px posters, 388px thumbs)
+        // rather than the massive 'details' primary image presets.
+        options.contextType = options.contextType || 'details-row';
+        return super._renderMediaCard(item, isLandscape, type, options);
+    }
+
+    /**
+     * Resolves the active layout mode based on the media item type.
+     * Seasons and Episodes can have an independent layout mode configured.
+     *
+     * @param {Object} [item] - The media item if available
+     * @returns {string} Layout mode identifier ('posterLeft', 'posterRight', 'backdropMinimal', 'backdropLeft')
+     */
+    _getDetailsLayout(item = this._item) {
+        // Differentiate between Season/Episode items and Movies/Series
+        const isSeasonOrEpisode = item && (item.Type === 'Season' || item.Type === 'Episode');
+        if (isSeasonOrEpisode) {
+            // Check for dedicated Season/Episode layout preference with fallback to general details layout
+            return (
+                storage.getItem('pref:seasonEpisodeDetailsLayout') ||
+                storage.getItem('pref:detailsLayout') ||
+                'posterLeft'
+            );
+        }
+        // General layout preference used for Movies, Series, BoxSets, etc.
+        return storage.getItem('pref:detailsLayout') || 'posterLeft';
+    }
+
+    /**
+     * Determine the user's preferred tooltip presentation mode for action buttons.
+     * Evaluates storage preference with fallback support for legacy boolean states.
+     *
+     * @returns {'hidden' | 'floating' | 'cards'} Resolved tooltip presentation style
+     * @private
+     */
+    _getActionTooltipsMode() {
+        // Read raw preference string from local storage
+        const pref = storage.getItem('pref:showActionTooltips');
+
+        // Check if explicitly configured to hide or legacy false flag
+        if (pref === 'hidden' || pref === 'false') {
+            return 'hidden';
+        }
+
+        // Check if configured for legacy card pill badges
+        if (pref === 'cards') {
+            return 'cards';
+        }
+
+        // Default presentation is clean floating text
+        return 'floating';
+    }
+
+    /**
+     * Updates the page container classes to reflect the layout mode
+     * configured for the current media item type.
+     */
+    _updateLayoutClasses() {
+        // Locate page container element
+        const pageEl = this.el || this.$('.details-page');
+        if (!pageEl) return;
+
+        // Determine layout based on current item
+        const detailsLayout = this._getDetailsLayout(this._item);
+
+        // Remove all layout variant classes
+        pageEl.classList.remove(
+            'layout-poster-left',
+            'layout-poster-right',
+            'layout-backdrop-minimal',
+            'layout-backdrop-left'
+        );
+
+        // Map layout identifier to CSS class
+        let layoutClass = 'layout-poster-left';
+        if (detailsLayout === 'posterRight') {
+            layoutClass = 'layout-poster-right';
+        } else if (detailsLayout === 'backdropMinimal') {
+            layoutClass = 'layout-backdrop-minimal';
+        } else if (detailsLayout === 'backdropLeft') {
+            layoutClass = 'layout-backdrop-left';
+        }
+
+        // Apply updated layout class
+        pageEl.classList.add(layoutClass);
+    }
+
+    render() {
+        // Resolve initial layout class based on default / item layout
+        const detailsLayout = this._getDetailsLayout();
+        let layoutClass = 'layout-poster-left';
+        if (detailsLayout === 'posterRight') {
+            layoutClass = 'layout-poster-right';
+        } else if (detailsLayout === 'backdropMinimal') {
+            layoutClass = 'layout-backdrop-minimal';
+        } else if (detailsLayout === 'backdropLeft') {
+            layoutClass = 'layout-backdrop-left';
+        }
+
+        // Resolve action tooltips display mode (floating text default, name cards, or hidden)
+        const tooltipMode = this._getActionTooltipsMode();
+        // Hide tooltips class used for layout adjustments when tooltips are disabled
+        const tooltipsClass = tooltipMode === 'hidden' ? 'tooltips-disabled' : '';
+        // Modifier class indicating whether floating or card style is active
+        const tooltipModeClass = `tooltip-mode-${tooltipMode}`;
+
+        return `
+            <div class="page details-page ${layoutClass} ${tooltipsClass} ${tooltipModeClass}">
+                <!-- Backdrop -->
+                <div class="details-backdrop" id="backdrop">
+                    <div class="backdrop-gradient"></div>
+                </div>
+                
+                <!-- Scrollable Content -->
+                <div class="details-content page-content">
+
+
+
+                    <!-- Main Split Layout (Marked as media-row for focus scrolling) -->
+                    <div class="details-main-split media-row">
+                        <!-- Left: Poster -->
+                        <div class="hero-poster" id="poster"></div>
+                        
+                        <!-- Right: Info column -->
+                        <div class="details-info-col">
+                            <div class="hero-info" id="hero-info">
+                                <!-- Info rendered here -->
+                            </div>
+
+                            <!-- Actions -->
+                            <section class="details-actions" id="actions">
+                                <button class="btn btn-primary play-btn" tabindex="0" data-tooltip="${i18n.t('Play')}">
+                                    ${detailsIcons.play}
+                                    <span data-i18n="Play">Play</span>
+                                </button>
+                                <button class="btn btn-secondary resume-btn hidden" tabindex="-1" data-tooltip="${i18n.t('ResumePlayback') || 'Resume Playback'}">
+                                    <span data-i18n="ResumePlayback">Resume Playback</span>
+                                </button>
+                                <!-- Adjacent Episode Navigation (Visible on Episode Details pages) -->
+                                <button class="btn btn-icon prev-episode-btn hidden" tabindex="-1" aria-label="${i18n.t('PreviousEpisode') || 'Previous Episode'}" data-tooltip="${i18n.t('PreviousEpisode') || 'Previous Episode'}">
+                                    ${detailsIcons.previousEpisode}
+                                </button>
+                                <button class="btn btn-icon next-episode-btn hidden" tabindex="-1" aria-label="${i18n.t('NextEpisode') || 'Next Episode'}" data-tooltip="${i18n.t('NextEpisode') || 'Next Episode'}">
+                                    ${detailsIcons.nextEpisode}
+                                </button>
+                                <button class="btn btn-icon reset-btn hidden" tabindex="-1" aria-label="${i18n.t('ResetProgress')}" data-tooltip="${i18n.t('ResetProgress')}">
+                                    ${detailsIcons.reset}
+                                </button>
+                                <button class="btn btn-icon ghost-btn hidden" tabindex="-1" aria-label="${i18n.t('GhostMode') || 'Ghost Mode'}" data-tooltip="${i18n.t('GhostMode') || 'Ghost Mode'}">
+                                    ${detailsIcons.ghost}
+                                </button>
+                                <!-- Trailer button — shown only when item has local or remote trailers.
+                                     Visibility is set dynamically by _updateTrailerButton() after load. -->
+                                <button class="btn btn-icon trailer-btn hidden" tabindex="-1" aria-label="${i18n.t('WatchTrailer') || 'Watch Trailer'}" data-tooltip="${i18n.t('WatchTrailer') || 'Watch Trailer'}">
+                                    ${detailsIcons.trailer}
+                                </button>
+                                <button class="btn btn-icon shuffle-btn hidden" tabindex="-1" aria-label="${i18n.t('Shuffle')}" data-tooltip="${i18n.t('Shuffle')}">
+                                    ${detailsIcons.shuffle}
+                                </button>
+                                <button class="btn btn-icon watched-btn" tabindex="0" aria-label="${i18n.t('MarkWatched')}" data-tooltip="${i18n.t('MarkWatched')}">
+                                    ${detailsIcons.watchedOutline}
+                                </button>
+                                <!-- Favorite Button Injected Here -->
+                                <button class="btn btn-icon audio-btn" tabindex="0" aria-label="${i18n.t('AudioTracks')}" data-tooltip="${i18n.t('AudioTracks')}">
+                                    ${detailsIcons.audio}
+                                </button>
+                                <button class="btn btn-icon subtitle-btn" tabindex="0" aria-label="${i18n.t('SubtitleTracks')}" data-tooltip="${i18n.t('SubtitleTracks')}">
+                                    ${detailsIcons.subtitle}
+                                </button>
+                                <button class="btn btn-icon more-btn" tabindex="0" aria-label="${i18n.t('MoreOptions')}" data-tooltip="${i18n.t('MoreOptions')}">
+                                    ${detailsIcons.more}
+                                </button>
+                                <div class="action-btn-tooltip-bar style-${tooltipMode}" id="action-tooltip-bar">
+                                    <span class="action-btn-tooltip-text" id="action-tooltip-text"></span>
+                                </div>
+                            </section>
+
+                            <!-- Overview -->
+                            <div id="watch-providers-container" class="hidden"></div>
+                            <div class="details-overview">
+                                <div class="overview-text ${getOverviewClampClass()}" tabindex="-1"></div>
+                                <button class="see-more-btn" tabindex="0" data-i18n="${shouldAlwaysShowOverviewButton() ? 'DetailedView' : 'ShowMore'}">${getOverviewButtonText()}</button>
+                            </div>
+
+                        </div>
+                    </div>
+                    
+                    <!-- Rich Metadata (Genres, People, Studios, Tags) -->
+                    <!-- Note: NOT marked as media-row to prevent aggressive 700px top-snapping on focus -->
+                    <div id="rich-meta-container">
+                        <div class="details-rich-meta" id="rich-meta" tabindex="0"></div>
+                    </div>
+
+                    <!-- Collection Movies (BoxSet) -->
+                    <section class="details-collection-movies media-row hidden" id="collection-movies-section">
+                        <h2 class="row-title" data-i18n="Movies">Movies</h2>
+                        <div class="collection-row row-items" id="collection-movies-row"></div>
+                    </section>
+
+                    <!-- Collection Shows (BoxSet) -->
+                    <section class="details-collection-shows media-row hidden" id="collection-shows-section">
+                        <h2 class="row-title" data-i18n="Series">TV Shows</h2>
+                        <div class="collection-row row-items" id="collection-shows-row"></div>
+                    </section>
+
+                    <!-- Collection Episodes (BoxSet) -->
+                    <section class="details-collection-episodes media-row hidden" id="collection-episodes-section">
+                        <h2 class="row-title" data-i18n="Episodes">Episodes</h2>
+                        <div class="collection-row row-items" id="collection-episodes-row"></div>
+                    </section>
+
+                    <!-- Collection Videos (BoxSet) -->
+                    <section class="details-collection-videos media-row hidden" id="collection-videos-section">
+                        <h2 class="row-title" data-i18n="Videos">Videos</h2>
+                        <div class="collection-row row-items" id="collection-videos-row"></div>
+                    </section>
+
+                    <!-- Collection Albums (BoxSet) -->
+                    <section class="details-collection-albums media-row hidden" id="collection-albums-section">
+                        <h2 class="row-title" data-i18n="Albums">Albums</h2>
+                        <div class="collection-row row-items" id="collection-albums-row"></div>
+                    </section>
+
+                    <!-- Collection Books (BoxSet) -->
+                    <section class="details-collection-books media-row hidden" id="collection-books-section">
+                        <h2 class="row-title" data-i18n="Books">Books</h2>
+                        <div class="collection-row row-items" id="collection-books-row"></div>
+                    </section>
+
+                    <!-- Sub-Collections (BoxSet) -->
+                    <section class="details-collection-subcollections media-row hidden" id="collection-subcollections-section">
+                        <h2 class="row-title" data-i18n="Collections">Collections</h2>
+                        <div class="collection-row row-items" id="collection-subcollections-row"></div>
+                    </section>
+
+                    <!-- Collection Other Items (BoxSet) -->
+                    <section class="details-collection-other media-row hidden" id="collection-other-section">
+                        <h2 class="row-title" data-i18n="HeaderOtherItems">Other Items</h2>
+                        <div class="collection-row row-items" id="collection-other-row"></div>
+                    </section>
+
+                    <!-- Playlist Items — shown when viewing a Playlist type item.
+                         Uses a landscape MediaGrid to handle the mixed content (movies,
+                         episodes, music videos) that playlists can contain. -->
+                    <section class="details-playlist-items media-row hidden" id="playlist-items-section">
+                        <h2 class="row-title" id="playlist-items-title" data-i18n="PlaylistItems">Items</h2>
+                        <div class="playlist-items-list" id="playlist-items-list"></div>
+                    </section>
+                    
+                    <!-- Next Up (for series) -->
+                    <section class="details-next-up media-row hidden" id="next-up-section">
+                        <h2 class="row-title" data-i18n="NextUp">Next Up</h2>
+                        <div class="next-up-row row-items" id="next-up-row"></div>
+                    </section>
+                    
+                    <!-- Seasons (for series) -->
+                    <section class="details-seasons media-row hidden" id="seasons-section">
+                        <h2 class="row-title" data-i18n="HeaderSeasons">Seasons</h2>
+                        <div class="seasons-row" id="seasons-row"></div>
+                    </section>
+                    
+                    <!-- Episodes (for season/series) -->
+                    <section class="details-episodes media-row hidden" id="episodes-section">
+                        <h2 class="row-title" data-i18n="Episodes">Episodes</h2>
+                        <div class="episodes-list" id="episodes-list"></div>
+                    </section>
+
+                    <!-- More from Season (for episodes) -->
+                    <section class="details-season-episodes media-row hidden" id="more-from-season-section">
+                        <h2 class="row-title" id="more-from-season-title" data-i18n="HeaderMoreFromSeason">More from Season</h2>
+                        <div class="season-episodes-row row-items" id="more-from-season-row"></div>
+                    </section>
+
+                    <!-- Additional Parts (Multi-part movies/videos) -->
+                    <section class="details-additional-parts media-row hidden" id="additional-parts-section">
+                        <h2 class="row-title" data-i18n="AdditionalParts">Additional Parts</h2>
+                        <div class="additional-parts-row row-items" id="additional-parts-row"></div>
+                    </section>
+
+                    <!-- Cast & Crew -->
+                    <section class="details-people media-row hidden" id="people-section">
+                        <h2 class="row-title" data-i18n="HeaderCastAndCrew">Cast & Crew</h2>
+                        <div class="people-row row-items" id="people-row"></div>
+                    </section>
+
+                    <!-- Special Features -->
+                    <section class="details-special-features media-row hidden" id="special-features-section">
+                        <h2 class="row-title" data-i18n="SpecialFeatures">Special Features</h2>
+                        <div class="special-features-row row-items" id="special-features-row"></div>
+                    </section>
+
+                    <!-- Songs (for albums) -->
+                    <section class="details-songs media-row hidden" id="songs-section">
+                        <h2 class="row-title songs-title" data-i18n="Songs">Songs</h2>
+                        <div class="songs-list" id="songs-list"></div>
+                    </section>
+
+                    <!-- Artists (for music/albums) -->
+                    <section class="details-artists media-row hidden" id="artists-section">
+                        <h2 class="row-title" data-i18n="Artists">Artists</h2>
+                        <div class="artists-row row-items" id="artists-row"></div>
+                    </section>
+
+                    <!-- Guest Stars (for episodes) -->
+                    <section class="details-guest-stars media-row hidden" id="guest-stars-section">
+                        <h2 class="row-title" data-i18n="HeaderGuestCast">Guest Stars</h2>
+                        <div class="guest-stars-row row-items" id="guest-stars-row"></div>
+                    </section>
+                    
+                    <!-- Collections this item belongs to -->
+                    <section class="details-item-collections media-row hidden" id="item-collections-section">
+                        <h2 class="row-title" data-i18n="Collections">Collections</h2>
+                        <div class="item-collections-row row-items" id="item-collections-row"></div>
+                    </section>
+
+                    <!-- Similar items -->
+                    <section class="details-similar media-row hidden" id="similar-section">
+                        <h2 class="row-title" data-i18n="HeaderMoreLikeThis">More Like This</h2>
+                        <div class="similar-row" id="similar-row"></div>
+                    </section>
+
+                    <!-- Seerr Recommendations -->
+                    <section class="details-seerr-recommendations media-row hidden" id="seerr-recommendations-section">
+                        <h2 class="row-title" data-i18n="SeerrRecommendations">${i18n.t('SeerrRecommendations')}</h2>
+                        <div class="seerr-recommendations-row" id="seerr-recommendations-row"></div>
+                    </section>
+                </div>
+                
+
+            </div>
+        `;
+    }
+
+    async onInit() {
+        this._itemId = this.params.id;
+
+        try {
+            // Setup focus
+            this._setupFocus();
+
+            // Bind actions
+            this._bindActions();
+
+            // Setup action button tooltip listener
+            this._setupTooltipListener();
+
+            // Translate static UI labels
+            i18n.translateDOM(this.el);
+
+            // Load item details
+            await this._loadDetails();
+
+            // Mark the page as rendered, fulfilling the Promise for NavigationState
+            // to restore scroll/focus natively
+            this.markReady();
+
+            // ----------------------------------------------------------------
+            // Auto-chain check: did we just return from a local trailer that
+            // was launched as part of an auto-chain sequence?
+            //
+            // _playLocalTrailerThenChain() writes 'details:autoChainRemote'
+            // to state (an in-memory singleton that outlives page instances)
+            // before navigating to the player. When the player finishes and
+            // router.back() brings us back here as a fresh DetailsPage, we
+            // check for that flag and open the remote trailer automatically.
+            //
+            // We only consume the flag if the item ID matches — in case the
+            // user somehow navigated to a different details page in between.
+            // ----------------------------------------------------------------
+            const pendingChain = state.get('details:autoChainRemote');
+            if (pendingChain && pendingChain === this._itemId) {
+                // Consume the flag immediately so it won't re-fire on next visit
+                state.delete('details:autoChainRemote');
+                log.info(
+                    '[AutoChain] Detected pending remote chain for item',
+                    this._itemId,
+                    '— opening remote trailer'
+                );
+
+                // Short delay: let the page settle visually before slamming the
+                // overlay on top. Prevents a jarring instant transition.
+                setTimeout(() => this._showRemoteTrailerPlayer(), 300);
+            }
+        } catch (err) {
+            log.error('onInit failed', err);
+        }
+    }
+
+    _setupFocus() {
+        // ====================================================================
+        // Details Page Primary Actions Focus Registration
+        // ====================================================================
+        // We register the actions section using a 'grid' orientation,
+        // On smaller displays or layouts with wrapped buttons, a strict horizontal
+        // orientation forces users to navigate linearly and skips wrapped elements
+        // when pressing vertical keys (UP/DOWN).
+        // Using 'grid' delegates movement to the SpatialNavigator, allowing the D-pad
+        // to move naturally between wrapped rows of action buttons.
+        // ====================================================================
+        this.registerFocusSection('details-actions', this.$('#actions'), {
+            orientation: 'grid',
+            leaveUp: null, // Boundary at the top of the page
+            leaveDown: null, // Dynamically chained based on sibling visibility
+            leaveLeft: 'sidebar',
+            // Landing priority: always favor primary action (Play or Resume)
+            // when entering this section to keep interaction flow consistent.
+            defaultFocusSelector: '.resume-btn:not(.hidden), .play-btn'
+        });
+
+        // Set the primary actions row as the initial active focus section
+        this.setActiveSection('details-actions');
+    }
+
+    _bindActions() {
+        let lastActivateTime = 0;
+        const handleActivate = (e, callback) => {
+            const now = Date.now();
+            if (now - lastActivateTime < 400) return;
+            lastActivateTime = now;
+            e.preventDefault();
+            e.stopPropagation();
+            callback();
+        };
+
+        // Play button
+        const playBtn = this.$('.play-btn');
+        if (playBtn) {
+            playBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._play()));
+            playBtn.addEventListener('click', (e) => handleActivate(e, () => this._play()));
+        }
+
+        // Resume button
+        const resumeBtn = this.$('.resume-btn');
+        if (resumeBtn) {
+            resumeBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._play({ resume: true })));
+            resumeBtn.addEventListener('click', (e) => handleActivate(e, () => this._play({ resume: true })));
+        }
+
+        // Previous Episode button
+        const prevEpBtn = this.$('.prev-episode-btn');
+        if (prevEpBtn) {
+            prevEpBtn.addEventListener('mousedown', (e) =>
+                handleActivate(e, () => this._navigateToAdjacentEpisode(this._prevEpisode))
+            );
+            prevEpBtn.addEventListener('click', (e) =>
+                handleActivate(e, () => this._navigateToAdjacentEpisode(this._prevEpisode))
+            );
+        }
+
+        // Next Episode button
+        const nextEpBtn = this.$('.next-episode-btn');
+        if (nextEpBtn) {
+            nextEpBtn.addEventListener('mousedown', (e) =>
+                handleActivate(e, () => this._navigateToAdjacentEpisode(this._nextEpisode))
+            );
+            nextEpBtn.addEventListener('click', (e) =>
+                handleActivate(e, () => this._navigateToAdjacentEpisode(this._nextEpisode))
+            );
+        }
+
+        // Watched button
+        const watchedBtn = this.$('.watched-btn');
+        if (watchedBtn) {
+            watchedBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._toggleWatched()));
+            watchedBtn.addEventListener('click', (e) => handleActivate(e, () => this._toggleWatched()));
+        }
+
+        // Reset button
+        const resetBtn = this.$('.reset-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._resetProgress()));
+            resetBtn.addEventListener('click', (e) => handleActivate(e, () => this._resetProgress()));
+        }
+
+        // Ghost button
+        const ghostBtn = this.$('.ghost-btn');
+        if (ghostBtn) {
+            ghostBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._play({ ghostMode: true })));
+            ghostBtn.addEventListener('click', (e) => handleActivate(e, () => this._play({ ghostMode: true })));
+        }
+
+        // Trailer button
+        const trailerBtn = this.$('.trailer-btn');
+        if (trailerBtn) {
+            trailerBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._onTrailerClick()));
+            trailerBtn.addEventListener('click', (e) => handleActivate(e, () => this._onTrailerClick()));
+        }
+
+        // Shuffle button
+        const shuffleBtn = this.$('.shuffle-btn');
+        if (shuffleBtn) {
+            shuffleBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._shufflePlay()));
+            shuffleBtn.addEventListener('click', (e) => handleActivate(e, () => this._shufflePlay()));
+        }
+
+        // Subtitle button
+        const subtitleBtn = this.$('.subtitle-btn');
+        if (subtitleBtn) {
+            subtitleBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._showSubtitleTrackMenu()));
+            subtitleBtn.addEventListener('click', (e) => handleActivate(e, () => this._showSubtitleTrackMenu()));
+        }
+
+        // Audio button
+        const audioBtn = this.$('.audio-btn');
+        if (audioBtn) {
+            audioBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._showAudioTrackMenu()));
+            audioBtn.addEventListener('click', (e) => handleActivate(e, () => this._showAudioTrackMenu()));
+        }
+
+        // More button
+        const moreBtn = this.$('.more-btn');
+        if (moreBtn) {
+            moreBtn.addEventListener('mousedown', (e) =>
+                handleActivate(e, () => this._showMoreOptionsModal(this._itemId))
+            );
+            moreBtn.addEventListener('click', (e) => handleActivate(e, () => this._showMoreOptionsModal(this._itemId)));
+        }
+
+        // See more button
+        const seeMoreBtn = this.$('.see-more-btn');
+        if (seeMoreBtn) {
+            // Route events through the central handler to manage activation limits.
+            seeMoreBtn.addEventListener('mousedown', (e) => handleActivate(e, () => this._showFullOverview()));
+            seeMoreBtn.addEventListener('click', (e) => handleActivate(e, () => this._showFullOverview()));
+        }
+    }
+
+    /**
+     * Listen for focus changes and update the action button tooltip label.
+     * Positions the tooltip centered directly underneath the currently focused button.
+     */
+    _setupTooltipListener() {
+        const tooltipBar = this.$('#action-tooltip-bar');
+        const tooltipText = this.$('#action-tooltip-text');
+        if (!tooltipBar || !tooltipText) return;
+
+        /*
+         * ANDROID TOUCH: a tap latches focus on the action button, which
+         * keeps this tooltip visible 24/7 (same stuck-hover family as the
+         * sidebar labels). On the touch shell the tooltip therefore reveals
+         * ONLY while the finger is down (press-and-hold, via the pointer
+         * handlers below) or for keyboard-style focus (:focus-visible —
+         * D-pad/remote). Tap-latched focus is ignored. Desktop/TV pointer
+         * platforms keep the stock focus/hover behavior unchanged.
+         */
+        this._isTouchTooltipShell =
+            document.documentElement.hasAttribute('data-litefin-touch') &&
+            !window.matchMedia('(pointer: fine)').matches;
+
+        this._onFocusChangedForTooltip = (focusedEl) => {
+            // Check if tooltips mode is active (either floating or cards)
+            const tooltipMode = this._getActionTooltipsMode();
+            const isEnabled = tooltipMode !== 'hidden';
+            const targetEl = focusedEl || document.activeElement;
+            if (!isEnabled || !targetEl) {
+                tooltipBar.classList.remove('visible');
+                return;
+            }
+
+            if (this._isTouchTooltipShell) {
+                let keyboardFocus = false;
+                try {
+                    keyboardFocus = targetEl.matches(':focus-visible');
+                } catch (_) {
+                    keyboardFocus = false;
+                }
+                if (!keyboardFocus && !this._tooltipPressActive) {
+                    tooltipBar.classList.remove('visible');
+                    return;
+                }
+            }
+
+            // Check if the focused element is an action button inside #actions
+            const actionsContainer = this.$('#actions');
+            if (actionsContainer && actionsContainer.contains(targetEl)) {
+                let text = targetEl.getAttribute('data-tooltip') || targetEl.getAttribute('aria-label');
+                if (!text) {
+                    const span = targetEl.querySelector('span[data-i18n], span');
+                    if (span) text = span.textContent?.trim();
+                }
+
+                if (text) {
+                    // Calculate fixed position centered under the focused button relative to actionsContainer.
+                    // Uses offset metrics rather than getBoundingClientRect to prevent 1-2px vertical jitter
+                    // caused by scale(1.05) focus animations.
+                    const btnCenterX = targetEl.offsetLeft + targetEl.offsetWidth / 2;
+                    const btnBottomY = targetEl.offsetTop + targetEl.offsetHeight;
+
+                    tooltipBar.style.left = `${btnCenterX}px`;
+                    // Both styles hang from the focused button, so a wrapped second row gets its own label
+                    tooltipBar.style.top = `${btnBottomY}px`;
+                    tooltipText.textContent = text;
+                    tooltipBar.classList.add('visible');
+                    return;
+                }
+            }
+
+            tooltipBar.classList.remove('visible');
+        };
+
+        eventBus.on('focus:changed', this._onFocusChangedForTooltip);
+
+        const actionsContainer = this.$('#actions');
+        if (actionsContainer) {
+            actionsContainer.addEventListener('mouseover', (e) => {
+                const btn = e.target.closest('.btn, button');
+                if (btn) this._onFocusChangedForTooltip?.(btn);
+            });
+
+            actionsContainer.addEventListener('mouseout', (e) => {
+                const related = e.relatedTarget;
+                if (!related || !actionsContainer.contains(related)) {
+                    const activeInActions = document.activeElement && actionsContainer.contains(document.activeElement);
+                    if (activeInActions) {
+                        this._onFocusChangedForTooltip?.(document.activeElement);
+                    } else {
+                        tooltipBar.classList.remove('visible');
+                    }
+                } else {
+                    const newBtn = related.closest('.btn, button');
+                    if (newBtn) {
+                        this._onFocusChangedForTooltip?.(newBtn);
+                    }
+                }
+            });
+
+            /*
+             * ANDROID TOUCH press-and-hold reveal: the tooltip shows while the
+             * finger is down on an action button and folds away on release —
+             * mirroring the sidebar label behavior. Only bound on the touch
+             * shell (see _isTouchTooltipShell above).
+             */
+            if (this._isTouchTooltipShell) {
+                actionsContainer.addEventListener(
+                    'pointerdown',
+                    (e) => {
+                        const btn = e.target.closest('.btn, button');
+                        if (!btn) return;
+                        this._tooltipPressActive = true;
+                        this._onFocusChangedForTooltip?.(btn);
+                    },
+                    { passive: true }
+                );
+                const endPress = () => {
+                    if (!this._tooltipPressActive) return;
+                    this._tooltipPressActive = false;
+                    tooltipBar.classList.remove('visible');
+                };
+                actionsContainer.addEventListener('pointerup', endPress, { passive: true });
+                actionsContainer.addEventListener('pointercancel', endPress, { passive: true });
+            }
+        }
+
+        // Run initial evaluation so tooltip displays immediately for initial focused button
+        this._tooltipTimers = [];
+        const updateInitial = () => {
+            if (typeof this._onFocusChangedForTooltip !== 'function') return;
+            const targetEl =
+                document.activeElement && document.activeElement.closest('#actions')
+                    ? document.activeElement
+                    : this.$('.resume-btn:not(.hidden)') || this.$('.play-btn');
+            if (targetEl) {
+                this._onFocusChangedForTooltip?.(targetEl);
+            }
+        };
+        updateInitial();
+        requestAnimationFrame(updateInitial);
+        this._tooltipTimers.push(setTimeout(updateInitial, 150));
+        this._tooltipTimers.push(setTimeout(updateInitial, 400));
+    }
+
+    /**
+     * Re-fetch the current item metadata from the server and refresh
+     * all on-screen media images (poster, backdrop, logo) and hero details
+     * after an admin metadata or image update.
+     * @returns {Promise<void>}
+     */
+    async _refreshItem() {
+        if (!this._itemId) return;
+
+        try {
+            log.info(`Re-fetching item metadata and visual assets for ${this._itemId}`);
+
+            // 1. Build metadata fields query
+            // Default to 'genres-studios-writers' to prevent loading excessive tags that bloat DOM
+            const richMetadataStyle =
+                storage.getItem('pref:richMetadataStyle') ||
+                (storage.getItem('pref:hideRichMetadata') === 'true' ? 'none' : 'genres-studios-writers');
+            const hideRich = richMetadataStyle === 'none';
+            const hideCast = storage.getItem('pref:hideCastSection') === 'true';
+
+            const requestedFields = [
+                'MediaStreams',
+                'MediaSources',
+                'Overview',
+                'LibraryId',
+                'CanDelete',
+                'Width',
+                'Height',
+                'CameraMake',
+                'CameraModel',
+                'ExposureTime',
+                'FocalLength',
+                'Aperture',
+                'Altitude',
+                'DateCreated',
+                'PremiereDate',
+                'ProviderIds',
+                'SeriesTmdbId'
+            ];
+
+            if (!hideRich) {
+                requestedFields.push('Genres', 'GenreItems');
+                if (richMetadataStyle === 'all' || richMetadataStyle === 'genres-studios-writers') {
+                    requestedFields.push('Studios');
+                }
+                if (richMetadataStyle === 'all') {
+                    requestedFields.push('Tags');
+                }
+                if (
+                    richMetadataStyle === 'all' ||
+                    richMetadataStyle === 'genres-studios-writers' ||
+                    richMetadataStyle === 'genres-writers'
+                ) {
+                    requestedFields.push('People');
+                }
+            }
+
+            if (!hideCast && !requestedFields.includes('People')) {
+                requestedFields.push('People');
+            }
+
+            // 2. Query fresh item details directly from server
+            const item = await api.getItem(this._itemId, {
+                Fields: requestedFields.join(',')
+            });
+
+            if (!item) return;
+
+            // 3. Update active item reference in memory
+            this._item = item;
+
+            // Reconcile with authoritative client state if server database commit is still in flight
+            this._reconcileItemWithLastStopped(this._item);
+
+            // 4. Update series cache if applicable
+            if (item.Type === 'Series') {
+                state.set(`details:series:${item.Id}`, item);
+            }
+
+            // 5. Update layout classes and text info
+            this._updateLayoutClasses();
+            this._renderHeroText();
+            this._setupFavoriteButton();
+            this._renderRichMetadata();
+            void this._loadWatchProviders();
+            this._updateTrailerButton();
+
+            // 6. Immediately re-fetch and render visual artwork (poster & backdrop)
+            this._loadImages();
+
+            // 7. Re-fetch or clear logo
+            const logoContainer = this.$('#details-logo');
+            const hasLogo = !!(item.ImageTags?.Logo || item.ParentLogoImageTag);
+            if (hasLogo) {
+                await this._loadLogoAsync();
+            } else if (logoContainer) {
+                logoContainer.innerHTML = '';
+            }
+        } catch (err) {
+            log.error('Failed to refresh item data:', err.message || err);
+        }
+    }
+
+    async _loadWatchProviders() {
+        const container = this.$('#watch-providers-container');
+        if (!container) return;
+
+        const requestId = (this._watchProvidersRequestId || 0) + 1;
+        this._watchProvidersRequestId = requestId;
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        if (storage.getItem('pref:showWatchProviders') !== 'true') return;
+        const target = watchProviderTarget(this._item);
+        if (!target) return;
+        const isCurrent = () =>
+            !this._isDestroyed &&
+            this._watchProvidersRequestId === requestId &&
+            storage.getItem('pref:showWatchProviders') === 'true';
+        try {
+            if (!(await seerr.isAvailable()) || !isCurrent()) return;
+            const details = await seerr.details(target.mediaType, target.tmdbId);
+            if (!isCurrent()) return;
+            container.innerHTML = renderWatchProviders(
+                details.WatchProviders,
+                watchProviderRegion(storage.getItem('pref:watchProviderRegion')),
+                (key) => i18n.t(key),
+                i18n.currentLang
+            );
+            container.classList.remove('hidden');
+        } catch (err) {
+            // Availability is optional; playback and Jellyfin metadata remain usable.
+            log.warn('Unable to load streaming availability', err);
+        }
+    }
+
+    /**
+     * Reconciles a media item's UserData against authoritative playback stop state.
+     * Prevents UI desynchronization on DetailsPage when the server database transaction
+     * is still processing or committing asynchronously right after the player exits.
+     *
+     * @param {Object} item - Media item with UserData
+     * @private
+     */
+    _reconcileItemWithLastStopped(item) {
+        if (!item) return;
+
+        // Retrieve last stopped snapshot from in-memory state
+        const lastStopped = state.get('playback:lastStopped');
+        if (!lastStopped || lastStopped.itemId !== item.Id) return;
+
+        // Only reconcile if stop was recent (within 30 seconds)
+        if (Date.now() - lastStopped.timestamp > 30000) return;
+
+        item.UserData = item.UserData || {};
+        if (lastStopped.isNearComplete) {
+            // Playback completed or crossed watched threshold
+            item.UserData.Played = true;
+            item.UserData.PlaybackPositionTicks = 0;
+            item.UserData.UnplayedItemCount = 0;
+        } else if (lastStopped.positionTicks > 0) {
+            // Partially watched: preserve exact resume position
+            item.UserData.PlaybackPositionTicks = lastStopped.positionTicks;
+        }
+    }
+
+    async _loadDetails() {
+        // Invalidate optional metadata before starting a different item load.
+        this._watchProvidersRequestId = (this._watchProvidersRequestId || 0) + 1;
+        const providersContainer = this.$('#watch-providers-container');
+        if (providersContainer) providersContainer.classList.add('hidden');
+        this.setLoading(true);
+        this._hasEnteredEpisodesGrid = false;
+
+        try {
+            // ────────────────────────────────────────────────────────────────────────
+            // 1. Fetch Base Item Details (blocking — page needs this to render)
+            // ────────────────────────────────────────────────────────────────────────
+            // Build requested fields for base details fetch
+            // Default to 'genres-studios-writers' to avoid hundreds of tag chips on initial load
+            const richMetadataStyle =
+                storage.getItem('pref:richMetadataStyle') ||
+                (storage.getItem('pref:hideRichMetadata') === 'true' ? 'none' : 'genres-studios-writers');
+            const hideRich = richMetadataStyle === 'none';
+            const hideCast = storage.getItem('pref:hideCastSection') === 'true';
+
+            const requestedFields = [
+                'MediaStreams',
+                'MediaSources',
+                'Overview',
+                'LibraryId',
+                'CanDelete',
+                'Width',
+                'Height',
+                'CameraMake',
+                'CameraModel',
+                'ExposureTime',
+                'FocalLength',
+                'Aperture',
+                'Altitude',
+                'DateCreated',
+                'PremiereDate',
+                'ProviderIds',
+                'SeriesTmdbId'
+            ];
+
+            if (!hideRich) {
+                requestedFields.push('Genres', 'GenreItems');
+                if (richMetadataStyle === 'all' || richMetadataStyle === 'genres-studios-writers') {
+                    requestedFields.push('Studios');
+                }
+                if (richMetadataStyle === 'all') {
+                    requestedFields.push('Tags');
+                }
+                if (
+                    richMetadataStyle === 'all' ||
+                    richMetadataStyle === 'genres-studios-writers' ||
+                    richMetadataStyle === 'genres-writers'
+                ) {
+                    requestedFields.push('People');
+                }
+            }
+
+            if (!hideCast) {
+                if (!requestedFields.includes('People')) {
+                    requestedFields.push('People');
+                }
+            }
+
+            const userPromise = state.get('user:data') ? Promise.resolve(state.get('user:data')) : api.getCurrentUser();
+
+            const item = await api.getItem(this._itemId, {
+                Fields: requestedFields.join(',')
+            });
+            this._item = item;
+
+            // Reconcile with authoritative client state if server database commit is still in flight
+            this._reconcileItemWithLastStopped(this._item);
+
+            // Synchronize container layout class once item type is determined
+            this._updateLayoutClasses();
+
+            // Cache Series item for reuse across child Season/Episode detail pages
+            if (item.Type === 'Series') {
+                state.set(`details:series:${item.Id}`, item);
+            }
+
+            // Render all text content immediately — only needs this._item
+            this._renderHeroText();
+            this._setupFavoriteButton();
+            this._renderRichMetadata();
+            void this._loadWatchProviders();
+            this._updateTrailerButton();
+
+            // Load adjacent episode navigation buttons if the active media item is an Episode
+            if (item.Type === 'Episode') {
+                this._loadAdjacentEpisodes();
+            } else {
+                this._updateAdjacentEpisodeButtons();
+            }
+
+            // Restore persisted version selection
+            const savedSourceId = storage.getItem(`mediaSource:${this._itemId}`);
+            if (savedSourceId && item.MediaSources?.some((m) => m.Id === savedSourceId)) {
+                this._selectedMediaSourceId = savedSourceId;
+            } else {
+                this._selectedMediaSourceId = null;
+            }
+
+            // =========================================================================
+            // Restore Persisted Track Selections for this Media Item
+            // =========================================================================
+            // When resuming or navigating to an item where the user previously selected
+            // an audio commentary or subtitle track, restore that selection using
+            // identity-aware reconciliation so that any stream index shifts (e.g. from
+            // newly downloaded external subtitles) automatically re-map to the right stream.
+            // =========================================================================
+            const activeSource =
+                this._item.MediaSources?.find((m) => m.Id === this._selectedMediaSourceId) ||
+                this._item.MediaSources?.[0];
+
+            this._restoreSavedTrackSelections(activeSource);
+
+            // Await user data (likely already resolved from state cache)
+            this._currentUser = await userPromise;
+
+            // ────────────────────────────────────────────────────────────────────────
+            // 2. Fire background images (non-blocking)
+            // ────────────────────────────────────────────────────────────────────────
+            this._loadImages();
+
+            // ────────────────────────────────────────────────────────────────────────
+            // 3. Load logo — await for backdrop layouts (where logo is the primary
+            //    title), fire-and-forget for poster layouts (text title is sufficient)
+            // ────────────────────────────────────────────────────────────────────────
+            const detailsLayout = this._getDetailsLayout(this._item);
+            const isBackdropLayout = detailsLayout === 'backdropMinimal' || detailsLayout === 'backdropLeft';
+            if (isBackdropLayout) {
+                await this._loadLogoAsync();
+            } else {
+                this._loadLogo();
+            }
+
+            // ────────────────────────────────────────────────────────────────────────
+            // 4. Hide loading — main text content is visible, images/logo loading in bg
+            //    But if we have a pending focus target to restore (back-navigation),
+            //    defer hiding the overlay until focus lands on the target row.
+            //    This prevents a visible "focus jump" where the page content appears
+            //    and then focus snaps to a restored card a frame later.
+            // ────────────────────────────────────────────────────────────────────────
+            const focusStateKey = `details:lastFocusedItem:${this._itemId}`;
+            const hasFocusTarget = this._pendingNavState || state.get(focusStateKey);
+            if (hasFocusTarget) {
+                this._deferredLoading = true;
+            } else {
+                this.setLoading(false);
+
+                // No restore target, so the page is about to become interactive right
+                // now — before secondary content (cast, similar, collections) below has
+                // even started loading. Force focus onto Resume immediately rather than
+                // waiting for the deferred block further down, which only runs once all
+                // of that secondary content finishes. Only do this if no modal is active.
+                const modalOpen = document.querySelector('.modal-overlay.visible');
+                if (!modalOpen) {
+                    this._resumeFocusForced = this._focusResumeButton();
+                }
+            }
+
+            // ────────────────────────────────────────────────────────────────────────
+            // 5. Load secondary content in visual order (top rows first, bottom rows last)
+            // ────────────────────────────────────────────────────────────────────────
+            // 5a. Primary rows first (seasons, episodes, cast, special features)
+            await this._loadSecondaryContent();
+
+            // 4b. Bottom-of-page rows after (similar items, collections, seerr recommendations)
+            if (this._item.Type !== 'Season') {
+                await this._loadSimilar();
+            }
+            if (this._item.Type === 'Movie' || this._item.Type === 'Series') {
+                await this._loadItemCollections();
+            }
+            // Fetch and display Seerr recommendations row for movies, series, seasons, and episodes
+            await this._loadSeerrRecommendations();
+
+            // Trigger theme song background audio if user has activated it
+            if (storage.getItem('pref:playThemeSongs') === 'true') {
+                void this._playThemeSong();
+            }
+
+            // ────────────────────────────────────────────────────────────────────────
+            // 5. Post-render tasks (navigation chain, focus restoration)
+            // ────────────────────────────────────────────────────────────────────────
+            await new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    this._rebuildNavigationChain();
+                    resolve();
+                });
+            });
+
+            focusManager.invalidateCache('details-actions');
+
+            requestAnimationFrame(() => {
+                const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                let lastFocusedObj = null;
+
+                if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                    lastFocusedObj = state.get(stateKey);
+                } else {
+                    state.delete(stateKey);
+                }
+
+                let restoredFocus = false;
+
+                if (lastFocusedObj) {
+                    const targetId = lastFocusedObj.itemId;
+                    const sectionId = lastFocusedObj.sectionId;
+
+                    const virtualRow = this._virtualRows ? this._virtualRows[sectionId] : null;
+
+                    if (virtualRow) {
+                        this.setActiveSection(sectionId, false);
+                        const node = virtualRow.ensureItemRendered(targetId);
+                        if (node) {
+                            focusManager.focusElement(node, { instantScroll: true });
+                            restoredFocus = true;
+                        }
+                    } else {
+                        const sectionConfig = focusManager.getSectionConfig(sectionId);
+                        const sectionContainer = sectionConfig ? sectionConfig.container : this.el;
+                        const savedCard = sectionContainer.querySelector(
+                            `[data-item-id="${targetId}"], [data-id="${targetId}"]`
+                        );
+                        if (savedCard) {
+                            this.setActiveSection(sectionId, false);
+                            focusManager.focusElement(savedCard, { instantScroll: true });
+                            restoredFocus = true;
+                        }
+                    }
+
+                    state.delete(stateKey);
+                }
+
+                if (!restoredFocus) {
+                    if (this._pendingNavState) {
+                        // A Back-navigation left us a section/index to restore (e.g.
+                        // returning from Settings via the sidebar). Consume it now —
+                        // otherwise it just sits here forever, since DetailsPage never
+                        // triggers the base-class restore itself, and the Resume-button
+                        // fallback below would be skipped without ever taking its place.
+                        this.restoreScrollFocusWhenReady();
+                    } else if (!this._resumeFocusForced) {
+                        this._focusResumeButton();
+                    }
+                }
+
+                // If loading was deferred for focus restoration, reveal the page now
+                // that focus has been placed (or attempted). This prevents the visible
+                // "focus jump" when the page content is revealed and focus snaps to a
+                // restored card in a later frame.
+                if (this._deferredLoading) {
+                    this._deferredLoading = false;
+                    this.setLoading(false);
+                }
+            });
+        } catch (error) {
+            log.error('Failed to load', error);
+            this.showError(i18n.t('FailedToLoadDetails'));
+            this.setLoading(false);
+        }
+    }
+
+    /**
+     * Restore saved audio and subtitle track selections for the active media source.
+     * Uses MediaHelper.resolveSavedTrack to ensure that if Jellyfin re-indexed streams
+     * (for instance, after external subtitles are downloaded or deleted), track identities
+     * are preserved and in-memory selection indices are dynamically updated.
+     *
+     * @param {Object} [activeSource] - The active MediaSource to evaluate
+     */
+    _restoreSavedTrackSelections(activeSource = null) {
+        // Resolve target media source from parameter, selected ID, or first available source
+        const source =
+            activeSource ||
+            this._item?.MediaSources?.find((m) => m.Id === this._selectedMediaSourceId) ||
+            this._item?.MediaSources?.[0];
+
+        // Guard against missing media source or streams
+        if (!source || !source.MediaStreams) {
+            this._selectedAudioIndex = undefined;
+            this._selectedSubtitleIndex = undefined;
+            return;
+        }
+
+        // =====================================================================
+        // Restore Saved Audio Track
+        // =====================================================================
+        // Consult track memory, resolving through MediaHelper to reconcile any
+        // stream index shifts caused by external subtitles or re-probing.
+        const savedAudioTrack = storage.getItem(`track:audio:${this._itemId}`);
+        if (savedAudioTrack !== null && savedAudioTrack !== undefined) {
+            const resolvedAudio = MediaHelper.resolveSavedTrack(source, 'Audio', savedAudioTrack, this._itemId);
+            if (resolvedAudio !== undefined) {
+                this._selectedAudioIndex = resolvedAudio;
+                log.info(`Restored saved audio track for ${this._itemId}: ${resolvedAudio}`);
+            } else {
+                this._selectedAudioIndex = undefined;
+            }
+        } else {
+            this._selectedAudioIndex = undefined;
+        }
+
+        // Check series-level audio preference for TV episodes if no item-level override exists
+        if (this._selectedAudioIndex === undefined && this._item?.SeriesId) {
+            const resolvedSeriesAudio = MediaHelper.resolveSeriesTrack(source, 'Audio', this._item.SeriesId);
+            if (resolvedSeriesAudio !== undefined) {
+                this._selectedAudioIndex = resolvedSeriesAudio;
+                log.info(`Restored series-level audio track for ${this._itemId}: ${resolvedSeriesAudio}`);
+            }
+        }
+
+        // =====================================================================
+        // Auto-Resolve Optimal DirectPlay Audio Track for Prewarm
+        // =====================================================================
+        // If the item has not been played previously (no track persisted in
+        // storage), resolve the optimal audio track before triggering prewarm.
+        // On media with TrueHD default tracks (e.g. 4K Dolby Vision releases),
+        // this selects the compatible AC3/EAC3 backup track instead of allowing
+        // the server to evaluate the unsupported TrueHD default. This ensures the
+        // background PlaybackInfo prewarm requests the exact direct-playable stream,
+        // preventing transcode degradation and whitewashed video on first play.
+        if (this._selectedAudioIndex === undefined) {
+            const bestStream = resolveBestAudioStream(source);
+            if (bestStream) {
+                this._selectedAudioIndex = bestStream.Index;
+                log.info(
+                    `Auto-selected DirectPlay audio track for ${this._itemId}: ${this._selectedAudioIndex} (${bestStream.Codec})`
+                );
+            }
+        }
+
+        // =====================================================================
+        // Restore Saved Subtitle Track
+        // =====================================================================
+        // Restore subtitle selection, verifying identity through MediaHelper.
+        const savedSubtitleTrack = storage.getItem(`track:subtitle:${this._itemId}`);
+        const effectiveSubtitleMode = getEffectiveSubtitleMode();
+
+        // ---------------------------------------------------------------------
+        // Subtitle Track Selection Resolution
+        // ---------------------------------------------------------------------
+        // 1. Check item-specific saved track override if one exists
+        // Guard: If Subtitle Mode is 'None', never restore saved tracks.
+        // If Subtitle Mode is 'OnlyForced', only restore if the saved track is actually forced.
+        if (savedSubtitleTrack !== null && savedSubtitleTrack !== undefined && effectiveSubtitleMode !== 'None') {
+            const resolvedSubtitle = MediaHelper.resolveSavedTrack(
+                source,
+                'Subtitle',
+                savedSubtitleTrack,
+                this._itemId
+            );
+            if (resolvedSubtitle !== undefined) {
+                if (effectiveSubtitleMode === 'OnlyForced') {
+                    const candidateStream = source.MediaStreams?.find(
+                        (s) => s.Type === 'Subtitle' && s.Index === resolvedSubtitle
+                    );
+                    if (candidateStream && isForcedStream(candidateStream)) {
+                        this._selectedSubtitleIndex = resolvedSubtitle;
+                        log.info(`Restored saved forced subtitle track for ${this._itemId}: ${resolvedSubtitle}`);
+                    } else {
+                        this._selectedSubtitleIndex = undefined;
+                    }
+                } else if (effectiveSubtitleMode === 'Always' && resolvedSubtitle === -1) {
+                    // In Always mode, do not restore an Off (-1) state from previous sessions.
+                    // Subtitles must always display; leave undefined so automatic language resolution runs.
+                    this._selectedSubtitleIndex = undefined;
+                } else {
+                    this._selectedSubtitleIndex = resolvedSubtitle;
+                    log.info(`Restored saved subtitle track for ${this._itemId}: ${resolvedSubtitle}`);
+                }
+            } else {
+                this._selectedSubtitleIndex = undefined;
+            }
+        } else {
+            this._selectedSubtitleIndex = undefined;
+        }
+
+        // 2. Check series-level subtitle preference for TV episodes if no item-level override exists
+        // Guard: Do NOT restore series subtitle preferences if the user has globally or
+        // server-side set Subtitle Mode to 'None' or 'OnlyForced'.
+        if (
+            this._selectedSubtitleIndex === undefined &&
+            this._item?.SeriesId &&
+            effectiveSubtitleMode !== 'None' &&
+            effectiveSubtitleMode !== 'OnlyForced'
+        ) {
+            const resolvedSeriesSubtitle = MediaHelper.resolveSeriesTrack(source, 'Subtitle', this._item.SeriesId);
+            if (resolvedSeriesSubtitle !== undefined) {
+                if (effectiveSubtitleMode === 'Always' && resolvedSeriesSubtitle === -1) {
+                    // In Always mode, do not inherit an Off state from series track memory
+                    this._selectedSubtitleIndex = undefined;
+                } else {
+                    this._selectedSubtitleIndex = resolvedSeriesSubtitle;
+                    log.info(`Restored series-level subtitle track for ${this._itemId}: ${resolvedSeriesSubtitle}`);
+                }
+            }
+        }
+
+        // 3. Fallback: If still unresolved, determine subtitle index from active Subtitle Mode setting
+        if (this._selectedSubtitleIndex === undefined && source?.MediaStreams) {
+            this._selectedSubtitleIndex = resolveSubtitleStream(source, {
+                audioStreamIndex: this._selectedAudioIndex
+            });
+            log.info(
+                `Resolved subtitle track from Subtitle Mode (${effectiveSubtitleMode}): ${this._selectedSubtitleIndex}`
+            );
+        }
+
+        // =====================================================================
+        // Refresh Prewarm With Reconciled Tracks
+        // =====================================================================
+        // Trigger background prewarm for playable media items with the reconciled tracks
+        const isGameItem = this._isGame(this._item);
+        if (
+            !isGameItem &&
+            this._item &&
+            (this._item.Type === 'Movie' ||
+                this._item.Type === 'Episode' ||
+                this._item.Type === 'Video' ||
+                this._item.Type === 'Trailer')
+        ) {
+            prewarmManager.prewarm(this._item, {
+                mediaSourceId: this._selectedMediaSourceId || source.Id,
+                audioStreamIndex: this._selectedAudioIndex,
+                subtitleStreamIndex: this._selectedSubtitleIndex
+            });
+        }
+    }
+
+    /**
+     * Focus the Resume button if the item has playback progress and the button
+     * is visible. Returns whether focus was actually forced.
+     */
+    _focusResumeButton() {
+        if (!(this._item.UserData?.PlaybackPositionTicks > 0)) return false;
+
+        const resumeBtn = this.$('.resume-btn');
+        if (!resumeBtn || resumeBtn.classList.contains('hidden')) return false;
+
+        log.info('Forcing focus to Resume button');
+        focusManager.focusElement(resumeBtn);
+        return true;
+    }
+
+    _showVersionSelectionMenu() {
+        if (!this._item?.MediaSources || this._item.MediaSources.length <= 1) return;
+
+        // Map MediaSources to a format compatible with _renderTrackSelectionMenu
+        const sources = this._item.MediaSources.map((s) => ({
+            ...s,
+            Index: s.Id, // We use the ID as the index for selection
+            DisplayTitle: s.Name || i18n.t('Version') || 'Version'
+        }));
+
+        const currentId = this._selectedMediaSourceId || this._item.MediaSources[0].Id;
+
+        this._renderTrackSelectionMenu(i18n.t('SelectVersion'), sources, currentId, (id) => {
+            if (this._selectedMediaSourceId === id) return;
+
+            this._selectedMediaSourceId = id;
+            log.info('Selected Media Source ID:', id);
+
+            // Persist the selection so it survives back-navigation and re-visits
+            storage.setItem(`mediaSource:${this._itemId}`, id);
+
+            // Reset track selections when version changes as stream indices are source-specific
+            this._selectedAudioIndex = undefined;
+            this._selectedSubtitleIndex = undefined;
+            storage.removeItem(`track:audio:${this._itemId}`);
+            storage.removeItem(`track:subtitle:${this._itemId}`);
+
+            // =================================================================
+            // Auto-Resolve DirectPlay Audio Track for New Version
+            // =================================================================
+            // When switching to an alternative media source (e.g. 4K vs 1080p),
+            // auto-select the best audio track for the new source so background
+            // prewarming immediately generates a valid DirectPlay stream profile.
+            // =================================================================
+            const newSource = this._item.MediaSources?.find((m) => m.Id === id);
+            if (newSource) {
+                const bestStream = resolveBestAudioStream(newSource);
+                if (bestStream) {
+                    this._selectedAudioIndex = bestStream.Index;
+                    log.info(
+                        `Auto-selected DirectPlay audio track for version ${id}: ${this._selectedAudioIndex} (${bestStream.Codec})`
+                    );
+                }
+            }
+
+            // Re-render hero header and technical details to reflect the selected version
+            this._renderHeroText();
+            // Notify native page extensions so metadata (e.g. Enhanced media chips)
+            // follows the newly selected MediaSource instead of showing stale values.
+            eventBus.emit('details:media-source-changed', {
+                page: this,
+                mediaSourceId: id
+            });
+            // Re-trigger zero-latency prewarm for the newly selected version
+            if (
+                this._item &&
+                (this._item.Type === 'Movie' ||
+                    this._item.Type === 'Episode' ||
+                    this._item.Type === 'Video' ||
+                    this._item.Type === 'Trailer')
+            ) {
+                prewarmManager.prewarm(this._item, {
+                    mediaSourceId: id,
+                    audioStreamIndex: this._selectedAudioIndex,
+                    subtitleStreamIndex: this._selectedSubtitleIndex
+                });
+            }
+        });
+    }
+
+    _loadImages() {
+        const item = this._item;
+
+        // Poster
+        const posterContainer = this.$('#poster');
+        posterContainer.innerHTML = '';
+
+        // Determine Aspect Ratio Type
+        let posterType = 'poster';
+        if (item.Type === 'Episode') posterType = 'landscape';
+        if (
+            item.Type === 'MusicAlbum' ||
+            item.Type === 'MusicArtist' ||
+            item.Type === 'Audio' ||
+            item.Type === 'TvChannel'
+        )
+            posterType = 'square';
+
+        // Apply class for CSS aspect ratio
+        posterContainer.classList.remove('landscape', 'square', 'tv-channel-poster');
+        if (posterType !== 'poster') {
+            posterContainer.classList.add(posterType);
+        }
+        if (item.Type === 'TvChannel') {
+            posterContainer.classList.add('tv-channel-poster');
+        }
+        posterContainer.setAttribute('data-type', item.Type || '');
+
+        if (item.ImageTags && item.ImageTags.Primary) {
+            const params = imageService.getParams('details-poster');
+            const posterUrl = api.getImageUrl(item.Id, 'Primary', {
+                maxWidth: params.maxWidth,
+                quality: params.quality,
+                tag: item.ImageTags.Primary
+            });
+
+            // Resolve Poster BlurHash
+            const isBlurHashDisabled = storage.getItem('litefin:disableBlurhash') === 'true';
+            let posterBlurHash = '';
+            if (!isBlurHashDisabled && item.ImageBlurHashes?.Primary) {
+                const keys = Object.keys(item.ImageBlurHashes.Primary);
+                if (keys.length > 0) {
+                    posterBlurHash = item.ImageBlurHashes.Primary[keys[0]];
+                }
+            }
+
+            // Render dynamic BlurHash canvas placeholder
+            let posterCanvas = null;
+            if (posterBlurHash) {
+                posterCanvas = document.createElement('canvas');
+                posterCanvas.className = 'blurhash-canvas poster-blurhash';
+                posterCanvas.style.position = 'absolute';
+                posterCanvas.style.top = '0';
+                posterCanvas.style.left = '0';
+                posterCanvas.style.width = '100%';
+
+                posterContainer.appendChild(posterCanvas);
+
+                // Decode at a lightweight size asynchronously
+                import('../utils/BlurHashDecoder.js')
+                    .then(({ default: BlurHashDecoder }) => {
+                        const pixels = BlurHashDecoder.decode(posterBlurHash, 32, 48);
+                        if (pixels && posterCanvas) {
+                            posterCanvas.width = 32;
+                            posterCanvas.height = 48;
+                            const ctx = posterCanvas.getContext('2d');
+                            const imageData = ctx.createImageData(32, 48);
+                            imageData.data.set(pixels);
+                            ctx.putImageData(imageData, 0, 0);
+                        }
+                    })
+                    .catch((err) => log.error('Failed to decode poster blurhash', err));
+            }
+
+            /*
+             * ================================================================
+             * Primary Poster Artwork Presentation
+             * ================================================================
+             * Instantiates the primary poster image element. When custom headers
+             * are active (e.g. Cloudflare Access), resolves via CustomHeadersManager
+             * to fetch the authenticated blob URL so native WebViews display it.
+             * ================================================================
+             */
+            const applyPoster = (effectivePosterUrl) => {
+                const img = new Image();
+                img.onload = () => {
+                    img.classList.add('loaded');
+                    // Fade out and remove canvas when image loads
+                    if (posterCanvas) {
+                        posterCanvas.style.opacity = '0';
+                        setTimeout(() => {
+                            if (posterCanvas && posterCanvas.parentNode) {
+                                posterCanvas.parentNode.removeChild(posterCanvas);
+                            }
+                        }, 250);
+                    }
+                };
+                img.src = effectivePosterUrl;
+                img.alt = item.Name;
+                posterContainer.appendChild(img);
+            };
+
+            // Check if reverse proxy headers are active for the Jellyfin server
+            if (customHeaders?.hasCustomHeaders?.()) {
+                const cached = customHeaders.getCachedBlobUrl(posterUrl);
+                if (cached) {
+                    applyPoster(cached);
+                } else {
+                    customHeaders
+                        .resolveImageUrl(posterUrl)
+                        .then((resolvedUrl) => applyPoster(resolvedUrl))
+                        .catch(() => applyPoster(posterUrl));
+                }
+            } else {
+                applyPoster(posterUrl);
+            }
+        } else {
+            // No primary image, show gradient fallback
+            const isLandscape = posterType === 'landscape';
+            posterContainer.innerHTML = CardRenderer.getFallbackHtml(item, isLandscape);
+        }
+
+        // ====================================================================
+        // Backdrop Presentation & Transition Sync
+        // ====================================================================
+        // Resolve backdrop URL using user's configured details quality profile.
+        // Store on instance so playback transitions can reuse the identical URL,
+        // avoiding duplicate server re-encodes and cache misses.
+        // ====================================================================
+        const params = imageService.getParams('details-backdrop');
+        const backdropUrl = BackdropManager.getBackdropUrl(item, {
+            maxWidth: params.maxWidth,
+            quality: params.quality
+        });
+        this._backdropUrl = backdropUrl;
+
+        // Resolve Backdrop BlurHash
+        let backdropBlurHash = '';
+        if (item.ImageBlurHashes?.Backdrop) {
+            const keys = Object.keys(item.ImageBlurHashes.Backdrop);
+            if (keys.length > 0) {
+                backdropBlurHash = item.ImageBlurHashes.Backdrop[keys[0]];
+            }
+        }
+
+        if (backdropUrl) {
+            BackdropManager.applyBackdrop(this.$('#backdrop'), backdropUrl, backdropBlurHash);
+        } else {
+            BackdropManager.clearBackdrop(this.$('#backdrop'));
+        }
+    }
+
+    async _loadSecondaryContent() {
+        // Load additional data based on type
+        if (this._item.Type === 'Series') {
+            /*
+             * Visual hierarchy for TV series: Next Up episode is prioritized
+             * and positioned directly above the Seasons row.
+             */
+            await this._loadNextUp();
+            await this._loadSeasons();
+        } else if (this._item.Type === 'Season') {
+            /*
+             * Resolve parent series identifier for metadata queries.
+             * Jellyfin seasons provide SeriesId directly, or ParentId as fallback.
+             */
+            const seriesId = this._item.SeriesId || this._item.ParentId;
+            this._parentSeries = state.get(`details:series:${seriesId}`);
+
+            /*
+             * Present Next Up on Season view if the upcoming episode falls within this season.
+             * Visually positioned right above the episode list to streamline resumption.
+             */
+            await this._loadNextUp();
+            await this._loadEpisodes(seriesId, this._itemId);
+        } else if (this._item.Type === 'Episode') {
+            this._parentSeries = state.get(`details:series:${this._item.SeriesId}`);
+            // More from Season is above Guest Stars visually
+            await this._loadMoreFromSeason();
+            const hideCast = storage.getItem('pref:hideCastSection') === 'true';
+            if (!hideCast) {
+                await this._loadGuestStars();
+            } else {
+                const guestStarsSection = this.$('#guest-stars-section');
+                if (guestStarsSection) guestStarsSection.classList.add('hidden');
+            }
+        } else if (this._item.Type === 'BoxSet') {
+            await this._loadCollectionItems();
+        } else if (this._item.Type === 'MusicAlbum') {
+            await this._loadAlbumSongs();
+        } else if (this._item.Type === 'Playlist') {
+            // Playlist: load the server-ordered item list using the dedicated endpoint
+            await this._loadPlaylistItems();
+        }
+
+        // Render people if available
+        this._people = this._item.People || [];
+        const hideCast = storage.getItem('pref:hideCastSection') === 'true';
+        if (this._people.length > 0 && !hideCast) {
+            this._renderPeople();
+        } else if (hideCast) {
+            const peopleSection = this.$('#people-section');
+            if (peopleSection) peopleSection.classList.add('hidden');
+        }
+
+        // Additional Parts for multi-part video items (e.g. multi-part movies)
+        if (['Movie', 'Video'].includes(this._item?.Type) || this._item?.PartCount > 1) {
+            await this._loadAdditionalParts();
+        }
+
+        // Special Features
+        if (['Movie', 'Series', 'Season', 'Episode', 'Trailer', 'MusicVideo'].includes(this._item.Type)) {
+            await this._loadSpecialFeatures();
+        }
+
+        // Load Artists (Music/Albums)
+        await this._loadArtists();
+    }
+
+    async _loadArtists() {
+        if (!['Audio', 'MusicAlbum', 'MusicArtist'].includes(this._item.Type)) return;
+
+        // Combine ArtistItems and Featured Artists from People
+        const artists = [];
+        const seenIds = new Set();
+
+        // 1. Add Main Artists from ArtistItems (these have IDs and Name)
+        if (this._item.ArtistItems) {
+            for (const artist of this._item.ArtistItems) {
+                if (artist.Id && !seenIds.has(artist.Id)) {
+                    artists.push({
+                        ...artist,
+                        Type: 'MusicArtist'
+                    });
+                    seenIds.add(artist.Id);
+                }
+            }
+        }
+
+        // 2. Add Featured Artists from People
+        if (this._item.People) {
+            const featured = this._item.People.filter((p) => p.Role === 'Featured Artist' || p.Type === 'GuestArtist');
+            for (const p of featured) {
+                if (p.Id && !seenIds.has(p.Id)) {
+                    artists.push({
+                        ...p,
+                        Type: 'MusicArtist'
+                    });
+                    seenIds.add(p.Id);
+                }
+            }
+        }
+
+        if (artists.length > 0) {
+            this._renderArtists(artists);
+        }
+    }
+
+    async _loadAlbumSongs() {
+        if (this._item.Type !== 'MusicAlbum') return;
+
+        try {
+            // In Jellyfin, music album tracks are indexed by their AlbumId.
+            // We first query via AlbumIds which succeeds regardless of folder layout.
+            let response = await api.getItems({
+                AlbumIds: this._itemId,
+                IncludeItemTypes: 'Audio',
+                Recursive: true,
+                Fields: 'UserData,RunTimeTicks',
+                SortBy: 'ParentIndexNumber,IndexNumber,SortName'
+            });
+
+            // If virtual album query yields no results, fallback to folder hierarchy (ParentId)
+            if (!response?.Items?.length) {
+                response = await api.getItems({
+                    ParentId: this._itemId,
+                    IncludeItemTypes: 'Audio',
+                    Recursive: true,
+                    Fields: 'UserData,RunTimeTicks',
+                    SortBy: 'ParentIndexNumber,IndexNumber,SortName'
+                });
+            }
+
+            const songs = response?.Items || [];
+            if (songs.length > 0) {
+                this._renderAlbumSongs(songs);
+            }
+        } catch (error) {
+            log.warn('Failed to load album songs', error);
+        }
+    }
+
+    /**
+     * Fetch all items inside a Jellyfin Playlist using the dedicated endpoint.
+     * Unlike generic getItems(), /Playlists/{id}/Items respects the user's
+     * defined ordering and returns PlaylistItemId per entry for SyncPlay.
+     */
+    async _loadPlaylistItems() {
+        try {
+            const response = await api.getPlaylistItems(this._itemId);
+            this._playlistItems = response?.Items || [];
+
+            if (this._playlistItems.length > 0) {
+                this._renderPlaylistItems();
+            }
+        } catch (error) {
+            log.warn('Failed to load playlist items', error);
+        }
+    }
+
+    /**
+     * Render playlist items using a landscape MediaGrid.
+     *
+     * Playlists can contain mixed media (movies, episodes, music videos,
+     * audio) so we use 'thumb' landscape cards — they work uniformly
+     * regardless of what content type each item is, mirroring how
+     * jellyfin-web renders playlists as a vertical thumb list.
+     *
+     * The section title is updated with the item count so users know
+     * how long the playlist is at a glance.
+     */
+    _renderPlaylistItems() {
+        const container = this.$('#playlist-items-list');
+        const section = this.$('#playlist-items-section');
+        if (!section || !container || !this._playlistItems?.length) return;
+
+        // Reveal the section
+        section.classList.remove('hidden');
+
+        // Update the section header with item count so the user can see
+        // how many entries are in the playlist without scrolling
+        const titleEl = this.$('#playlist-items-title');
+        if (titleEl) {
+            const count = this._playlistItems.length;
+            titleEl.textContent =
+                count === 1
+                    ? i18n.t('ItemCountSingle') || '1 Item'
+                    : i18n.t('ItemCountValue', [count]) || `${count} Items`;
+        }
+
+        // Build the landscape grid — each card navigates to its own details page
+        this._playlistGrid = new MediaGrid({
+            id: 'playlist-items-grid',
+            items: this._playlistItems,
+            type: 'thumb', // Landscape thumb aspect ratio
+            contextType: 'library',
+            limit: 1000,
+            isLandscape: true, // Landscape layout for mixed content
+            onClick: (card) => {
+                // Save focus context so Back navigation returns to the same card
+                const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                if (card.dataset.itemId) {
+                    if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                        state.set(stateKey, {
+                            itemId: card.dataset.itemId,
+                            sectionId: 'details-playlist-items'
+                        });
+                    }
+                    router.navigate(`/details/${card.dataset.itemId}`);
+                }
+            }
+        });
+
+        container.innerHTML = this._playlistGrid.render();
+        this._playlistGrid.onMounted();
+
+        // Register focus section using the same grid pattern as the Season episode grid
+        const upwardLink = this._getPreviousVisibleSection('details-playlist-items')?.targetName || 'details-actions';
+        const nextSection = this._getNextVisibleSection('details-playlist-items');
+        const leaveDownTarget = nextSection ? nextSection.targetName : null;
+
+        this.registerFocusSection('details-playlist-items', container, {
+            orientation: 'grid',
+            leaveUp: upwardLink,
+            leaveDown: leaveDownTarget,
+            leaveLeft: 'sidebar',
+            onEnter: () => {
+                // First entry only: land on the very first card.
+                // After that, FocusManager uses spatial memory.
+                if (!this._hasEnteredPlaylistGrid) {
+                    this._hasEnteredPlaylistGrid = true;
+                    return container.querySelector('.media-card');
+                }
+                return null;
+            }
+        });
+
+        this._updateLeaveDown(upwardLink, 'details-playlist-items');
+    }
+
+    _renderAlbumSongs(songs) {
+        const container = this.$('#songs-list');
+        const section = this.$('#songs-section');
+        if (!section || !container) return;
+
+        section.classList.remove('hidden');
+
+        this._songsGrid = new MediaGrid({
+            id: 'album-songs-grid',
+            items: songs,
+            type: 'square', // Square posters as requested
+            contextType: 'library',
+            limit: 60,
+            moreUrl: `/library/all?parentId=${this._itemId}&includeItemTypes=Audio`,
+            isLandscape: false, // Not landscape
+            onClick: (card) => {
+                const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                if (card.dataset.itemId) {
+                    if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                        state.set(stateKey, {
+                            itemId: card.dataset.itemId,
+                            sectionId: 'details-songs'
+                        });
+                    }
+                    // Start playback directly for songs?
+                    // Or navigate to song details?
+                    // Jellyfin usually plays. Litefin usually navigates.
+                    router.navigate(`/details/${card.dataset.itemId}`);
+                }
+            }
+        });
+
+        container.innerHTML = this._songsGrid.render();
+        this._songsGrid.onMounted();
+
+        // Register focus section
+        const upwardLink = this._getPreviousVisibleSection('details-songs')?.targetName || 'details-actions';
+        const nextSection = this._getNextVisibleSection('details-songs');
+        const leaveDownTarget = nextSection ? nextSection.targetName : null;
+
+        this.registerFocusSection('details-songs', container, {
+            orientation: 'grid',
+            leaveUp: upwardLink,
+            leaveDown: leaveDownTarget,
+            leaveLeft: 'sidebar'
+        });
+
+        this._updateLeaveDown(upwardLink, 'details-songs');
+    }
+
+    _renderArtists(artists) {
+        if (!artists || artists.length === 0) return;
+
+        const isMusic = this._item.Type === 'MusicAlbum' || this._item.Type === 'Audio';
+
+        this._renderVirtualRow({
+            sectionId: 'artists-section',
+            listId: 'artists-row',
+            items: artists,
+            isLandscape: false,
+            renderCard: (artist) => {
+                return this._renderMediaCard(artist, false, isMusic ? 'square' : 'person');
+            },
+            focusSectionName: 'artists-section',
+            cardType: isMusic ? 'square' : 'person',
+            onClick: (card) => {
+                if (card.dataset.itemId) router.navigate(`/person/${card.dataset.itemId}`);
+            }
+        });
+    }
+
+    /**
+     * Rebuilds the entire navigation chain after all sections have been rendered.
+     * This ensures visibility checks are accurate since DOM is fully updated.
+     */
+    _rebuildNavigationChain() {
+        // Get all registered sections and rebuild their leaveUp/leaveDown links
+        const sectionOrder = [
+            'details-actions',
+            'details-see-more',
+            'details-rich-meta',
+            'collection-movies-section',
+            'collection-shows-section',
+            'collection-episodes-section',
+            'collection-videos-section',
+            'collection-albums-section',
+            'collection-books-section',
+            'collection-subcollections-section',
+            'collection-other-section',
+            'details-playlist-items', // Playlist items grid (Playlist type)
+            'details-next-up',
+            'details-seasons',
+            'details-episodes',
+            'details-songs',
+            'more-from-season-section',
+            'details-additional-parts', // Multi-part movie/video section
+            'details-people',
+            'details-special-features',
+            'artists-section',
+            'guest-stars-section',
+            'details-item-collections',
+            'details-similar',
+            'details-seerr-recommendations'
+        ];
+
+        // For each section that exists, update its links
+        for (const sectionName of sectionOrder) {
+            const config = focusManager.getSectionConfig(sectionName);
+            if (!config) continue;
+
+            // Calculate correct up/down links based on current DOM state
+            const prev = this._getPreviousVisibleSection(sectionName);
+            const next = this._getNextVisibleSection(sectionName);
+
+            config.leaveUp = prev ? prev.targetName : null;
+            config.leaveDown = next ? next.targetName : null;
+
+            // Re-register with updated links
+            focusManager.register(sectionName, config.container, config);
+        }
+
+        log.debug('Navigation chain rebuilt after DOM ready');
+    }
+
+    async _loadCollectionItems() {
+        log.info('Loading collection items for:', this._itemId);
+
+        // Determine sort order
+        // Jellyfin DisplayOrder settings: Default, SortName, PremiereDate
+        // User wants default for collections in Litefin to be PremiereDate (Release Date)
+        let sortBy = 'PremiereDate';
+        if (this._item?.DisplayOrder === 'SortName') {
+            sortBy = 'SortName';
+        } else if (this._item?.DisplayOrder === 'Default') {
+            sortBy = 'DateModified';
+        } else if (this._item?.DisplayOrder === 'PremiereDate') {
+            sortBy = 'PremiereDate';
+        }
+
+        try {
+            // Fetch direct child items of the collection (matching Jellyfin-web behavior)
+            const response = await api.getItems({
+                ParentId: this._itemId,
+                Recursive: false,
+                Fields: 'ProductionYear,PrimaryImageAspectRatio',
+                SortBy: sortBy,
+                SortOrder: 'Ascending',
+                Limit: 300
+            });
+
+            const allItems = response.Items || [];
+
+            // Define collection item type categories in order (matching Jellyfin-web)
+            const categories = [
+                {
+                    key: 'movies',
+                    sectionId: 'collection-movies-section',
+                    listId: 'collection-movies-row',
+                    filter: (item) => item.Type === 'Movie',
+                    isLandscape: false,
+                    cardType: 'poster'
+                },
+                {
+                    key: 'shows',
+                    sectionId: 'collection-shows-section',
+                    listId: 'collection-shows-row',
+                    filter: (item) => item.Type === 'Series',
+                    isLandscape: false,
+                    cardType: 'poster'
+                },
+                {
+                    key: 'episodes',
+                    sectionId: 'collection-episodes-section',
+                    listId: 'collection-episodes-row',
+                    filter: (item) => item.Type === 'Episode',
+                    isLandscape: true,
+                    cardType: 'thumb'
+                },
+                {
+                    key: 'videos',
+                    sectionId: 'collection-videos-section',
+                    listId: 'collection-videos-row',
+                    filter: (item) =>
+                        item.MediaType === 'Video' &&
+                        item.Type !== 'Movie' &&
+                        item.Type !== 'Series' &&
+                        item.Type !== 'Episode',
+                    isLandscape: true,
+                    cardType: 'thumb'
+                },
+                {
+                    key: 'albums',
+                    sectionId: 'collection-albums-section',
+                    listId: 'collection-albums-row',
+                    filter: (item) => item.Type === 'MusicAlbum',
+                    isLandscape: false,
+                    cardType: 'square'
+                },
+                {
+                    key: 'books',
+                    sectionId: 'collection-books-section',
+                    listId: 'collection-books-row',
+                    filter: (item) => item.Type === 'Book',
+                    isLandscape: false,
+                    cardType: 'poster'
+                },
+                {
+                    key: 'subcollections',
+                    sectionId: 'collection-subcollections-section',
+                    listId: 'collection-subcollections-row',
+                    filter: (item) => item.Type === 'BoxSet',
+                    isLandscape: false,
+                    cardType: 'poster'
+                }
+            ];
+
+            let remainingItems = [...allItems];
+            const activeSections = [];
+
+            // Render categorized rows
+            for (const cat of categories) {
+                const categoryItems = remainingItems.filter(cat.filter);
+                remainingItems = remainingItems.filter((i) => !cat.filter(i));
+
+                if (categoryItems.length > 0) {
+                    this._renderCollectionRow(
+                        cat.sectionId,
+                        cat.listId,
+                        categoryItems,
+                        null,
+                        cat.isLandscape,
+                        cat.cardType
+                    );
+                    activeSections.push(cat.sectionId);
+                }
+            }
+
+            // Render leftover "Other Items" row if any exist
+            if (remainingItems.length > 0) {
+                this._renderCollectionRow(
+                    'collection-other-section',
+                    'collection-other-row',
+                    remainingItems,
+                    null,
+                    false,
+                    'poster'
+                );
+                activeSections.push('collection-other-section');
+            }
+
+            // Rebuild focus navigation chain across active sections
+            this._rebuildNavigationChain();
+        } catch (e) {
+            log.warn('Failed to load collection items', e);
+        }
+    }
+
+    _renderVirtualRow(options) {
+        const {
+            sectionId,
+            listId,
+            items,
+            isLandscape,
+            renderCard,
+            leaveUpTarget,
+            focusSectionName,
+            titleElText,
+            cardType,
+            onClick,
+            currentIndex
+        } = options;
+
+        const section = this.$(`#${sectionId}`);
+        const list = this.$(`#${listId}`);
+        if (!section || !list || !items || items.length === 0) return;
+
+        section.classList.remove('hidden');
+        list.classList.add('row-items');
+
+        if (titleElText) {
+            const titleEl = section.querySelector('.row-title');
+            if (titleEl) titleEl.textContent = titleElText;
+        }
+
+        list.innerHTML = `<div class="row-items-track"></div>`;
+        const trackContainer = list.querySelector('.row-items-track');
+
+        const virtualRow = new VirtualCardRow(trackContainer, items, {
+            isLandscape: isLandscape,
+            visibleCount: isLandscape ? 8 : 12,
+            // For portrait rows, eagerly render up to 7 cards on initial load to prevent
+            // the blank-then-pop effect when the user first navigates down to the row.
+            // We cap portrait at 7 instead of items.length to keep construction time low.
+            initialWindow: isLandscape ? 5 : Math.min(7, items.length),
+            focusSectionId: focusSectionName,
+            cardType: cardType,
+            renderCard: renderCard,
+            currentIndex: currentIndex
+        });
+
+        if (!this._virtualRows) this._virtualRows = {};
+        this._virtualRows[focusSectionName] = virtualRow;
+
+        lazyLoader.observe(list);
+
+        list.addEventListener('focusin', (e) => {
+            if (e.target.classList.contains('media-card')) {
+                virtualRow.syncIndexFromNode(e.target);
+            }
+        });
+
+        list.onclick = (e) => {
+            const card = e.target.closest('.media-card');
+            if (card) {
+                // -------------------------------------------------------------
+                // Block navigation events if the clicked card is unpressable
+                // (e.g. the active current episode card in siblings row).
+                // -------------------------------------------------------------
+                if (card.classList.contains('unpressable')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+
+                // Save clicked item for exact focus restoration, scoped by current page item ID
+                // to prevent child DetailsPages from consuming parent state
+                const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                if (card.dataset.itemId) {
+                    if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                        state.set(stateKey, {
+                            itemId: card.dataset.itemId,
+                            sectionId: focusSectionName
+                        });
+                    }
+                } else if (card.dataset.id) {
+                    // Fallback for some cards that might use data-id
+                    if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                        state.set(stateKey, {
+                            itemId: card.dataset.id,
+                            sectionId: focusSectionName
+                        });
+                    }
+                }
+
+                if (onClick) {
+                    onClick(card);
+                } else if (card.dataset.itemId) {
+                    // Special handling for Persons and Artists: navigate to the unified PersonPage
+                    const itemType = card.dataset.type;
+                    if (
+                        itemType === 'Person' ||
+                        itemType === 'MusicArtist' ||
+                        itemType === 'Artist' ||
+                        itemType === 'AlbumArtist'
+                    ) {
+                        log.info('Navigating to PersonPage:', card.dataset.itemId);
+                        router.navigate(`/person/${card.dataset.itemId}`);
+                    } else {
+                        log.info('Navigating to item details:', card.dataset.itemId);
+                        router.navigate(`/details/${card.dataset.itemId}`);
+                    }
+                }
+            }
+        };
+
+        const upwardLink =
+            leaveUpTarget || this._getPreviousVisibleSection(focusSectionName)?.targetName || 'details-actions';
+        const nextSection = this._getNextVisibleSection(focusSectionName);
+        const leaveDownTarget = nextSection ? nextSection.targetName : null;
+
+        this.registerFocusSection(focusSectionName, list, {
+            orientation: 'horizontal',
+            leaveUp: upwardLink,
+            leaveDown: leaveDownTarget,
+            leaveLeft: 'sidebar',
+            onMove: (direction, currentElement) => {
+                if (!currentElement || currentElement.dataset.virtualIndex === undefined) {
+                    return false;
+                }
+
+                const currentIndex = parseInt(currentElement.dataset.virtualIndex, 10);
+                const nextNode = virtualRow.handleMove(direction, currentIndex);
+
+                if (nextNode) {
+                    // Manually sync the index immediately to prevent race conditions on rapid key presses.
+                    // This ensures the next 'handleMove' call uses the correct 'currentIndex' before focusin bubbles.
+                    virtualRow.syncIndexFromNode(nextNode);
+
+                    focusManager.focusElement(nextNode);
+                    return true;
+                }
+                return false;
+            },
+            onEnter: (fromElement, options) => {
+                // Only intercept for vertical entry.
+                // Instead of spatial X alignment, we restore the row's last focused index.
+                // This prevents rows from shifting and acting like grids.
+                if (fromElement && options && (options.direction === 'up' || options.direction === 'down')) {
+                    virtualRow._updateWindow(virtualRow.currentIndex);
+                    return virtualRow.domNodes.get(virtualRow.currentIndex);
+                }
+                return null;
+            },
+            onRestoreIndex: (index) => {
+                return virtualRow.focusByIndex(index);
+            }
+        });
+
+        this._updateLeaveDown(upwardLink, focusSectionName);
+    }
+
+    _renderCollectionRow(sectionId, listId, items, leaveUpTarget, isLandscape = false, cardType = 'poster') {
+        this._renderVirtualRow({
+            sectionId: sectionId,
+            listId: listId,
+            items: items,
+            isLandscape: isLandscape,
+            cardType: cardType,
+            renderCard: (item) => this._renderMediaCard(item, isLandscape, cardType),
+            focusSectionName: sectionId,
+            leaveUpTarget: leaveUpTarget || 'details-rich-meta'
+        });
+    }
+
+    _renderRichMetadata() {
+        // Retrieve setting to customize rich metadata fields display.
+        // Defaults to 'genres-studios-writers' to show key creators and studios while keeping layout lean.
+        // Falls back to backward-compatible hideRichMetadata if new setting is not set.
+        const richMetadataStyle =
+            storage.getItem('pref:richMetadataStyle') ||
+            (storage.getItem('pref:hideRichMetadata') === 'true' ? 'none' : 'genres-studios-writers');
+        const isHidden = richMetadataStyle === 'none';
+        let container = this.$('#rich-meta');
+        const containerWrapper = this.$('#rich-meta-container');
+
+        if (isHidden) {
+            if (container) container.innerHTML = '';
+            if (containerWrapper) containerWrapper.classList.add('hidden');
+            return;
+        }
+
+        const item = this._item;
+        const htmlParts = [];
+
+        // Genres (Prefer GenreItems for IDs, but fallback to Name strings)
+        const genres = item.GenreItems && item.GenreItems.length > 0 ? item.GenreItems : item.Genres;
+
+        // Fallback to Album Genres for Audio items if they have none
+        if ((!genres || genres.length === 0) && item.Type === 'Audio' && item.AlbumId) {
+            // Check if we already faked/cached album genres to prevent infinite loop
+            if (!item._hasAlbumGenresFetched) {
+                // Fire and forget fetch
+                api.getItem(item.AlbumId)
+                    .then((album) => {
+                        item._hasAlbumGenresFetched = true;
+                        if (album.GenreItems?.length > 0 || album.Genres?.length > 0) {
+                            log.info('Inheriting Genres from Album metadata...');
+                            item.GenreItems = album.GenreItems;
+                            item.Genres = album.Genres;
+                            // Re-render metadata section
+                            this._renderRichMetadata();
+                        }
+                    })
+                    .catch((err) => log.warn('Failed to fetch album genres for fallback', err));
+            }
+        }
+
+        if (genres && genres.length > 0) {
+            htmlParts.push(RichMetadataTable.createChipRow('Genres', genres));
+        }
+
+        // Directors (only shown in 'all')
+        if (richMetadataStyle === 'all') {
+            const directors = (item.People || []).filter((p) => p.Type === 'Director');
+            if (directors.length > 0) {
+                htmlParts.push(RichMetadataTable.createChipRow('Directors', directors));
+            }
+        }
+
+        // Writers (shown in 'all', 'genres-studios-writers', or 'genres-writers')
+        if (
+            richMetadataStyle === 'all' ||
+            richMetadataStyle === 'genres-studios-writers' ||
+            richMetadataStyle === 'genres-writers'
+        ) {
+            const writers = (item.People || []).filter((p) => p.Type === 'Writer');
+            if (writers.length > 0) {
+                htmlParts.push(RichMetadataTable.createChipRow('Writers', writers));
+            }
+        }
+
+        // Studios (shown in 'all' or 'genres-studios-writers')
+        if (richMetadataStyle === 'all' || richMetadataStyle === 'genres-studios-writers') {
+            if (item.Studios && item.Studios.length > 0) {
+                htmlParts.push(RichMetadataTable.createChipRow('Studios', item.Studios));
+            }
+        }
+
+        // Tags (only shown in 'all')
+        if (richMetadataStyle === 'all') {
+            if (item.Tags && item.Tags.length > 0) {
+                htmlParts.push(RichMetadataTable.createChipRow('Tags', item.Tags));
+            }
+        }
+
+        // Photo EXIF Data (only shown in 'all')
+        if (item.Type === 'Photo' && richMetadataStyle === 'all') {
+            const esc = (str) =>
+                String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+            let dateStr = '';
+            if (item.DateCreated) {
+                try {
+                    dateStr = new Date(item.DateCreated).toLocaleDateString();
+                } catch (_) {
+                    dateStr = item.DateCreated;
+                }
+            } else if (item.ProductionYear) {
+                dateStr = String(item.ProductionYear);
+            }
+
+            const camera = [item.CameraMake, item.CameraModel].filter(Boolean).join(' ');
+            const aperture = item.Aperture ? `f/${item.Aperture}` : null;
+            let exposure = null;
+            if (item.ExposureTime) {
+                exposure =
+                    item.ExposureTime < 1 ? `1/${Math.round(1 / item.ExposureTime)} s` : `${item.ExposureTime} s`;
+            }
+            const focal = item.FocalLength ? `${item.FocalLength} mm` : null;
+            const altitude = item.Altitude != null ? `${Math.round(item.Altitude)} m` : null;
+
+            htmlParts.push(RichMetadataTable.createTextRow(i18n.t('ExifDate') || 'Date', esc(dateStr)));
+            htmlParts.push(RichMetadataTable.createTextRow(i18n.t('ExifCamera') || 'Camera', esc(camera)));
+            htmlParts.push(RichMetadataTable.createTextRow(i18n.t('ExifAperture') || 'Aperture', aperture));
+            htmlParts.push(RichMetadataTable.createTextRow(i18n.t('ExifExposure') || 'Exposure', exposure));
+            htmlParts.push(RichMetadataTable.createTextRow(i18n.t('ExifFocalLength') || 'Focal Length', focal));
+            htmlParts.push(RichMetadataTable.createTextRow(i18n.t('ExifAltitude') || 'Altitude', altitude));
+        }
+
+        container = this.$('#rich-meta');
+        if (container) {
+            // Auto-deactivate trap mode if rich metadata was previously active to avoid orphaned traps
+            if (this._isRichMetaActive) {
+                this._deactivateRichMeta();
+            }
+
+            container.innerHTML = htmlParts.join('');
+
+            // Make container focusable as a single unit
+            if (htmlParts.length > 0) {
+                container.setAttribute('tabindex', '0');
+                container.classList.add('focusable');
+
+                // Bind Click AND Keydown (Enter) to activate "Trap Mode"
+                const activateHandler = (e) => {
+                    // Only Enter (13) if key event
+                    if (e.type === 'keydown' && e.keyCode !== 13) return;
+
+                    // Prevent bubbling if clicking internal chips already valid
+                    if (e.target.classList.contains('meta-chip') && this._isRichMetaActive) {
+                        return;
+                    }
+
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this._activateRichMeta();
+                };
+
+                // Both click and Enter key activate the trap mode
+                container.onclick = activateHandler;
+                container.onkeydown = activateHandler;
+
+                // Register Focus Section
+                // Restrict section target specifically to the table container element (#rich-meta)
+                // so FocusManager returns the focusable unit in O(1) without querying or filtering child chips
+                const upwardLink =
+                    this._getPreviousVisibleSection('details-rich-meta')?.targetName || 'details-actions';
+                const nextSection = this._getNextVisibleSection('details-rich-meta');
+                const leaveDownTarget = nextSection ? nextSection.targetName : null;
+
+                this.registerFocusSection('details-rich-meta', this.$('#rich-meta-container'), {
+                    orientation: 'vertical',
+                    selector: '#rich-meta',
+                    leaveUp: upwardLink,
+                    leaveDown: leaveDownTarget,
+                    leaveLeft: 'sidebar',
+                    enterTo: 'first'
+                });
+
+                // Update upward link
+                this._updateLeaveDown(upwardLink, 'details-rich-meta');
+            }
+        }
+    }
+
+    _activateRichMeta() {
+        if (this._isRichMetaActive) return;
+
+        const container = this.$('#rich-meta'); // The Table
+        if (!container) return;
+
+        this._isRichMetaActive = true;
+        container.classList.add('active-table');
+
+        // Enable chips
+        const chips = container.querySelectorAll('.meta-chip');
+        chips.forEach((chip) => chip.setAttribute('tabindex', '0'));
+
+        // Disable container from auto-focus
+        container.setAttribute('tabindex', '-1');
+
+        // Async focus shift to ensure attributes apply
+        requestAnimationFrame(() => {
+            // Re-query chips to be sure
+            const validChips = container.querySelectorAll('.meta-chip');
+            if (validChips.length === 0) {
+                log.error('RichMeta: No chips found after render, reverting');
+                this._deactivateRichMeta();
+                return;
+            }
+
+            // Bind navigation handlers to each chip
+            validChips.forEach((chip) => {
+                // Click handler
+                chip.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this._deactivateRichMeta();
+                    this._handleMetaClick(chip);
+                };
+
+                // Enter key handler
+                chip.onkeydown = (e) => {
+                    if (e.keyCode === 13) {
+                        // Enter
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this._deactivateRichMeta();
+                        this._handleMetaClick(chip);
+                    }
+                };
+            });
+
+            // Push focus trap with specific chip selector
+            focusManager.pushTrap(container, {
+                selector: '.meta-chip',
+                orientation: 'grid'
+            });
+
+            // Force focus
+            focusManager.focusElement(validChips[0]);
+        });
+    }
+
+    _deactivateRichMeta() {
+        if (!this._isRichMetaActive) return;
+
+        const container = this.$('#rich-meta');
+        if (!container) return;
+
+        this._isRichMetaActive = false;
+        container.classList.remove('active-table');
+
+        // Disable chips
+        const chips = container.querySelectorAll('.meta-chip');
+        chips.forEach((chip) => chip.setAttribute('tabindex', '-1'));
+
+        // Pop trap (Restores focus to previous element = container)
+        focusManager.popTrap();
+
+        // Restore container visibility
+        container.setAttribute('tabindex', '0');
+
+        // Ensure focus is on container (redundant but safe)
+        focusManager.focusElement(container);
+    }
+
+    onBack() {
+        // 1. Track Menu (Higher priority if overlay)
+        if (this._isTrackMenuOpen) {
+            this._closeTrackMenu();
+            return true;
+        }
+
+        // 2. Rich Meta Trap
+        if (this._isRichMetaActive) {
+            log.debug('RichMeta: Back pressed, exiting trap');
+            this._deactivateRichMeta();
+            return true;
+        }
+        return super.onBack();
+    }
+
+    _loadLogo() {
+        return this._loadLogoAsync();
+    }
+
+    /**
+     * Load the logo image and return a promise that resolves when the logo
+     * is loaded (or immediately if no logo exists).
+     * @returns {Promise<void>}
+     */
+    _loadLogoAsync() {
+        const item = this._item;
+        const logoTag = item.ImageTags?.Logo || item.ParentLogoImageTag;
+        const logoItemId = item.ImageTags?.Logo ? item.Id : item.ParentLogoItemId || item.SeriesId;
+
+        if (!logoItemId || !logoTag) return Promise.resolve();
+
+        const params = imageService.getParams('details-logo');
+        let titleStyle = storage.getItem('pref:detailsTitleStyle') || 'both';
+        const detailsLayout = this._getDetailsLayout(item);
+        if (detailsLayout === 'backdropMinimal' || detailsLayout === 'backdropLeft') {
+            titleStyle = 'logo-only';
+        }
+        const isLogoOnly = titleStyle === 'logo-only';
+        let baseWidth = isLogoOnly ? 360 : 280;
+        let baseHeight = isLogoOnly ? 140 : 100;
+        if (detailsLayout === 'backdropMinimal' || detailsLayout === 'backdropLeft') {
+            baseWidth = 540;
+            baseHeight = 220;
+        }
+        const dpr = window.devicePixelRatio || 1;
+
+        const logoUrl = api.getImageUrl(logoItemId, 'Logo', {
+            fillWidth: Math.round(baseWidth * dpr),
+            fillHeight: Math.round(baseHeight * dpr),
+            quality: params.quality,
+            tag: logoTag
+        });
+        const img = new Image();
+        if (item.Type === 'Season' || item.Type === 'Episode') {
+            const targetId = item.SeriesId;
+            if (targetId) {
+                img.classList.add('clickable-logo');
+                img.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    log.info('Logo clicked, navigating to series details:', targetId);
+                    router.navigate(`/details/${targetId}`);
+                };
+            }
+        }
+
+        return new Promise((resolve) => {
+            img.onload = () => {
+                const logoContainer = this.$('#details-logo');
+                if (logoContainer) {
+                    const aspect = img.naturalWidth / img.naturalHeight || 1;
+                    let maxW = isLogoOnly ? 360 : 280;
+                    let minHeight = isLogoOnly ? 60 : 50;
+                    let maxHeight = isLogoOnly ? 140 : 100;
+                    if (detailsLayout === 'backdropMinimal' || detailsLayout === 'backdropLeft') {
+                        maxW = 540;
+                        minHeight = 100;
+                        maxHeight = 220;
+                    }
+                    const targetHeight = maxW / aspect;
+                    const containerHeight = Math.min(maxHeight, Math.max(minHeight, Math.round(targetHeight)));
+
+                    logoContainer.style.height = `${containerHeight}px`;
+
+                    logoContainer.innerHTML = '';
+                    logoContainer.appendChild(img);
+                    img.classList.add('loaded');
+                }
+                resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = logoUrl;
+        });
+    }
+
+    /**
+     * ========================================================================
+     * Background Theme Song Loader and Player
+     * ========================================================================
+     * Dynamically queries the theme media associated with the active item on the server.
+     * Works for any media type (Movies, Series, Seasons, Episodes, Collections, etc.).
+     * If a theme song is available, compiles the authenticated stream source URL and initiates
+     * background score playback via ThemeSongPlayer.
+     */
+    async _playThemeSong() {
+        // Assert that the item details are fully loaded into memory before querying API
+        if (!this._item) {
+            return;
+        }
+
+        try {
+            log.info('Fetching theme media details for item ID', this._itemId);
+            // Fetch list of theme media options from Jellyfin
+            const themeMedia = await api.getThemeMedia(this._itemId);
+
+            // ----------------------------------------------------------------
+            // Safety Guard: Avoid async race conditions.
+            // If the user navigated away from the details page before the
+            // network fetch returned, playing the audio now would create a
+            // "ghost" track playing forever. Abort immediately.
+            // ----------------------------------------------------------------
+            if (this._isDestroyed) {
+                log.warn('Theme media API request resolved after page destroy; aborting playback');
+                return;
+            }
+
+            // Check if any theme songs were successfully retrieved
+            if (themeMedia && themeMedia.ThemeSongsResult?.Items?.length > 0) {
+                const song = themeMedia.ThemeSongsResult.Items[0];
+
+                // Compile authenticated direct stream URL
+                const streamUrl = api.getAudioStreamUrl(song.Id);
+
+                // Leverage the show owner ID to sustain music across dynamic parent navigations
+                const ownerId = themeMedia.ThemeSongsResult.OwnerId;
+
+                log.debug('Initiating background theme playback:', song.Name);
+                // Dispatch play command to the global background manager
+                themeSongPlayer.play(streamUrl, ownerId);
+            }
+        } catch (error) {
+            log.error('Failed to query or play theme media score:', error);
+        }
+    }
+
+    /**
+     * ========================================================================
+     * Technical Media Specifications Parser & Renderer
+     * ========================================================================
+     * Extracts and constructs the technical specification badge pills for the
+     * currently active media source/version. Includes resolution, video codec,
+     * dynamic range (Dolby Vision, HDR10+, HDR, HLG), audio codec with Atmos
+     * detection & channel layout, subtitle count, and container/bitrate.
+     * ========================================================================
+     */
+    _renderTechnicalDetails() {
+        // Assert that the item exists before attempting inspection
+        if (!this._item) {
+            return '';
+        }
+
+        // Identify the active media source based on current user selection or default to primary
+        const source =
+            this._item.MediaSources?.find((m) => m.Id === this._selectedMediaSourceId) ||
+            this._item.MediaSources?.[0] ||
+            (this._item.MediaStreams ? this._item : null);
+
+        // If no media source or stream metadata is available, omit the row
+        if (!source) {
+            return '';
+        }
+
+        // Extract streams collection from the active media source
+        const streams = source.MediaStreams || this._item.MediaStreams || [];
+        if (!streams || streams.length === 0) {
+            return '';
+        }
+
+        // Separate streams by type for individual parameter extraction
+        const videoStream = streams.find((s) => s.Type === 'Video');
+        const audioStreams = streams.filter((s) => s.Type === 'Audio');
+        const subtitleStreams = streams.filter((s) => s.Type === 'Subtitle');
+
+        const pills = [];
+
+        // --------------------------------------------------------------------
+        // 1. Resolution Classification
+        // --------------------------------------------------------------------
+        const width = videoStream?.Width || source.Width || this._item.Width || 0;
+        const height = videoStream?.Height || source.Height || this._item.Height || 0;
+        let resLabel = '';
+
+        if (width || height) {
+            const maxDim = Math.max(width, height);
+            const minDim = Math.min(width, height);
+
+            // Classify resolution with generous thresholds for widescreen/anamorphic crops
+            if (maxDim >= 3000 || minDim >= 1800) {
+                resLabel = '4K';
+            } else if (maxDim >= 1600 || minDim >= 900) {
+                resLabel = '1080p';
+            } else if (maxDim >= 1000 || minDim >= 600) {
+                resLabel = '720p';
+            } else if (maxDim >= 640 || minDim >= 400) {
+                resLabel = '480p';
+            } else if (maxDim > 0) {
+                resLabel = 'SD';
+            }
+        }
+
+        if (resLabel) {
+            pills.push(`<span class="tech-pill tech-pill-res">${resLabel}</span>`);
+        }
+
+        // --------------------------------------------------------------------
+        // 2. Video Codec Formatting
+        // --------------------------------------------------------------------
+        const rawVideoCodec = videoStream?.Codec || '';
+        if (rawVideoCodec) {
+            const lowerCodec = rawVideoCodec.toLowerCase();
+            let formattedVideoCodec = '';
+
+            // Map common codec identifiers to standardized notation
+            if (lowerCodec === 'hevc' || lowerCodec === 'h265') {
+                formattedVideoCodec = 'HEVC';
+            } else if (lowerCodec === 'h264' || lowerCodec === 'avc') {
+                formattedVideoCodec = 'H.264';
+            } else if (lowerCodec === 'av1') {
+                formattedVideoCodec = 'AV1';
+            } else if (lowerCodec === 'vp9') {
+                formattedVideoCodec = 'VP9';
+            } else if (lowerCodec === 'vp8') {
+                formattedVideoCodec = 'VP8';
+            } else if (lowerCodec === 'vc1') {
+                formattedVideoCodec = 'VC-1';
+            } else if (lowerCodec === 'mpeg2video' || lowerCodec === 'mpeg2') {
+                formattedVideoCodec = 'MPEG-2';
+            } else if (lowerCodec === 'mpeg4') {
+                formattedVideoCodec = 'MPEG-4';
+            } else {
+                formattedVideoCodec = rawVideoCodec.toUpperCase();
+            }
+
+            pills.push(`<span class="tech-pill tech-pill-codec">${escapeHtml(formattedVideoCodec)}</span>`);
+        }
+
+        // --------------------------------------------------------------------
+        // 3. Dynamic Range & HDR / Dolby Vision Inspection
+        // --------------------------------------------------------------------
+        const itemRange = `${this._item.VideoRange || ''} ${this._item.VideoRangeType || ''}`;
+        const videoRange = videoStream?.VideoRange || '';
+        const videoRangeType = videoStream?.VideoRangeType || '';
+        const profile = videoStream?.Profile || '';
+        const streamTitle = videoStream?.Title || videoStream?.DisplayTitle || '';
+        const checkString =
+            `${itemRange} ${videoRange} ${videoRangeType} ${profile} ${streamTitle} ${rawVideoCodec}`.toLowerCase();
+
+        let isHdr10Plus = false;
+        let isDovi = false;
+        let isHdr = false;
+        let isHlg = false;
+
+        // Inspect for HDR10+ dynamic metadata flags
+        if (
+            checkString.includes('hdr10plus') ||
+            checkString.includes('hdr10+') ||
+            checkString.includes('hdr10p') ||
+            checkString.includes('doviwithhdr10plus') ||
+            checkString.includes('doviwithelhdr10plus')
+        ) {
+            isHdr10Plus = true;
+        }
+
+        // Inspect for Dolby Vision profile and codec signaling
+        if (
+            checkString.includes('dovi') ||
+            checkString.includes('dolby vision') ||
+            rawVideoCodec.toLowerCase().startsWith('dv')
+        ) {
+            isDovi = true;
+        }
+
+        // Inspect for baseline static HDR10 metadata
+        if (checkString.includes('hdr') || videoRange === 'HDR') {
+            isHdr = true;
+        }
+
+        // Inspect for Hybrid Log-Gamma signaling
+        if (checkString.includes('hlg')) {
+            isHlg = true;
+        }
+
+        // Push appropriate dynamic range badges
+        if (isDovi) {
+            pills.push(`<span class="tech-pill tech-pill-dovi">Dolby Vision</span>`);
+        }
+        if (isHdr10Plus) {
+            pills.push(`<span class="tech-pill tech-pill-hdr">HDR10+</span>`);
+        } else if (isHdr && !isDovi) {
+            pills.push(`<span class="tech-pill tech-pill-hdr">HDR</span>`);
+        } else if (isHlg && !isDovi) {
+            pills.push(`<span class="tech-pill tech-pill-hdr">HLG</span>`);
+        }
+
+        // --------------------------------------------------------------------
+        // 4. Audio Codec, Atmos & Channel Configuration
+        // --------------------------------------------------------------------
+        let activeAudio = null;
+        if (this._selectedAudioIndex !== undefined) {
+            activeAudio = audioStreams.find((s) => s.Index === this._selectedAudioIndex);
+        }
+        if (!activeAudio) {
+            // Check if preferDirectPlayAudio auto-resolves a playable track (e.g. AC3/EAC3 over TrueHD/DTS)
+            const bestAudioTrack = resolveBestAudioStream(source);
+            activeAudio =
+                bestAudioTrack ||
+                audioStreams.find((s) => s.Index === source.DefaultAudioStreamIndex) ||
+                audioStreams.find((s) => s.IsDefault) ||
+                audioStreams[0];
+        }
+
+        if (activeAudio) {
+            const rawAudioCodec = (activeAudio.Codec || '').toLowerCase();
+            const audioTitle = (activeAudio.Title || activeAudio.DisplayTitle || '').toLowerCase();
+            const audioProfile = (activeAudio.Profile || '').toLowerCase();
+
+            // Detect immersive Dolby Atmos / object audio metadata
+            const isAtmos = audioProfile.includes('atmos') || audioTitle.includes('atmos');
+
+            // Format audio codec label cleanly
+            let audioCodecLabel = '';
+            if (rawAudioCodec === 'truehd') {
+                audioCodecLabel = 'TrueHD';
+            } else if (
+                rawAudioCodec === 'dts-hd ma' ||
+                rawAudioCodec === 'dtshd_ma' ||
+                (rawAudioCodec === 'dts' && audioProfile.includes('ma'))
+            ) {
+                audioCodecLabel = 'DTS-HD MA';
+            } else if (rawAudioCodec === 'dts-hd' || rawAudioCodec === 'dtshd_hra') {
+                audioCodecLabel = 'DTS-HD';
+            } else if (rawAudioCodec === 'dts') {
+                audioCodecLabel = 'DTS';
+            } else if (rawAudioCodec === 'eac3') {
+                audioCodecLabel = isAtmos ? 'Dolby' : 'DD+';
+            } else if (rawAudioCodec === 'ac3') {
+                audioCodecLabel = 'DD';
+            } else if (rawAudioCodec === 'flac') {
+                audioCodecLabel = 'FLAC';
+            } else if (rawAudioCodec === 'aac') {
+                audioCodecLabel = 'AAC';
+            } else if (rawAudioCodec === 'opus') {
+                audioCodecLabel = 'Opus';
+            } else if (rawAudioCodec === 'vorbis') {
+                audioCodecLabel = 'Vorbis';
+            } else if (rawAudioCodec === 'mp3') {
+                audioCodecLabel = 'MP3';
+            } else if (rawAudioCodec.startsWith('pcm')) {
+                audioCodecLabel = 'PCM';
+            } else {
+                audioCodecLabel = (activeAudio.Codec || '').toUpperCase();
+            }
+
+            // Determine surround channel configuration
+            let channelText = '';
+            if (activeAudio.Channels === 8 || activeAudio.ChannelLayout === '7.1') {
+                channelText = '7.1';
+            } else if (activeAudio.Channels === 6 || activeAudio.ChannelLayout === '5.1') {
+                channelText = '5.1';
+            } else if (activeAudio.Channels === 2 || activeAudio.ChannelLayout === 'stereo') {
+                channelText = '2.0';
+            } else if (activeAudio.Channels === 1 || activeAudio.ChannelLayout === 'mono') {
+                channelText = 'Mono';
+            } else if (activeAudio.Channels) {
+                channelText = `${activeAudio.Channels}ch`;
+            }
+
+            // Build cohesive audio string
+            let audioFullString = '';
+            if (isAtmos) {
+                audioFullString =
+                    `${audioCodecLabel ? audioCodecLabel + ' ' : ''}Atmos${channelText ? ' ' + channelText : ''}`.trim();
+                pills.push(`<span class="tech-pill tech-pill-atmos">${escapeHtml(audioFullString)}</span>`);
+            } else {
+                audioFullString = `${audioCodecLabel}${channelText ? ' ' + channelText : ''}`.trim();
+                if (audioFullString) {
+                    pills.push(`<span class="tech-pill tech-pill-audio">${escapeHtml(audioFullString)}</span>`);
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // 5. Subtitles Count
+        // --------------------------------------------------------------------
+        const subtitleCount = subtitleStreams.length;
+        if (subtitleCount > 0) {
+            const subLabel =
+                subtitleCount === 1
+                    ? `1 ${i18n.t('Subtitle') || 'Subtitle'}`
+                    : `${subtitleCount} ${i18n.t('Subtitles') || 'Subtitles'}`;
+
+            pills.push(`
+                <span class="tech-pill tech-pill-subtitles">
+                    <span>${escapeHtml(subLabel)}</span>
+                </span>
+            `);
+        }
+
+        // --------------------------------------------------------------------
+        // 6. Container Format & Overall Bitrate
+        // --------------------------------------------------------------------
+        const container = source.Container ? source.Container.toUpperCase() : '';
+        let bitrateLabel = '';
+        if (source.Bitrate) {
+            if (source.Bitrate >= 1000000) {
+                bitrateLabel = `${(source.Bitrate / 1000000).toFixed(1)} Mbps`;
+            } else {
+                bitrateLabel = `${Math.round(source.Bitrate / 1000)} Kbps`;
+            }
+        }
+
+        if (container || bitrateLabel) {
+            const containerBitrate = [container, bitrateLabel].filter(Boolean).join(' • ');
+            pills.push(`<span class="tech-pill">${escapeHtml(containerBitrate)}</span>`);
+        }
+
+        // If no pills were generated, return empty string
+        if (pills.length === 0) {
+            return '';
+        }
+
+        // Wrap generated badges inside the technical row container
+        return `<div class="details-tech-row">${pills.join('')}</div>`;
+    }
+
+    _renderHeroText() {
+        const item = this._item;
+
+        // Build meta items (Year, Runtime, Ratings)
+        const year = item.ProductionYear || '';
+
+        let runtimeText = '';
+        let endsAtText = '';
+
+        if (item.Type === 'Photo') {
+            if (item.Width && item.Height) {
+                runtimeText = `${item.Width} × ${item.Height}`;
+            }
+        } else if (item.RunTimeTicks) {
+            const totalMinutes = Math.round(item.RunTimeTicks / 600000000);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            runtimeText = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+            // Ends At
+            // Use timeManager.now() so offline Tizen/WebOS TVs accurately reflect local time
+            const endTime = new Date(timeManager.now().getTime() + item.RunTimeTicks / 10000);
+            const timeString = i18n.formatLocalTime(endTime);
+            endsAtText = i18n.t('EndsAtValue', [timeString]);
+        }
+
+        const rating = item.OfficialRating;
+        const starRating =
+            item.CommunityRating && shouldShowScore(item)
+                ? `${detailsIcons.ratingStar}${item.CommunityRating.toFixed(1)}`
+                : '';
+        const criticScore = item.CriticRating
+            ? String(item.CriticRating).endsWith('%')
+                ? item.CriticRating
+                : `${Math.round(item.CriticRating)}%`
+            : '';
+        const criticRating =
+            item.CriticRating && shouldShowScore(item) ? `${detailsIcons.rottenTomatoesFresh}${criticScore}` : '';
+
+        const isGameItem = this._isGame(item);
+        const gamePlatform = isGameItem ? this._getGamePlatformTag(item) : '';
+        const ttbRaw = isGameItem && item.ProviderIds ? item.ProviderIds.IgdbTTB : null;
+        let ttbLabel = '';
+        if (ttbRaw) {
+            const parts = ttbRaw.split(',');
+            const map = {};
+            parts.forEach((p) => {
+                if (p.length > 1) map[p[0]] = p.substring(1);
+            });
+            if (map.M) ttbLabel = `Main: ${map.M}h`;
+            else if (map.H) ttbLabel = `Main+Extras: ${map.H}h`;
+            else if (map.C) ttbLabel = `Completionist: ${map.C}h`;
+        }
+
+        let metaHtml = '';
+        if (gamePlatform)
+            metaHtml += `<span class="meta-item meta-badge game-platform-pill">${escapeHtml(gamePlatform)}</span>`;
+        if (ttbLabel) metaHtml += `<span class="meta-item meta-badge game-ttb-pill">${escapeHtml(ttbLabel)}</span>`;
+        if (year) metaHtml += `<span class="meta-item">${year}</span>`;
+        if (runtimeText) metaHtml += `<span class="meta-item">${runtimeText}</span>`;
+        if (rating) metaHtml += `<span class="meta-item meta-badge">${rating}</span>`;
+        if (starRating) metaHtml += `<span class="meta-item meta-star">${starRating}</span>`;
+        if (criticRating) metaHtml += `<span class="meta-item meta-tomato">${criticRating}</span>`;
+        if (endsAtText) metaHtml += `<span class="meta-item meta-ends-at">${endsAtText}</span>`;
+
+        // --- Added & Aired Dates ---
+        // Retrieve merged dates display setting with graceful fallback to legacy preferences
+        let showDatesMode = storage.getItem('pref:showDates');
+        if (!showDatesMode) {
+            const addedLegacy = storage.getItem('pref:showAddedDate') === 'true';
+            const airedLegacy = storage.getItem('pref:showDateAired') === 'true';
+            if (addedLegacy && airedLegacy) {
+                showDatesMode = 'both';
+            } else if (addedLegacy) {
+                showDatesMode = 'added';
+            } else if (airedLegacy) {
+                showDatesMode = 'aired';
+            } else {
+                showDatesMode = 'none';
+            }
+        }
+
+        const includeYear = storage.getItem('pref:showDatesIncludeYear') === 'true';
+
+        let addedText = '';
+        if ((showDatesMode === 'both' || showDatesMode === 'added') && item.DateCreated) {
+            const formatted = formatDate(item.DateCreated, { includeYear });
+            if (formatted) {
+                addedText = `${i18n.t('Added') || 'Added'} ${formatted}`;
+            }
+        }
+
+        let airedText = '';
+        if ((showDatesMode === 'both' || showDatesMode === 'aired') && item.PremiereDate) {
+            const formatted = formatDate(item.PremiereDate, { includeYear });
+            if (formatted) {
+                airedText = `${i18n.t('Aired') || 'Aired'} ${formatted}`;
+            }
+        }
+
+        // Combine added and aired dates with an interpunct delimiter if both are visible
+        let datesFormattedString = '';
+        if (addedText && airedText) {
+            datesFormattedString = `${addedText} · ${airedText}`;
+        } else if (addedText) {
+            datesFormattedString = addedText;
+        } else if (airedText) {
+            datesFormattedString = airedText;
+        }
+
+        if (datesFormattedString) {
+            metaHtml += `<span class="meta-item meta-item-dates">${datesFormattedString}</span>`;
+        }
+        let titleStyle = storage.getItem('pref:detailsTitleStyle') || 'both';
+        const detailsLayout = this._getDetailsLayout(item);
+        if (detailsLayout === 'backdropMinimal' || detailsLayout === 'backdropLeft') {
+            titleStyle = 'logo-only';
+        }
+
+        // Retrieve and check for logo references using Jellyfin image tags.
+        // Determines if a localized image tag or series/parent image tag is available.
+        const logoTag = item.ImageTags?.Logo || item.ParentLogoImageTag;
+        const logoItemId = item.ImageTags?.Logo ? item.Id : item.ParentLogoItemId || item.SeriesId;
+        const hasLogo = !!(logoItemId && logoTag);
+
+        // Control flags for rendering logo and text title dynamically.
+        let showLogo = false;
+        let showTitle = true;
+        let logoClass = 'details-logo';
+
+        // Apply chosen Title Display Style preference with elegant fallbacks.
+        if (titleStyle === 'text-only') {
+            // Completely hide the logo and force text title display.
+            showLogo = false;
+            showTitle = true;
+        } else if (titleStyle === 'logo-only' && hasLogo) {
+            // Display only the logo icon and hide the text title.
+            // Assign a completely separate details-title-logo CSS class.
+            // This prevents inheriting any absolute alignment styling from details-logo.
+            showLogo = true;
+            showTitle = false;
+            logoClass = 'details-title-logo';
+        } else {
+            // Default option ('both'): render both if a logo exists.
+            // Fall back to this mode if 'logo-only' was chosen but no logo image exists for this item.
+            showLogo = hasLogo;
+            showTitle = true;
+            logoClass = 'details-logo';
+        }
+
+        // Retrieve setting to hide the original language title on the details page.
+        // It defaults to 'false' (off), so it's shown unless explicitly toggled to 'true'.
+        const hideOriginalTitle = storage.getItem('pref:hideOriginalTitle') === 'true';
+
+        const isSeason = item.Type === 'Season';
+        const displayTitle = i18n.ensureBiDi(isSeason ? item.SeriesName || item.Name : item.Name);
+
+        // Define display subtitle (original title) based on settings.
+        // Season titles are unaffected; we only hide original titles for movies/shows when configured.
+        const displaySubtitle = i18n.ensureBiDi(
+            isSeason
+                ? item.Name
+                : !hideOriginalTitle && item.OriginalTitle && item.OriginalTitle !== item.Name
+                  ? item.OriginalTitle
+                  : ''
+        );
+
+        // Build the dynamic inner HTML for the hero-info block.
+        let heroHtml = '';
+
+        // If enabled, prepend the logo container div at the top of the header info.
+        if (showLogo) {
+            heroHtml += `<div id="details-logo" class="${logoClass}"></div>`;
+        }
+
+        // If enabled, append the h1 details title.
+        if (showTitle) {
+            // If there is no logo displayed, style the title to span the full width of the container.
+            const titleStyleAttr = !showLogo ? 'style="max-width: 100%;"' : '';
+            heroHtml += `<h1 class="details-title" ${titleStyleAttr}>${escapeHtml(displayTitle)}</h1>`;
+        }
+
+        // Add the subtitle element underneath if present.
+        if (displaySubtitle && displaySubtitle !== displayTitle) {
+            heroHtml += `<h2 class="details-original-title">${escapeHtml(displaySubtitle)}</h2>`;
+        }
+
+        // Render episode season/number details for TV episodes.
+        if (item.Type === 'Episode') {
+            // When in 'logo-only' mode with a logo, the main header visual is the Series Logo.
+            // Since the text title (Episode Name) is hidden, we dynamically swap the subtitle
+            // text from showing the Series Name to showing the Episode Name (item.Name).
+            // Under any other mode (where text title is shown as the header), we keep
+            // the classic 'SxxExx - Series Name' pattern.
+            const showLogoAsTitle = titleStyle === 'logo-only' && hasLogo;
+
+            // Format the episode identification string (SxxExx)
+            const seasonPrefix = `S${(item.ParentIndexNumber || 0).toString().padStart(2, '0')}`;
+            const episodePrefix = `E${(item.IndexNumber || 0).toString().padStart(2, '0')}`;
+
+            // Construct the final display string based on layout preferences
+            const subtitleText = showLogoAsTitle
+                ? `${seasonPrefix}${episodePrefix} - ${item.Name}`
+                : `${seasonPrefix}${episodePrefix} - ${item.SeriesName}`;
+
+            const useSecondaryColor = storage.getItem('pref:secondaryTitleSecondaryColor') !== 'false';
+            const colorClass = useSecondaryColor ? 'secondary-color' : '';
+
+            heroHtml += `<p class="details-episode-info clickable-subtitle ${colorClass}" id="episode-subtitle-link">${escapeHtml(i18n.ensureBiDi(subtitleText))}</p>`;
+        }
+
+        // Conditionally construct technical details badges row if enabled by user settings
+        let techHtml = '';
+        if (storage.getItem('pref:showTechnicalDetails') !== 'false') {
+            techHtml = this._renderTechnicalDetails();
+        }
+
+        // Finish appending standard metadata row and technical specifications.
+        heroHtml += `
+            <div class="details-meta-row">
+                ${metaHtml}
+            </div>
+            ${techHtml}
+        `;
+
+        const heroInfoContainer = this.$('#hero-info');
+        if (heroInfoContainer) {
+            heroInfoContainer.innerHTML = heroHtml;
+        }
+
+        // Bind clickable subtitle if present
+        const subtitleLink = this.$('#episode-subtitle-link');
+        if (subtitleLink && item.SeriesId) {
+            subtitleLink.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                log.info('Navigating to series via subtitle link:', item.SeriesId);
+                router.navigate(`/details/${item.SeriesId}`);
+            };
+        }
+
+        // Overview
+        const overviewEl = this.$('.overview-text');
+
+        // Tagline
+        const tagline = item.Taglines && item.Taglines.length > 0 ? item.Taglines[0] : '';
+
+        // Find or create tagline element
+        let taglineEl = this.$('.details-tagline');
+        const overviewContainer = this.$('.details-overview');
+        if (!taglineEl && tagline && overviewContainer) {
+            taglineEl = document.createElement('p');
+            taglineEl.className = 'details-tagline';
+            // Insert before the overview text when available, otherwise append
+            if (overviewEl) {
+                overviewContainer.insertBefore(taglineEl, overviewEl);
+            } else {
+                overviewContainer.appendChild(taglineEl);
+            }
+        }
+
+        if (taglineEl) {
+            taglineEl.textContent = tagline;
+            taglineEl.style.display = tagline ? 'block' : 'none';
+        }
+
+        if (overviewEl) {
+            overviewEl.innerHTML = item.Overview || '';
+            overviewEl.querySelectorAll('a').forEach((anchor) => anchor.setAttribute('tabindex', '-1'));
+
+            // Reset overview element styling with user-selected line clamp setting
+            const clampClass = getOverviewClampClass();
+            overviewEl.className = `overview-text ${clampClass}`;
+        }
+
+        const seeMoreBtn = this.$('.see-more-btn');
+        if (seeMoreBtn) {
+            seeMoreBtn.style.display = 'none';
+        }
+
+        // Reveal columns
+        const detailsInfoCol = this.$('.details-info-col');
+        if (detailsInfoCol) {
+            requestAnimationFrame(() => {
+                detailsInfoCol.classList.add('visible');
+                this._checkOverviewTruncation();
+            });
+        }
+
+        // Update buttons based on state
+        this._updateButtons();
+    }
+
+    async _handleMetaClick(element) {
+        const type = element.dataset.type;
+        const id = element.dataset.id;
+        const name = element.dataset.name || element.dataset.value;
+
+        let libraryId = this._item.LibraryId || state.get('activeLibraryId');
+
+        if (!libraryId) {
+            // For items opened from the Home screen or via deep links, LibraryId might be missing.
+            // The most robust way to find the true root library is to check the user's views.
+            try {
+                log.info(`Resolving true Library ID for Type="${this._item.Type}" via getUserViews...`);
+                const views = await api.getUserViews();
+                const items = views?.Items || [];
+
+                let targetCollectionType = null;
+                const type = this._item.Type;
+
+                if (['Audio', 'MusicAlbum', 'MusicArtist', 'MusicGenre'].includes(type) || this._item.AlbumId) {
+                    targetCollectionType = 'music';
+                } else if (['Series', 'Season', 'Episode', 'TvChannel'].includes(type) || this._item.SeriesId) {
+                    targetCollectionType = 'tvshows';
+                } else if (['Movie', 'BoxSet', 'Video'].includes(type)) {
+                    targetCollectionType = 'movies';
+                }
+
+                if (targetCollectionType) {
+                    const view = items.find((v) => v.CollectionType === targetCollectionType);
+                    if (view) {
+                        libraryId = view.Id;
+                        log.info(`Resolved ${targetCollectionType} Library correctly: ${libraryId} (${view.Name})`);
+                    }
+                }
+
+                // If still not found, fallback to ParentId
+                libraryId = libraryId || this._item.ParentId;
+
+                // Cache it
+                this._item.LibraryId = libraryId;
+            } catch (err) {
+                log.error('Failed to resolve LibraryId via views', err);
+                libraryId = this._item.ParentId;
+            }
+        }
+
+        // Fallback to ParentId for top-level items like Movies or standalone Series
+        // (where ParentId IS the LibraryId).
+        libraryId = libraryId || this._item.ParentId;
+
+        if (!libraryId) {
+            log.warn('Could not determine LibraryId for item', this._item);
+            return;
+        }
+
+        log.info(`Navigating to ${type} -> ${name} (${id})`);
+
+        switch (type) {
+            case 'year':
+                router.navigate(`/library/${libraryId}/year/${encodeURIComponent(name)}`);
+                break;
+            case 'genres':
+                router.navigate(`/library/${libraryId}/genre/${id}`);
+                break;
+            case 'studios':
+                router.navigate(`/library/${libraryId}/studio/${id}`);
+                break;
+            case 'directors':
+            case 'writers':
+                // Search by PersonId
+                router.navigate(`/library/${libraryId}/person/${id}`);
+                break;
+            case 'tags':
+                router.navigate(`/library/${libraryId}/tag/${encodeURIComponent(name)}`);
+                break;
+            default:
+                log.warn(`Unhandled metadata type "${type}"`);
+                return;
+        }
+    }
+
+    /**
+     * Determines whether the given item represents a JellyEmu game.
+     * ROM items imported through the JellyEmu plugin are resolved as Books with 'JellyEmu' tag.
+     * @param {Object} item
+     * @returns {boolean}
+     * @private
+     */
+    _isGame(item = this._item) {
+        if (!item || !item.Tags) return false;
+        return Array.isArray(item.Tags) && item.Tags.includes('JellyEmu');
+    }
+
+    /**
+     * Resolves the primary gaming platform tag for display badges.
+     * @param {Object} item
+     * @returns {string} Platform name (e.g. 'SNES', 'GBA', 'PlayStation')
+     * @private
+     */
+    _getGamePlatformTag(item = this._item) {
+        if (!item || !Array.isArray(item.Tags)) return '';
+        // Skip generic markers, return first specific console platform tag
+        const skipTags = new Set(['JellyEmu', 'Game', 'MultiDisc', 'Unknown', 'Unsupported']);
+        return item.Tags.find((t) => !skipTags.has(t)) || '';
+    }
+
+    _updateButtons() {
+        const item = this._item;
+        const userData = item.UserData || {};
+
+        // Mount and position FavoriteButton component in the action bar
+        this._setupFavoriteButton();
+
+        const playBtn = this.$('.play-btn');
+        const resumeBtn = this.$('.resume-btn');
+        const watchedBtn = this.$('.watched-btn');
+
+        // Reset state first
+        if (playBtn) {
+            playBtn.classList.remove('hidden');
+            playBtn.setAttribute('tabindex', '0'); // Make focusable
+        }
+        if (resumeBtn) {
+            resumeBtn.classList.add('hidden');
+            resumeBtn.setAttribute('tabindex', '-1'); // Remove from focus order when hidden
+            resumeBtn.classList.remove('btn-primary');
+            resumeBtn.classList.add('btn-secondary');
+        }
+
+        // Resume Logic
+        if (userData.PlaybackPositionTicks > 0) {
+            // If resume point exists: Hide Play, Show Resume as Primary
+            if (playBtn) {
+                playBtn.classList.add('hidden');
+                playBtn.setAttribute('tabindex', '-1'); // Remove from focus order when hidden
+            }
+
+            if (resumeBtn) {
+                resumeBtn.classList.remove('hidden');
+                resumeBtn.setAttribute('tabindex', '0'); // Make focusable when visible
+            }
+
+            // Show Reset Button when Resume is active
+            const resetBtn = this.$('.reset-btn');
+            if (resetBtn) {
+                resetBtn.classList.remove('hidden');
+                resetBtn.setAttribute('tabindex', '0');
+            }
+        } else {
+            // No resume point: Show Play, Hide Resume & Reset
+            if (playBtn) {
+                playBtn.classList.remove('hidden');
+                playBtn.setAttribute('tabindex', '0');
+            }
+
+            if (resumeBtn) {
+                resumeBtn.classList.add('hidden');
+                resumeBtn.setAttribute('tabindex', '-1');
+            }
+
+            const resetBtn = this.$('.reset-btn');
+            if (resetBtn) {
+                resetBtn.classList.add('hidden');
+                resetBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // Ghost Mode button visibility
+        const ghostBtn = this.$('.ghost-btn');
+        if (ghostBtn) {
+            // Check if SyncPlay is currently active.
+            const isSyncPlayActive = window.__syncPlayManager && window.__syncPlayManager.isEnabled;
+
+            // Check if user has toggled the preference option to hide the button entirely.
+            const isHiddenByPref = storage.getItem('pref:hideGhostMode') === 'true';
+
+            // Determine playability (non-photos and not in sync play, and not hidden by user preference).
+            const isPlayable = item.Type !== 'Photo' && !isSyncPlayActive && !isHiddenByPref;
+
+            // Toggle visibility classes and keyboard accessibility index dynamically.
+            if (isPlayable) {
+                ghostBtn.classList.remove('hidden');
+                ghostBtn.setAttribute('tabindex', '0');
+            } else {
+                ghostBtn.classList.add('hidden');
+                ghostBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // Photo overrides for Action Buttons
+        if (item.Type === 'Photo') {
+            if (playBtn) {
+                const playIcon = detailsIcons.photo;
+                playBtn.innerHTML = `${playIcon} <span>${i18n.t('ViewPhoto') || 'View Photo'}</span>`;
+                playBtn.onclick = () => {
+                    const parentId = this._item.LibraryId || this._item.ParentId || state.get('activeLibraryId') || '';
+                    router.navigate(`/slideshow/${this._itemId}?parentId=${parentId}`);
+                };
+            }
+
+            const audioBtn = this.$('.audio-btn');
+            if (audioBtn) {
+                audioBtn.classList.add('hidden');
+                audioBtn.setAttribute('tabindex', '-1');
+            }
+            const subBtn = this.$('.subtitle-btn');
+            if (subBtn) {
+                subBtn.classList.add('hidden');
+                subBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // The label/style/focus handoff below only applies when Resume is actually
+        // the active button (i.e. a resume point exists) — guard it the same way
+        // visibility was gated above so it doesn't steal focus from Play when there's
+        // nothing to resume.
+        if (userData.PlaybackPositionTicks > 0) {
+            // Upgrade to primary style
+            resumeBtn.classList.remove('btn-secondary');
+            resumeBtn.classList.add('btn-primary');
+
+            // Retrieve the resume position from UserData playback position.
+            // Convert playback ticks to total minutes. Note that 1 minute is equivalent to 600,000,000 ticks.
+            const resumeTime = Math.round(userData.PlaybackPositionTicks / 600000000);
+
+            // Define a variable to store our sleekly formatted timestamp string.
+            let timeString = '';
+
+            // Check if the user has watched past 59 minutes (i.e. at least 60 minutes).
+            // If so, we format the time using a premium hour-and-minute pattern (e.g., "1h 15m").
+            if (resumeTime >= 60) {
+                // Compute the absolute number of whole hours.
+                const hours = Math.floor(resumeTime / 60);
+                // Calculate the remaining minutes left over.
+                const minutes = resumeTime % 60;
+
+                // Format the string elegantly. If there are no remaining minutes (e.g. exactly 1 hour),
+                // show only the hour to maintain a clean and beautiful minimal aesthetic.
+                timeString = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+            } else {
+                // Under 60 minutes, display in simple minute format (e.g., "45m").
+                timeString = `${resumeTime}m`;
+            }
+
+            // Apply localization to the formatted time label to construct the full button label text.
+            const resumeLabel = i18n.t('ResumeAt', [timeString]);
+            // Check tooltip display mode
+            const tooltipMode = this._getActionTooltipsMode();
+            const showTooltips = tooltipMode !== 'hidden';
+
+            if (showTooltips) {
+                // When tooltips are enabled, display timestamp only on the button pill
+                // and present "Resume Playback" in the tooltip bar.
+                resumeBtn.innerHTML = `${detailsIcons.play} <span>${timeString}</span>`;
+                resumeBtn.setAttribute('data-tooltip', i18n.t('ResumePlayback') || 'Resume Playback');
+            } else {
+                // When tooltips are disabled, display full "Resume at {time}" inside the button.
+                resumeBtn.innerHTML = `${detailsIcons.play} <span>${resumeLabel}</span>`;
+                resumeBtn.setAttribute('data-tooltip', resumeLabel);
+            }
+
+            // We hid the Play button, so move focus to the Resume button.
+            resumeBtn.focus();
+            this._onFocusChangedForTooltip?.(resumeBtn);
+        }
+
+        // Watched button
+        if (watchedBtn) {
+            if (userData.Played) {
+                watchedBtn.classList.add('active');
+                watchedBtn.innerHTML = detailsIcons.watchedFilled;
+            } else {
+                watchedBtn.classList.remove('active');
+                watchedBtn.innerHTML = detailsIcons.watchedOutline;
+            }
+        }
+
+        // Shuffle Button Visibility
+        const shuffleBtn = this.$('.shuffle-btn');
+        if (shuffleBtn) {
+            // Playlists get shuffle too — they are inherently sequential,
+            // and shuffle is a natural interaction users expect.
+            const isShuffleable = ['Series', 'Season', 'BoxSet', 'Playlist'].includes(item.Type);
+            if (item.Type === 'Photo') {
+                shuffleBtn.classList.remove('hidden');
+                shuffleBtn.setAttribute('tabindex', '0');
+                shuffleBtn.setAttribute('aria-label', i18n.t('Slideshow') || 'Slideshow');
+                const playIcon = detailsIcons.playLarge;
+                shuffleBtn.innerHTML = playIcon;
+                shuffleBtn.onclick = () => {
+                    // Slideshow auto-starts via query param if we wanted, but right now SlideshowPage
+                    // doesn't have an auto start param, user can press play themselves. Thus we just open it.
+                    // Wait, we can pass autoPlay=true!
+                    const parentId = this._item.LibraryId || this._item.ParentId || state.get('activeLibraryId') || '';
+                    router.navigate(`/slideshow/${this._itemId}?parentId=${parentId}&autoPlay=true`);
+                };
+            } else if (isShuffleable) {
+                shuffleBtn.classList.remove('hidden');
+                shuffleBtn.setAttribute('tabindex', '0');
+            } else {
+                shuffleBtn.classList.add('hidden');
+                shuffleBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // Subtitles & Audio Track Button Visibility
+        const audioBtn = this.$('.audio-btn');
+        const subtitleBtn = this.$('.subtitle-btn');
+        const mediaStreams = item.MediaSources?.[0]?.MediaStreams || [];
+
+        if (audioBtn) {
+            // Only show audio tracks if there's at least one available to select
+            if (mediaStreams.some((s) => s.Type === 'Audio')) {
+                audioBtn.classList.remove('hidden');
+                audioBtn.setAttribute('tabindex', '0');
+            } else {
+                audioBtn.classList.add('hidden');
+                audioBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        if (subtitleBtn) {
+            // =========================================================================
+            // PGS Subtitle Filter Guard for Button Visibility
+            //
+            // We check if there are any available subtitle streams that are NOT disabled
+            // PGS tracks. If PGS rendering is disabled completely in settings, PGS streams
+            // should not count towards whether the subtitle button is visible. This avoids
+            // showing an active subtitle button when the only subtitle tracks are PGS tracks
+            // that the user has chosen to hide/disable completely.
+            // =========================================================================
+            const disablePgs = PlayerSettings.get('pgsPlaybackMode') === 'disable';
+            const hasSelectableSubtitles = mediaStreams.some((s) => {
+                // We only look at subtitle streams
+                if (s.Type !== 'Subtitle') return false;
+
+                // If PGS is disabled, skip PGS/PGSSUB codecs
+                if (disablePgs) {
+                    const codec = (s.Codec || '').toLowerCase();
+                    if (codec === 'pgs' || codec === 'pgssub') {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // If there's at least one renderable subtitle stream, make the button visible
+            if (hasSelectableSubtitles) {
+                subtitleBtn.classList.remove('hidden');
+                subtitleBtn.setAttribute('tabindex', '0');
+            } else {
+                // Otherwise, completely hide the subtitle button and remove from focus order
+                subtitleBtn.classList.add('hidden');
+                subtitleBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // ── Playlist-specific overrides ──────────────────────────────────────────
+        // A Playlist has no single MediaSource — audio stream and subtitle track
+        // info live on each individual item, not on the container. Showing these
+        // buttons would just open an empty menu, so we hide them.
+        if (item.Type === 'Playlist') {
+            if (audioBtn) {
+                audioBtn.classList.add('hidden');
+                audioBtn.setAttribute('tabindex', '-1');
+            }
+            if (subtitleBtn) {
+                subtitleBtn.classList.add('hidden');
+                subtitleBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // ── JellyEmu Game Overrides ──────────────────────────────────────────────
+        // If this item is a JellyEmu game ROM, present it cleanly as a console game:
+        // - Replace Play icon with Gamepad icon and label "Play Game"
+        // - Hide irrelevant media buttons (audio, subtitle, ghost mode, reset progress, trailers)
+        if (this._isGame(item)) {
+            if (playBtn) {
+                const gameIcon = detailsIcons.gamepad || detailsIcons.play;
+                const gameLabel = i18n.t('PlayGame') || 'Play Game';
+                playBtn.innerHTML = `${gameIcon} <span data-i18n="PlayGame">${gameLabel}</span>`;
+                playBtn.setAttribute('data-tooltip', gameLabel);
+                playBtn.classList.remove('hidden');
+                playBtn.setAttribute('tabindex', '0');
+            }
+            if (resumeBtn) {
+                resumeBtn.classList.add('hidden');
+                resumeBtn.setAttribute('tabindex', '-1');
+            }
+            const resetBtn = this.$('.reset-btn');
+            if (resetBtn) {
+                resetBtn.classList.add('hidden');
+                resetBtn.setAttribute('tabindex', '-1');
+            }
+            if (ghostBtn) {
+                ghostBtn.classList.add('hidden');
+                ghostBtn.setAttribute('tabindex', '-1');
+            }
+            if (audioBtn) {
+                audioBtn.classList.add('hidden');
+                audioBtn.setAttribute('tabindex', '-1');
+            }
+            if (subtitleBtn) {
+                subtitleBtn.classList.add('hidden');
+                subtitleBtn.setAttribute('tabindex', '-1');
+            }
+            const trailerBtn = this.$('.trailer-btn');
+            if (trailerBtn) {
+                trailerBtn.classList.add('hidden');
+                trailerBtn.setAttribute('tabindex', '-1');
+            }
+            const shuffleBtn = this.$('.shuffle-btn');
+            if (shuffleBtn) {
+                shuffleBtn.classList.add('hidden');
+                shuffleBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // Ensure tooltip is evaluated and displayed for whichever action button is currently active/focused (Play or Resume)
+        requestAnimationFrame(() => {
+            const activeActionsBtn =
+                document.activeElement && document.activeElement.closest('#actions')
+                    ? document.activeElement
+                    : this.$('.resume-btn:not(.hidden)') || this.$('.play-btn');
+            this._onFocusChangedForTooltip?.(activeActionsBtn);
+            // Balance action buttons evenly across 2 rows for mobile portrait orientation
+            this._balanceMobileActionRows();
+        });
+    }
+
+    async _loadNextUp() {
+        // =====================================================================
+        // Performance & Visibility Control Check
+        // =====================================================================
+        // Check if the user has enabled the "Hide Next Up" setting.
+        // By handling this check first, we short-circuit fetching Next Up items,
+        // avoiding unnecessary network calls and conserving VRAM on TV hardware.
+        // =====================================================================
+        const hideNextUp = storage.getItem('pref:hideNextUpSection') === 'true';
+        if (hideNextUp) {
+            const nextUpSection = this.$('#next-up-section');
+            if (nextUpSection) {
+                nextUpSection.classList.add('hidden');
+            }
+            return;
+        }
+
+        try {
+            // =====================================================================
+            // Series Context Resolution
+            // =====================================================================
+            // Determine series identifier based on whether the active details page
+            // represents a top-level Series or an individual Season.
+            let seriesId = this._itemId;
+            if (this._item?.Type === 'Season') {
+                seriesId = this._item.SeriesId || this._item.ParentId;
+                if (!seriesId) {
+                    const parentSeries = await this._getParentSeriesItem();
+                    seriesId = parentSeries?.Id;
+                }
+            }
+
+            // Abort gracefully if series context could not be resolved
+            if (!seriesId) {
+                const nextUpSection = this.$('#next-up-section');
+                if (nextUpSection) {
+                    nextUpSection.classList.add('hidden');
+                }
+                return;
+            }
+
+            let response;
+
+            // Check if the current server is Emby. Emby ignores the SeriesId parameter
+            // on the /Shows/NextUp endpoint, so we fall back to querying the first
+            // unplayed episode of the series via /Items, which matches NextUp logic.
+            if (api.isEmby()) {
+                // Fetch the oldest unplayed episode of this series.
+                response = await api.getItems({
+                    ParentId: seriesId,
+                    Recursive: true,
+                    IncludeItemTypes: 'Episode',
+                    Limit: 1,
+                    Filters: 'IsUnplayed',
+                    SortBy: 'ParentIndexNumber,IndexNumber',
+                    // Request all necessary fields for rendering the next up card.
+                    Fields: 'Overview,RunTimeTicks,CommunityRating,PremiereDate,IndexNumber,ParentIndexNumber,SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags'
+                });
+            } else {
+                // For Jellyfin, use the standard NextUp endpoint which filters by SeriesId correctly.
+                response = await api.getNextUp({ SeriesId: seriesId, Limit: 1 });
+            }
+
+            this._nextUp = response.Items || [];
+
+            // =====================================================================
+            // Season Scope Verification
+            // =====================================================================
+            // When viewing a Season details page, only display the Next Up card
+            // if the upcoming episode actually belongs to this specific season.
+            // If the next unplayed episode is in another season (or none exists),
+            // suppress the Next Up section so the episode list takes primary focus.
+            if (this._item?.Type === 'Season' && this._nextUp.length > 0) {
+                const nextEp = this._nextUp[0];
+                const isWithinThisSeason = Boolean(
+                    (nextEp.SeasonId && nextEp.SeasonId === this._itemId) ||
+                    (nextEp.ParentId && nextEp.ParentId === this._itemId) ||
+                    (nextEp.ParentIndexNumber != null &&
+                        this._item.IndexNumber != null &&
+                        nextEp.ParentIndexNumber === this._item.IndexNumber)
+                );
+
+                if (!isWithinThisSeason) {
+                    this._nextUp = [];
+                }
+            }
+
+            // If the episode returned by the server as Next Up was just marked complete,
+            // suppress it from the Next Up display so the finished item does not linger.
+            const lastStopped = state.get('playback:lastStopped');
+            if (
+                this._nextUp &&
+                this._nextUp.length > 0 &&
+                lastStopped &&
+                lastStopped.isNearComplete &&
+                this._nextUp[0].Id === lastStopped.itemId &&
+                Date.now() - lastStopped.timestamp < 30000
+            ) {
+                log.info('Server NextUp returned recently completed episode — suppressing stale item');
+                this._nextUp = [];
+            }
+
+            // Render next up if available and eligible for this view
+            if (this._nextUp.length > 0) {
+                this._renderNextUp();
+                prewarmManager.prewarm(this._nextUp[0]);
+            } else {
+                const nextUpSection = this.$('#next-up-section');
+                if (nextUpSection) {
+                    nextUpSection.classList.add('hidden');
+                }
+            }
+        } catch (error) {
+            log.warn('Failed to load next up', error);
+            if (this.$('#next-up-section')) {
+                this.$('#next-up-section').classList.add('hidden');
+            }
+        }
+    }
+
+    _renderNextUp() {
+        const episodeLayout = storage.getItem('pref:episodeLayout') || 'list';
+        if (episodeLayout === 'list') {
+            const container = this.$('#next-up-row');
+            const section = this.$('#next-up-section');
+            if (!section || !container || !this._nextUp || this._nextUp.length === 0) return;
+
+            section.classList.remove('hidden');
+            section.classList.remove('media-row');
+            container.classList.add('vertical-list');
+
+            let html = '<div class="episode-list-container" style="padding-bottom: 0;">';
+            this._nextUp.forEach((ep) => {
+                const progress =
+                    ep.UserData?.PlaybackPositionTicks && ep.RunTimeTicks
+                        ? (ep.UserData.PlaybackPositionTicks / ep.RunTimeTicks) * 100
+                        : 0;
+                const progressHtml =
+                    progress > 0
+                        ? `<div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; background-color: rgba(0,0,0,0.7); z-index: 100;"><div style="width: ${progress}%; height: 100%; background-color: var(--jf-accent);"></div></div>`
+                        : '';
+
+                const playedBadgeHtml = CardRenderer.getPlayedBadgeHtml(ep);
+                const qualityBadgeHtml = CardRenderer.getQualityBadgeHtml(ep);
+
+                const imgUrl = api.getImageUrl(ep.Id, 'Primary', {
+                    maxWidth: imageService.getParams('thumb').maxWidth,
+                    quality: imageService.getParams('thumb').quality
+                });
+                const episodeTitle = i18n.ensureBiDi(ep.Name);
+                const episodePrefix =
+                    ep.ParentIndexNumber && ep.IndexNumber
+                        ? `S${ep.ParentIndexNumber}E${ep.IndexNumber}. `
+                        : ep.IndexNumber
+                          ? `${ep.IndexNumber}. `
+                          : '';
+
+                const showRating = Boolean(ep.CommunityRating && shouldShowScore(ep));
+                let runtimeText = '';
+                if (ep.RunTimeTicks) {
+                    const mins = Math.round(ep.RunTimeTicks / 600000000);
+                    runtimeText = `${mins}m`;
+                }
+                let endsAtText = '';
+                if (ep.RunTimeTicks) {
+                    const endTime = new Date(timeManager.now().getTime() + ep.RunTimeTicks / 10000);
+                    const timeString = i18n.formatLocalTime(endTime);
+                    endsAtText = i18n.t('EndsAtValue', [timeString]);
+                }
+
+                html += `
+                    <div class="episode-row">
+                        <button class="episode-row-card media-card" data-episode-id="${ep.Id}" data-item-id="${ep.Id}" tabindex="0">
+                            <div class="episode-row-thumb">
+                                <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${imgUrl}" alt="" class="lazy">
+                                ${playedBadgeHtml}
+                                ${qualityBadgeHtml}
+                                ${progressHtml}
+                            </div>
+                            <div class="episode-row-info">
+                                <div class="episode-row-title">${episodePrefix}${episodeTitle}</div>
+                                <div class="episode-row-meta">
+                                    ${showRating ? `<span class="episode-row-rating">${detailsIcons.ratingStar}${ep.CommunityRating.toFixed(1)}</span>` : ''}
+                                    ${runtimeText ? `<span>${runtimeText}</span>` : ''}
+                                    ${endsAtText ? `<span>${endsAtText}</span>` : ''}
+                                </div>
+                                <div class="episode-row-overview">${ep.Overview || ''}</div>
+                            </div>
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+
+            container.onclick = (e) => {
+                const card = e.target.closest('.media-card');
+                if (card && card.dataset.itemId) {
+                    const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                    if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                        state.set(stateKey, {
+                            itemId: card.dataset.itemId,
+                            sectionId: 'details-next-up'
+                        });
+                    }
+                    router.navigate(`/details/${card.dataset.itemId}`);
+                }
+            };
+
+            lazyLoader.observe(container);
+
+            const upwardLink = this._getPreviousVisibleSection('details-next-up')?.targetName || 'details-actions';
+            const nextSection = this._getNextVisibleSection('details-next-up');
+            const leaveDownTarget = nextSection ? nextSection.targetName : null;
+
+            this.registerFocusSection('details-next-up', container, {
+                orientation: 'vertical',
+                leaveUp: upwardLink,
+                leaveDown: leaveDownTarget,
+                leaveLeft: 'sidebar',
+                onEnter: (fromElement, options) => {
+                    if (!this._hasEnteredNextUpGrid) {
+                        this._hasEnteredNextUpGrid = true;
+                        return container.querySelector('.media-card');
+                    }
+                    return null;
+                }
+            });
+
+            this._updateLeaveDown(upwardLink, 'details-next-up');
+            return;
+        }
+
+        this._renderVirtualRow({
+            sectionId: 'next-up-section',
+            listId: 'next-up-row',
+            items: this._nextUp,
+            isLandscape: true,
+            renderCard: (item) => this._renderMediaCard(item, true, 'episode'),
+            focusSectionName: 'details-next-up'
+        });
+    }
+
+    async _loadSeasons() {
+        try {
+            const response = await api.getSeasons(this._itemId);
+            this._seasons = response.Items || [];
+
+            if (this._seasons.length > 0) {
+                this._renderSeasons();
+            }
+        } catch (error) {
+            log.warn('Failed to load seasons', error);
+            if (this.$('#seasons-section')) {
+                this.$('#seasons-section').classList.add('hidden');
+            }
+        }
+    }
+
+    _renderSeasons() {
+        this._renderVirtualRow({
+            sectionId: 'seasons-section',
+            listId: 'seasons-row',
+            items: this._seasons,
+            isLandscape: false,
+            renderCard: (season) => this._renderMediaCard(season, false, 'season'),
+            focusSectionName: 'details-seasons'
+        });
+    }
+
+    async _loadEpisodes(seriesId, seasonId) {
+        const cacheKey = `details:episodes:${seriesId}:${seasonId}`;
+        const cached = state.get(cacheKey);
+        if (cached) {
+            this._episodes = cached;
+            if (this._episodes.length > 0) {
+                this._renderEpisodes();
+                if (!this._nextUp || this._nextUp.length === 0) {
+                    const targetEp = this._episodes.find((ep) => !ep.UserData?.Played) || this._episodes[0];
+                    if (targetEp) prewarmManager.prewarm(targetEp);
+                }
+            }
+            return;
+        }
+
+        try {
+            const response = await api.getEpisodes(seriesId, { SeasonId: seasonId });
+            this._episodes = response.Items || [];
+
+            // Reconcile episodes list with authoritative client state
+            if (this._episodes.length > 0) {
+                for (const ep of this._episodes) {
+                    this._reconcileItemWithLastStopped(ep);
+                }
+            }
+
+            state.set(cacheKey, this._episodes);
+
+            if (this._episodes.length > 0) {
+                this._renderEpisodes();
+                if (!this._nextUp || this._nextUp.length === 0) {
+                    const targetEp = this._episodes.find((ep) => !ep.UserData?.Played) || this._episodes[0];
+                    if (targetEp) prewarmManager.prewarm(targetEp);
+                }
+            }
+        } catch (error) {
+            log.warn('Failed to load episodes', error);
+            if (this.$('#episodes-section')) {
+                this.$('#episodes-section').classList.add('hidden');
+            }
+        }
+    }
+
+    _renderEpisodes() {
+        const container = this.$('#episodes-list');
+        const section = this.$('#episodes-section');
+
+        section.classList.remove('hidden');
+
+        if (this._item.Type === 'Season') {
+            // Remove 'media-row' to prevent ScrollController from aggressively top-snapping this entire deep layout
+            section.classList.remove('media-row');
+
+            const episodeLayout = storage.getItem('pref:episodeLayout') || 'list';
+
+            if (episodeLayout === 'list') {
+                container.classList.add('vertical-list');
+
+                // ====================================================================
+                // Premium List with Details Layout
+                // ====================================================================
+                // Render episode cards in a clean, vertical scrollable column:
+                // - Thumbnail on the left with a subtle rounded cover design and progress indicators.
+                // - High-contrast text stack on the right: SxxExx index code, clear title,
+                //   ratings & duration metadata row, and overview line clamping.
+                // ====================================================================
+                const limit = 30;
+                const episodesToShow = this._episodes.slice(0, limit);
+                const hasMore = this._episodes.length > limit;
+
+                let html = '<div class="episode-list-container">';
+                episodesToShow.forEach((ep) => {
+                    const progress =
+                        ep.UserData?.PlaybackPositionTicks && ep.RunTimeTicks
+                            ? (ep.UserData.PlaybackPositionTicks / ep.RunTimeTicks) * 100
+                            : 0;
+                    const progressHtml =
+                        progress > 0
+                            ? `<div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; background-color: rgba(0,0,0,0.7); z-index: 100;"><div style="width: ${progress}%; height: 100%; background-color: var(--jf-accent);"></div></div>`
+                            : '';
+
+                    const playedBadgeHtml = CardRenderer.getPlayedBadgeHtml(ep);
+                    const qualityBadgeHtml = CardRenderer.getQualityBadgeHtml(ep);
+
+                    const imgUrl = api.getImageUrl(ep.Id, 'Primary', {
+                        maxWidth: imageService.getParams('thumb').maxWidth,
+                        quality: imageService.getParams('thumb').quality
+                    });
+                    const episodeTitle = i18n.ensureBiDi(ep.Name);
+
+                    const showRating = Boolean(ep.CommunityRating && shouldShowScore(ep));
+                    let runtimeText = '';
+                    if (ep.RunTimeTicks) {
+                        const mins = Math.round(ep.RunTimeTicks / 600000000);
+                        runtimeText = `${mins}m`;
+                    }
+                    let endsAtText = '';
+                    if (ep.RunTimeTicks) {
+                        const endTime = new Date(timeManager.now().getTime() + ep.RunTimeTicks / 10000);
+                        const timeString = i18n.formatLocalTime(endTime);
+                        endsAtText = i18n.t('EndsAtValue', [timeString]);
+                    }
+
+                    html += `
+                        <div class="episode-row">
+                            <button class="episode-row-card media-card" data-episode-id="${ep.Id}" data-item-id="${ep.Id}" tabindex="0">
+                                <div class="episode-row-thumb">
+                                    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${imgUrl}" alt="" class="lazy">
+                                    ${playedBadgeHtml}
+                                    ${qualityBadgeHtml}
+                                    ${progressHtml}
+                                </div>
+                                <div class="episode-row-info">
+                                    <div class="episode-row-title">${ep.IndexNumber || 0}. ${episodeTitle}</div>
+                                    <div class="episode-row-meta">
+                                        ${showRating ? `<span class="episode-row-rating">${detailsIcons.ratingStar}${ep.CommunityRating.toFixed(1)}</span>` : ''}
+                                        ${runtimeText ? `<span>${runtimeText}</span>` : ''}
+                                        ${endsAtText ? `<span>${endsAtText}</span>` : ''}
+                                    </div>
+                                    <p class="episode-row-overview">${ep.Overview || ''}</p>
+                                </div>
+                            </button>
+                        </div>
+                    `;
+                });
+
+                if (hasMore) {
+                    const moreUrl = `/library/all?parentId=${this._itemId}&includeItemTypes=Episode&viewModeIndex=2`;
+                    html += `
+                        <div class="episode-row">
+                            <button class="episode-row-card media-card see-more-card" data-more-url="${moreUrl}" tabindex="0" style="justify-content: center; align-items: center; background: rgba(0, 0, 0, 0.5); border: 2px dashed rgba(255, 255, 255, 0.15);">
+                                <span style="font-size: 1.4rem; font-weight: 600; color: var(--jf-text-secondary);">${i18n.t('ShowMore') || 'See More'}</span>
+                            </button>
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+                container.innerHTML = html;
+
+                // Wire up click event delegation for navigating to details
+                container.onclick = (e) => {
+                    const card = e.target.closest('.media-card');
+                    if (card) {
+                        if (card.classList.contains('see-more-card')) {
+                            router.navigate(card.dataset.moreUrl);
+                            return;
+                        }
+                        const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                        if (card.dataset.itemId) {
+                            if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                                state.set(stateKey, {
+                                    itemId: card.dataset.itemId,
+                                    sectionId: 'details-episodes'
+                                });
+                            }
+                            router.navigate(`/details/${card.dataset.itemId}`);
+                        }
+                    }
+                };
+
+                lazyLoader.observe(container);
+
+                // Register vertical list navigation constraints
+                const upwardLink = this._getPreviousVisibleSection('details-episodes')?.targetName || 'details-actions';
+                const nextSection = this._getNextVisibleSection('details-episodes');
+                const leaveDownTarget = nextSection ? nextSection.targetName : null;
+
+                this.registerFocusSection('details-episodes', container, {
+                    orientation: 'vertical',
+                    leaveUp: upwardLink,
+                    leaveDown: leaveDownTarget,
+                    leaveLeft: 'sidebar',
+                    onEnter: (fromElement, options) => {
+                        if (!this._hasEnteredEpisodesGrid) {
+                            this._hasEnteredEpisodesGrid = true;
+                            return container.querySelector('.media-card');
+                        }
+                        return null;
+                    }
+                });
+
+                this._updateLeaveDown(upwardLink, 'details-episodes');
+            } else {
+                container.classList.remove('vertical-list');
+                // Use MediaGrid for a clean, generic 2D landscape episode layout
+                this._episodeGrid = new MediaGrid({
+                    id: 'season-episodes-grid',
+                    items: this._episodes,
+                    type: 'episode',
+                    // Pass 'season-grid' context so CardRenderer renders episode titles as primary
+                    contextType: 'season-grid',
+                    limit: 60,
+                    moreUrl: `/library/all?parentId=${this._itemId}&includeItemTypes=Episode&viewModeIndex=2`,
+                    isLandscape: true,
+                    onClick: (card) => {
+                        const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                        if (card.dataset.itemId) {
+                            if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                                state.set(stateKey, {
+                                    itemId: card.dataset.itemId,
+                                    sectionId: 'details-episodes'
+                                });
+                            }
+                            router.navigate(`/details/${card.dataset.itemId}`);
+                        }
+                    }
+                });
+
+                container.innerHTML = this._episodeGrid.render();
+                this._episodeGrid.onMounted(); // Wire up generic grid router links
+
+                // Register focus section for grid
+                const upwardLink = this._getPreviousVisibleSection('details-episodes')?.targetName || 'details-actions';
+                const nextSection = this._getNextVisibleSection('details-episodes');
+                const leaveDownTarget = nextSection ? nextSection.targetName : null;
+
+                this.registerFocusSection('details-episodes', container, {
+                    orientation: 'grid',
+                    leaveUp: upwardLink,
+                    leaveDown: leaveDownTarget,
+                    leaveLeft: 'sidebar',
+                    onEnter: (fromElement, options) => {
+                        if (!this._hasEnteredEpisodesGrid) {
+                            this._hasEnteredEpisodesGrid = true;
+                            return container.querySelector('.media-card');
+                        }
+                        return null;
+                    }
+                });
+
+                this._updateLeaveDown(upwardLink, 'details-episodes');
+            }
+        } else {
+            // Horizontal episode cards (for Series NextUp, etc.) require 'media-row' for correct horizontal snap scrolling
+            section.classList.add('media-row');
+            this._renderVirtualRow({
+                sectionId: 'episodes-section',
+                listId: 'episodes-list',
+                items: this._episodes,
+                isLandscape: true,
+                focusSectionName: 'details-episodes',
+                renderCard: (ep) => {
+                    const progress =
+                        ep.UserData?.PlaybackPositionTicks && ep.RunTimeTicks
+                            ? (ep.UserData.PlaybackPositionTicks / ep.RunTimeTicks) * 100
+                            : 0;
+                    return `
+                        <button class="episode-card media-card" data-episode-id="${ep.Id}" data-item-id="${ep.Id}" tabindex="0">
+                            <div class="episode-thumb">
+                                <img src="${api.getImageUrl(ep.Id, 'Primary', { maxWidth: imageService.getParams('thumb').maxWidth, quality: imageService.getParams('thumb').quality })}" alt="" class="lazy">
+                                ${progress > 0 ? `<div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; background-color: rgba(0,0,0,0.7); z-index: 100;"><div style="width: ${progress}%; height: 100%; background-color: var(--jf-accent);"></div></div>` : ''}
+                            </div>
+                            <div class="episode-info">
+                                <span class="episode-number">${i18n.ensureBiDi(`S${(ep.ParentIndexNumber || 0).toString().padStart(2, '0')}E${(ep.IndexNumber || 0).toString().padStart(2, '0')}`)}</span>
+                                <span class="episode-title">${i18n.ensureBiDi(ep.Name)}</span>
+                                <p class="episode-overview">${ep.Overview?.substring(0, 100) || ''}...</p>
+                            </div>
+                        </button>
+                    `;
+                }
+            });
+        }
+    }
+
+    _renderPeople() {
+        this._renderVirtualRow({
+            sectionId: 'people-section',
+            listId: 'people-row',
+            items: this._people,
+            isLandscape: false,
+            cardType: 'person',
+            renderCard: (person) => this._renderMediaCard(person, false, 'person'),
+            focusSectionName: 'details-people',
+            onClick: (card) => {
+                if (card.dataset.itemId) router.navigate(`/person/${card.dataset.itemId}`);
+            }
+        });
+    }
+
+    async _loadSpecialFeatures() {
+        try {
+            const features = await api.getSpecialFeatures(this._itemId);
+            this._specialFeatures = features || [];
+
+            if (this._specialFeatures.length > 0) {
+                this._renderSpecialFeatures();
+            }
+        } catch (error) {
+            log.warn('Failed to load special features', error);
+            const section = this.$('#special-features-section');
+            if (section) section.classList.add('hidden');
+        }
+    }
+
+    _renderSpecialFeatures() {
+        if (!this._specialFeatures || this._specialFeatures.length === 0) return;
+
+        this._renderVirtualRow({
+            sectionId: 'special-features-section',
+            listId: 'special-features-row',
+            items: this._specialFeatures,
+            isLandscape: true,
+            renderCard: (item) => this._renderMediaCard(item, true, 'thumb'),
+            focusSectionName: 'details-special-features'
+        });
+    }
+
+    /**
+     * Opens the full overview description in a scrollable dialog modal.
+     */
+    _showFullOverview() {
+        if (!this._item) return;
+
+        DescriptionModal.show(
+            {
+                title: this._item.Name,
+                overview: this._item.Overview
+            },
+            this
+        );
+    }
+
+    _checkOverviewTruncation() {
+        const overviewEl = this.$('.overview-text');
+        const seeMoreBtn = this.$('.see-more-btn');
+
+        if (!overviewEl || !seeMoreBtn) return;
+
+        const alwaysShow = shouldAlwaysShowOverviewButton();
+        const hasText = Boolean(overviewEl.textContent && overviewEl.textContent.trim().length > 0);
+        const isTruncated = overviewEl.scrollHeight > overviewEl.clientHeight + 2;
+
+        // Dynamically reflect current button label & i18n tag
+        seeMoreBtn.textContent = getOverviewButtonText();
+        seeMoreBtn.setAttribute('data-i18n', alwaysShow ? 'DetailedView' : 'ShowMore');
+
+        // If content height exceeds container bounds OR always-show option is enabled with text, expose button
+        if ((alwaysShow && hasText) || isTruncated) {
+            seeMoreBtn.style.display = 'block';
+
+            // 1. Determine what is below the See More button
+            const nextSection = this._getNextVisibleSection('details-see-more');
+            const downTarget = nextSection ? nextSection.targetName : null;
+
+            // 2. Register See More Section
+            this.registerFocusSection('details-see-more', this.$('.details-overview'), {
+                orientation: 'vertical',
+                leaveUp: 'details-actions',
+                leaveDown: downTarget
+            });
+
+            // 3. Link Actions -> See More
+            this._updateLeaveDown('details-actions', 'details-see-more');
+        } else {
+            // Unclamped or short overview does not require truncation expansion
+            seeMoreBtn.style.display = 'none';
+        }
+    }
+
+    _getNextVisibleSection(currentSectionName) {
+        // Helper to check if a section exists and is not hidden
+        const isNotHidden = (id) => {
+            const el = this.$(id);
+            return el && !el.classList.contains('hidden');
+        };
+
+        const sections = [
+            // Actions is always first and visible - needed so we can find what's after it
+            { name: 'details-actions', elementId: '#actions', isVisible: () => true },
+            {
+                name: 'details-see-more',
+                elementId: '#details-overview',
+                isVisible: () => this.$('.see-more-btn')?.style?.display !== 'none'
+            },
+            { name: 'details-rich-meta', elementId: '#rich-meta', isVisible: () => !!this.$('#rich-meta')?.innerHTML },
+            // Collection rows (BoxSet contents)
+            {
+                name: 'collection-movies-section',
+                elementId: '#collection-movies-row',
+                isVisible: () => isNotHidden('#collection-movies-section')
+            },
+            {
+                name: 'collection-shows-section',
+                elementId: '#collection-shows-row',
+                isVisible: () => isNotHidden('#collection-shows-section')
+            },
+            {
+                name: 'collection-episodes-section',
+                elementId: '#collection-episodes-row',
+                isVisible: () => isNotHidden('#collection-episodes-section')
+            },
+            {
+                name: 'collection-videos-section',
+                elementId: '#collection-videos-row',
+                isVisible: () => isNotHidden('#collection-videos-section')
+            },
+            {
+                name: 'collection-albums-section',
+                elementId: '#collection-albums-row',
+                isVisible: () => isNotHidden('#collection-albums-section')
+            },
+            {
+                name: 'collection-books-section',
+                elementId: '#collection-books-row',
+                isVisible: () => isNotHidden('#collection-books-section')
+            },
+            {
+                name: 'collection-subcollections-section',
+                elementId: '#collection-subcollections-row',
+                isVisible: () => isNotHidden('#collection-subcollections-section')
+            },
+            {
+                name: 'collection-other-section',
+                elementId: '#collection-other-row',
+                isVisible: () => isNotHidden('#collection-other-section')
+            },
+            // Playlist items — shown when the item is of Type 'Playlist'
+            {
+                name: 'details-playlist-items',
+                elementId: '#playlist-items-list',
+                isVisible: () => isNotHidden('#playlist-items-section')
+            },
+            // Standard content rows
+            { name: 'details-next-up', elementId: '#next-up-row', isVisible: () => isNotHidden('#next-up-section') },
+            { name: 'details-seasons', elementId: '#seasons-row', isVisible: () => isNotHidden('#seasons-section') },
+            {
+                name: 'details-episodes',
+                elementId: '#episodes-list',
+                isVisible: () => isNotHidden('#episodes-section')
+            },
+            {
+                name: 'more-from-season-section',
+                elementId: '#more-from-season-row',
+                isVisible: () => isNotHidden('#more-from-season-section')
+            },
+            // Additional video parts (multi-part movies/videos)
+            {
+                name: 'details-additional-parts',
+                elementId: '#additional-parts-row',
+                isVisible: () => isNotHidden('#additional-parts-section')
+            },
+            { name: 'details-people', elementId: '#people-row', isVisible: () => isNotHidden('#people-section') },
+            {
+                name: 'details-special-features',
+                elementId: '#special-features-row',
+                isVisible: () => isNotHidden('#special-features-section')
+            },
+            {
+                name: 'details-songs',
+                elementId: '#songs-list',
+                isVisible: () => isNotHidden('#songs-section')
+            },
+            {
+                name: 'artists-section',
+                elementId: '#artists-row',
+                isVisible: () => isNotHidden('#artists-section')
+            },
+            {
+                name: 'guest-stars-section',
+                elementId: '#guest-stars-row',
+                isVisible: () => isNotHidden('#guest-stars-section')
+            },
+            {
+                name: 'details-item-collections',
+                elementId: '#item-collections-row',
+                isVisible: () => isNotHidden('#item-collections-section')
+            },
+            { name: 'details-similar', elementId: '#similar-row', isVisible: () => isNotHidden('#similar-section') },
+            {
+                name: 'details-seerr-recommendations',
+                elementId: '#seerr-recommendations-row',
+                isVisible: () => isNotHidden('#seerr-recommendations-section')
+            }
+        ];
+
+        let foundCurrent = false;
+        for (const section of sections) {
+            if (section.name === currentSectionName) {
+                foundCurrent = true;
+                continue;
+            }
+            if (foundCurrent && section.isVisible()) {
+                return { targetName: section.name, elementId: section.elementId };
+            }
+        }
+        return null;
+    }
+
+    _getPreviousVisibleSection(currentSectionName) {
+        // Helper to check if a section exists and is not hidden
+        const isNotHidden = (id) => {
+            const el = this.$(id);
+            return el && !el.classList.contains('hidden');
+        };
+
+        const sections = [
+            {
+                name: 'details-seerr-recommendations',
+                elementId: '#seerr-recommendations-row',
+                isVisible: () => isNotHidden('#seerr-recommendations-section')
+            },
+            { name: 'details-similar', elementId: '#similar-row', isVisible: () => isNotHidden('#similar-section') },
+            {
+                name: 'details-item-collections',
+                elementId: '#item-collections-row',
+                isVisible: () => isNotHidden('#item-collections-section')
+            },
+            {
+                name: 'guest-stars-section',
+                elementId: '#guest-stars-row',
+                isVisible: () => isNotHidden('#guest-stars-section')
+            },
+            {
+                name: 'artists-section',
+                elementId: '#artists-row',
+                isVisible: () => isNotHidden('#artists-section')
+            },
+            {
+                name: 'details-songs',
+                elementId: '#songs-list',
+                isVisible: () => isNotHidden('#songs-section')
+            },
+            {
+                name: 'details-special-features',
+                elementId: '#special-features-row',
+                isVisible: () => isNotHidden('#special-features-section')
+            },
+            { name: 'details-people', elementId: '#people-row', isVisible: () => isNotHidden('#people-section') },
+            // Additional video parts (multi-part movies/videos)
+            {
+                name: 'details-additional-parts',
+                elementId: '#additional-parts-row',
+                isVisible: () => isNotHidden('#additional-parts-section')
+            },
+            {
+                name: 'more-from-season-section',
+                elementId: '#more-from-season-row',
+                isVisible: () => isNotHidden('#more-from-season-section')
+            },
+            {
+                name: 'details-episodes',
+                elementId: '#episodes-list',
+                isVisible: () => isNotHidden('#episodes-section')
+            },
+            { name: 'details-seasons', elementId: '#seasons-row', isVisible: () => isNotHidden('#seasons-section') },
+            { name: 'details-next-up', elementId: '#next-up-row', isVisible: () => isNotHidden('#next-up-section') },
+
+            // Playlist items — reverse position mirrors _getNextVisibleSection
+            {
+                name: 'details-playlist-items',
+                elementId: '#playlist-items-list',
+                isVisible: () => isNotHidden('#playlist-items-section')
+            },
+
+            // Collection rows (BoxSet contents) - in reverse order
+            {
+                name: 'collection-other-section',
+                elementId: '#collection-other-row',
+                isVisible: () => isNotHidden('#collection-other-section')
+            },
+            {
+                name: 'collection-subcollections-section',
+                elementId: '#collection-subcollections-row',
+                isVisible: () => isNotHidden('#collection-subcollections-section')
+            },
+            {
+                name: 'collection-books-section',
+                elementId: '#collection-books-row',
+                isVisible: () => isNotHidden('#collection-books-section')
+            },
+            {
+                name: 'collection-albums-section',
+                elementId: '#collection-albums-row',
+                isVisible: () => isNotHidden('#collection-albums-section')
+            },
+            {
+                name: 'collection-videos-section',
+                elementId: '#collection-videos-row',
+                isVisible: () => isNotHidden('#collection-videos-section')
+            },
+            {
+                name: 'collection-episodes-section',
+                elementId: '#collection-episodes-row',
+                isVisible: () => isNotHidden('#collection-episodes-section')
+            },
+            {
+                name: 'collection-shows-section',
+                elementId: '#collection-shows-row',
+                isVisible: () => isNotHidden('#collection-shows-section')
+            },
+            {
+                name: 'collection-movies-section',
+                elementId: '#collection-movies-row',
+                isVisible: () => isNotHidden('#collection-movies-section')
+            },
+            // Standard
+            { name: 'details-rich-meta', elementId: '#rich-meta', isVisible: () => !!this.$('#rich-meta')?.innerHTML },
+            {
+                name: 'details-see-more',
+                elementId: '#details-overview',
+                isVisible: () => this.$('.see-more-btn')?.style?.display !== 'none'
+            },
+            { name: 'details-actions', elementId: '#actions', isVisible: () => true } // Actions are always visible
+        ];
+
+        let foundCurrent = false;
+        for (const section of sections) {
+            if (section.name === currentSectionName) {
+                foundCurrent = true;
+                continue;
+            }
+            if (foundCurrent && section.isVisible()) {
+                return { targetName: section.name, elementId: section.elementId };
+            }
+        }
+        return null;
+    }
+
+    async _loadMoreFromSeason() {
+        if (!this._item.SeasonId || !this._item.SeriesId) return;
+
+        const cacheKey = `details:episodes:${this._item.SeriesId}:${this._item.SeasonId}`;
+        let allItems = state.get(cacheKey);
+
+        if (!allItems) {
+            try {
+                const response = await api.getEpisodes(this._item.SeriesId, {
+                    SeasonId: this._item.SeasonId
+                });
+                allItems = response.Items || [];
+                state.set(cacheKey, allItems);
+            } catch (error) {
+                log.warn('Failed to load more from season', error);
+                return;
+            }
+        }
+
+        // Reconcile season episodes with authoritative client state
+        if (allItems && allItems.length > 0) {
+            for (const ep of allItems) {
+                this._reconcileItemWithLastStopped(ep);
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Retrieve preference to determine if we include current episode.
+        // Defaults to false.
+        // -------------------------------------------------------------
+        const includeCurrent = storage.getItem('pref:includeCurrentEpisodeInMoreFromSeason') === 'true';
+
+        // Filter out current episode if preference is disabled, and slice limits to 100 for the row.
+        const siblings = allItems.filter((ep) => includeCurrent || ep.Id !== this._itemId).slice(0, 100);
+
+        if (siblings.length > 0) {
+            // Find index of the current active episode in the siblings list
+            const currentEpisodeIndex = siblings.findIndex((ep) => ep.Id === this._itemId);
+
+            // Pass siblings and focused index down to renderer
+            this._renderMoreFromSeason(siblings, currentEpisodeIndex !== -1 ? currentEpisodeIndex : 0);
+        }
+    }
+
+    _renderMoreFromSeason(episodes, currentEpisodeIndex = 0) {
+        this._renderVirtualRow({
+            sectionId: 'more-from-season-section',
+            listId: 'more-from-season-row',
+            items: episodes,
+            isLandscape: true,
+            titleElText: this._item.SeasonName
+                ? i18n.t('MoreFromValue', [
+                      this._item.SeasonName.toLowerCase().startsWith('season ')
+                          ? this._item.SeasonName.replace(/season\s+/i, i18n.t('Season') + ' ')
+                          : /^\d+$/.test(this._item.SeasonName)
+                            ? i18n.t('Season') + ' ' + this._item.SeasonName
+                            : this._item.SeasonName
+                  ])
+                : null,
+            // -------------------------------------------------------------
+            // Pass option down to CardRenderer indicating if this is the active episode details page
+            // -------------------------------------------------------------
+            renderCard: (ep) =>
+                this._renderMediaCard(ep, true, 'episode', {
+                    isCurrentEpisode: ep.Id === this._itemId
+                }),
+            focusSectionName: 'more-from-season-section',
+            currentIndex: currentEpisodeIndex
+        });
+    }
+
+    async _loadGuestStars() {
+        // Guest stars are usually included in the episode's People array with Type 'GuestStar' or 'Guest'
+        // or just 'Actor' but specific to the episode.
+        // In many setups, if they aren't 'Director' or 'Writer' or 'Producer', they are actors.
+        const guestStars = (this._item.People || []).filter((p) => p.Type === 'GuestStar' || p.Role === 'Guest Star');
+        const hideCast = storage.getItem('pref:hideCastSection') === 'true';
+
+        if (guestStars.length > 0 && !hideCast) {
+            this._renderGuestStars(guestStars);
+        } else if (hideCast) {
+            const guestStarsSection = this.$('#guest-stars-section');
+            if (guestStarsSection) guestStarsSection.classList.add('hidden');
+        }
+    }
+
+    _renderGuestStars(people) {
+        this._renderVirtualRow({
+            sectionId: 'guest-stars-section',
+            listId: 'guest-stars-row',
+            items: people,
+            isLandscape: false,
+            cardType: 'person',
+            renderCard: (p) => this._renderMediaCard(p, false, 'person'),
+            focusSectionName: 'guest-stars-section',
+            onClick: (card) => {
+                if (card.dataset.itemId) router.navigate(`/person/${card.dataset.itemId}`);
+            }
+        });
+    }
+
+    _updateLeaveDown(sectionName, targetName) {
+        const config = focusManager.getSectionConfig(sectionName);
+        if (!config) return;
+
+        // ONLY update leaveDown - do NOT touch leaveUp!
+        // leaveUp is set correctly during initial section registration.
+        // This function is specifically for linking DOWN direction.
+        const next = this._getNextVisibleSection(sectionName);
+        config.leaveDown = targetName || (next ? next.targetName : null);
+
+        // Re-register to apply changes (preserves existing leaveUp)
+        focusManager.register(sectionName, config.container, config);
+    }
+
+    async _loadSimilar() {
+        // -------------------------------------------------------------------------
+        // Performance & Visibility Control Check
+        // -------------------------------------------------------------------------
+        // Check if the user has enabled the "Hide More Like This" appearance option.
+        // By handling this check first, we can short-circuit the entire block,
+        // preventing unnecessary network requests and API server load.
+        const hideSimilar = storage.getItem('pref:hideSimilarSection') === 'true';
+
+        if (hideSimilar) {
+            // Find the container section in the DOM
+            const similarSection = this.$('#similar-section');
+            if (similarSection) {
+                // Keep the section hidden to prevent empty layout gaps
+                similarSection.classList.add('hidden');
+            }
+            // Exit early to completely avoid fetching metadata from the server
+            return;
+        }
+
+        try {
+            const cacheKey = `details:similar:${this._itemId}`;
+            const cachedSimilar = state.get(cacheKey);
+
+            if (cachedSimilar) {
+                this._similar = cachedSimilar;
+            } else {
+                const response = await api.getSimilar(this._itemId);
+                this._similar = response.Items || [];
+                // Cache the randomized result for the duration of the session
+                // so Back navigation restores the exact same row.
+                if (this._similar.length > 0) {
+                    state.set(cacheKey, this._similar);
+                }
+            }
+
+            if (this._similar.length > 0) {
+                this._renderSimilar();
+            }
+        } catch (error) {
+            log.warn('Failed to load similar', error);
+            if (this.$('#similar-section')) {
+                this.$('#similar-section').classList.add('hidden');
+            }
+        }
+    }
+
+    _renderSimilar() {
+        if (!this._similar || this._similar.length === 0) return;
+
+        const useSquare =
+            this._item.Type === 'MusicAlbum' || this._item.Type === 'Audio' || this._item.Type === 'TvChannel';
+
+        this._renderVirtualRow({
+            sectionId: 'similar-section',
+            listId: 'similar-row',
+            items: this._similar,
+            isLandscape: false,
+            renderCard: (item) => {
+                return this._renderMediaCard(item, false, useSquare ? 'square' : 'poster');
+            },
+            focusSectionName: 'details-similar',
+            cardType: useSquare ? 'square' : 'poster'
+        });
+    }
+
+    /**
+     * Resolves and caches the parent Series item for Season or Episode items.
+     * Ensures we have access to the Series TMDb ID for Seerr recommendations.
+     * Checks in-memory state cache first, then falls back to fetching from Jellyfin API.
+     *
+     * @returns {Promise<Object|null>} Resolved series item, or null if not applicable.
+     */
+    async _getParentSeriesItem() {
+        if (!this._item) return null;
+
+        // If active item is already a Series, return it immediately
+        if (this._item.Type === 'Series') {
+            return this._item;
+        }
+
+        // Only Season and Episode items belong to a parent Series
+        if (this._item.Type !== 'Season' && this._item.Type !== 'Episode') {
+            return null;
+        }
+
+        // Determine the series ID from the item metadata
+        let seriesId = this._item.SeriesId;
+
+        // For Season, ParentId in Jellyfin is the series ID
+        if (!seriesId && this._item.Type === 'Season' && this._item.ParentId) {
+            seriesId = this._item.ParentId;
+        }
+
+        // For Episode, if SeriesId is missing, resolve via season parent
+        if (!seriesId && this._item.Type === 'Episode') {
+            const seasonId = this._item.SeasonId || this._item.ParentId;
+            if (seasonId) {
+                // Check if season is already in memory cache
+                const cachedSeason = state.get(`details:season:${seasonId}`);
+                if (cachedSeason?.SeriesId) {
+                    seriesId = cachedSeason.SeriesId;
+                } else {
+                    try {
+                        const seasonItem = await api.getItem(seasonId);
+                        if (seasonItem) {
+                            state.set(`details:season:${seasonId}`, seasonItem);
+                            seriesId = seasonItem.SeriesId || seasonItem.ParentId;
+                        }
+                    } catch (err) {
+                        log.warn('Failed to resolve season parent for episode:', err);
+                    }
+                }
+            }
+        }
+
+        if (!seriesId) return null;
+
+        // Check if parent series is already cached in memory
+        let series = this._parentSeries || state.get(`details:series:${seriesId}`);
+
+        // If not cached or missing provider IDs, fetch the series from server
+        if (!series || (!series.ProviderIds && !series.SeriesTmdbId)) {
+            try {
+                series = await api.getItem(seriesId, {
+                    Fields: 'ProviderIds,SeriesTmdbId'
+                });
+                if (series) {
+                    state.set(`details:series:${seriesId}`, series);
+                    this._parentSeries = series;
+                }
+            } catch (err) {
+                log.warn(`Failed to fetch parent series ${seriesId}:`, err);
+            }
+        } else if (!this._parentSeries) {
+            this._parentSeries = series;
+        }
+
+        return series;
+    }
+
+    /**
+     * Resolves the media type and TMDb ID required for querying Seerr recommendations.
+     * Handles movies directly and resolves TV series parent metadata for seasons and episodes.
+     *
+     * @returns {Promise<{ mediaType: string, tmdbId: string|number }|null>}
+     */
+    async _resolveSeerrTarget() {
+        if (!this._item) return null;
+
+        const type = this._item.Type;
+
+        // 1. Movie handling
+        if (type === 'Movie') {
+            const tmdbId = this._item.ProviderIds?.Tmdb || this._item.ProviderIds?.tmdb || this._item.ProviderIds?.TMDB;
+            if (!tmdbId) return null;
+            return { mediaType: 'movie', tmdbId };
+        }
+
+        // 2. TV Series, Season, and Episode handling
+        if (type === 'Series' || type === 'Season' || type === 'Episode') {
+            const series = await this._getParentSeriesItem();
+            const tmdbId =
+                series?.ProviderIds?.Tmdb ||
+                series?.ProviderIds?.tmdb ||
+                series?.ProviderIds?.TMDB ||
+                series?.SeriesTmdbId ||
+                this._item.SeriesTmdbId ||
+                this._item.SeriesProviderIds?.Tmdb ||
+                this._item.SeriesProviderIds?.tmdb;
+
+            if (!tmdbId) return null;
+            return { mediaType: 'tv', tmdbId };
+        }
+
+        return null;
+    }
+
+    /**
+     * Loads recommendations from Seerr companion service for movies, series, seasons, and episodes.
+     * Evaluates user preferences and service availability before dispatching network requests.
+     */
+    async _loadSeerrRecommendations() {
+        // -------------------------------------------------------------------------
+        // 1. User Preference & Service Availability Check
+        // -------------------------------------------------------------------------
+        const isEnabled = storage.getItem('pref:SeerrRecommendations') !== 'false';
+        const section = this.$('#seerr-recommendations-section');
+
+        if (!isEnabled) {
+            if (section) section.classList.add('hidden');
+            return;
+        }
+
+        // Verify that Seerr companion service is configured and reachable
+        let isAvailable = false;
+        try {
+            isAvailable = await seerr.isAvailable();
+        } catch (e) {
+            log.warn('Failed to verify Seerr availability:', e);
+        }
+
+        if (!isAvailable) {
+            if (section) section.classList.add('hidden');
+            return;
+        }
+
+        // -------------------------------------------------------------------------
+        // 2. TMDb Identification & Media Type Resolution
+        // -------------------------------------------------------------------------
+        const target = await this._resolveSeerrTarget();
+        if (!target || !target.tmdbId) {
+            if (section) section.classList.add('hidden');
+            return;
+        }
+
+        // -------------------------------------------------------------------------
+        // 3. Data Retrieval with In-Memory Caching
+        // -------------------------------------------------------------------------
+        try {
+            const cacheKey = `details:seerr-recommendations:${target.mediaType}:${target.tmdbId}`;
+            const cached = state.get(cacheKey);
+
+            if (cached && Array.isArray(cached) && cached.length > 0) {
+                this._seerrRecommendations = cached;
+            } else {
+                const recs = await seerr.recommendations(target.mediaType, target.tmdbId);
+                this._seerrRecommendations = Array.isArray(recs) ? recs : [];
+                if (this._seerrRecommendations.length > 0) {
+                    state.set(cacheKey, this._seerrRecommendations);
+                }
+            }
+
+            // -------------------------------------------------------------------------
+            // 4. Render Virtual Card Row
+            // -------------------------------------------------------------------------
+            if (this._seerrRecommendations && this._seerrRecommendations.length > 0) {
+                this._renderSeerrRecommendations(target.mediaType);
+            } else {
+                if (section) section.classList.add('hidden');
+            }
+        } catch (error) {
+            log.warn('Failed to load Seerr recommendations:', error);
+            if (section) section.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Renders the Seerr recommendations virtual row using poster cards and status badges.
+     * Handles card click navigation to Seerr details with focus restoration state.
+     *
+     * @param {string} fallbackMediaType - Default media type ('movie'|'tv')
+     */
+    _renderSeerrRecommendations(fallbackMediaType = 'movie') {
+        if (!this._seerrRecommendations || this._seerrRecommendations.length === 0) return;
+
+        this._renderVirtualRow({
+            sectionId: 'seerr-recommendations-section',
+            listId: 'seerr-recommendations-row',
+            items: this._seerrRecommendations,
+            isLandscape: false,
+            renderCard: (item) => {
+                // CardRenderer natively formats Seerr items with status badges and poster artwork
+                return CardRenderer.createCardHtml(item, { type: 'poster' });
+            },
+            focusSectionName: 'details-seerr-recommendations',
+            cardType: 'poster',
+            onClick: (card) => {
+                // Resolve clicked item metadata
+                const cardId = card.dataset.itemId || card.dataset.id;
+                const target =
+                    this._seerrRecommendations?.find(
+                        (i) => String(i.Id) === String(cardId) || String(i._tmdbId) === String(cardId)
+                    ) || null;
+
+                const tmdbId = card.dataset.tmdbId || target?._tmdbId;
+                const mediaType = card.dataset.mediaType || target?._mediaType || fallbackMediaType;
+
+                if (tmdbId) {
+                    // Record last focused item for back-navigation restoration
+                    const stateKey = `details:lastFocusedItem:${this._itemId}`;
+                    if (storage.getItem('pref:disableFocusRestore') !== 'true') {
+                        state.set(stateKey, {
+                            itemId: cardId || target?.Id || tmdbId,
+                            sectionId: 'details-seerr-recommendations'
+                        });
+                    }
+
+                    log.info(`Navigating to Seerr details page: /seerr/${mediaType}/${tmdbId}`);
+                    router.navigate(`/seerr/${mediaType}/${tmdbId}`);
+                }
+            }
+        });
+    }
+
+    /**
+     * Fetch additional video parts for multi-part items (e.g. Part 2, Part 3 of a multi-disc movie).
+     * Populates the Additional Parts section so users can view or start playback from any part.
+     */
+    async _loadAdditionalParts() {
+        if (!['Movie', 'Video'].includes(this._item?.Type) && !(this._item?.PartCount > 1)) {
+            return;
+        }
+
+        try {
+            log.info('Fetching additional parts for item ID:', this._itemId);
+
+            // Primary item ID to query additional parts for
+            const targetId = this._item.PrimaryItemId || this._itemId;
+            const response = await api.getAdditionalParts(targetId);
+            const additionalParts = response?.Items || [];
+
+            if (additionalParts.length > 0) {
+                log.info(`Loaded ${additionalParts.length} additional video part(s) for item ${targetId}`);
+
+                // If current item is the primary item (Part 1), compile full list [this._item, ...additionalParts]
+                const allParts = [this._item, ...additionalParts];
+
+                // Ensure each part has clean display indexing if missing from server payload
+                allParts.forEach((part, index) => {
+                    if (!part.PartIndex) {
+                        part.PartIndex = index + 1;
+                    }
+                });
+
+                this._renderAdditionalParts(allParts);
+            }
+        } catch (error) {
+            log.warn('Failed to load additional parts for item:', error);
+        }
+    }
+
+    /**
+     * Render the Additional Parts row using Virtual Card Row.
+     * Allows selecting and initiating playback directly from any specific part.
+     * @param {Object[]} parts - Array of video part items
+     */
+    _renderAdditionalParts(parts) {
+        const section = this.$('#additional-parts-section');
+        const container = this.$('#additional-parts-row');
+
+        if (!section || !container || !parts || parts.length === 0) return;
+
+        // Reveal the section on the Details Page
+        section.classList.remove('hidden');
+
+        // Render virtual horizontal card row for additional parts
+        this._renderVirtualRow({
+            sectionId: 'additional-parts-section',
+            listId: 'additional-parts-row',
+            items: parts,
+            isLandscape: true,
+            cardType: 'thumb',
+            renderCard: (partItem) => {
+                // Ensure card displays Part suffix if available
+                const partLabel = partItem.PartIndex ? ` (Part ${partItem.PartIndex})` : '';
+                const displayItem = {
+                    ...partItem,
+                    Name: partItem.Name?.includes('Part') ? partItem.Name : `${this._item.Name}${partLabel}`
+                };
+                return this._renderMediaCard(displayItem, true, 'thumb');
+            },
+            focusSectionName: 'details-additional-parts',
+            onClick: (card) => {
+                const targetItemId = card.dataset.itemId || card.dataset.id;
+                if (targetItemId) {
+                    log.info('Additional part card selected, launching playback from part ID:', targetItemId);
+                    const partToPlay = parts.find((p) => p.Id === targetItemId) || this._item;
+                    this._play({ targetItem: partToPlay });
+                }
+            }
+        });
+    }
+
+    async _loadItemCollections() {
+        try {
+            const cacheKey = `details:collections:${this._itemId}`;
+            let collections = state.get(cacheKey);
+
+            if (!collections) {
+                const response = await api.getItemCollections(this._itemId);
+                collections = response.Items || [];
+                if (collections.length > 0) {
+                    state.set(cacheKey, collections);
+                }
+            }
+
+            this._itemCollections = collections;
+
+            if (this._itemCollections.length > 0) {
+                this._renderItemCollections();
+            } else {
+                const section = this.$('#item-collections-section');
+                if (section) {
+                    section.classList.add('hidden');
+                }
+            }
+        } catch (error) {
+            log.debug('Item has no collections or failed to fetch collections', error?.message || error);
+            const section = this.$('#item-collections-section');
+            if (section) {
+                section.classList.add('hidden');
+            }
+        }
+    }
+
+    _renderItemCollections() {
+        if (!this._itemCollections || this._itemCollections.length === 0) return;
+
+        this._renderVirtualRow({
+            sectionId: 'item-collections-section',
+            listId: 'item-collections-row',
+            items: this._itemCollections,
+            isLandscape: false,
+            renderCard: (item) => {
+                return this._renderMediaCard(item, false, 'poster');
+            },
+            focusSectionName: 'details-item-collections',
+            cardType: 'poster'
+        });
+    }
+
+    async _play({ resume = false, isShufflePlay = false, ghostMode = false, targetItem = null } = {}) {
+        /*
+         * Allow initiating playback directly from a specific target item (e.g. Part 2 or Part 3
+         * selected from the Additional Parts section on the details page).
+         */
+        let itemToPlay = targetItem || this._item;
+
+        // If this item is a JellyEmu game ROM, bypass video player completely
+        // and navigate directly to the dedicated EmulatorPage host.
+        if (this._isGame(this._item)) {
+            log.info('JellyEmu Game detected. Navigating to EmulatorPage for item ID:', this._item.Id);
+            router.navigate(`/emulator/${this._item.Id}`);
+            return;
+        }
+
+        // If it's a Live TV Program, play the parent Channel instead
+        if (this._item.Type === 'Program' && this._item.ChannelId) {
+            log.info('Live TV Program detected. Playing parent Channel instead.');
+            itemToPlay = {
+                Id: this._item.ChannelId,
+                Type: 'TvChannel',
+                Name: this._item.ChannelName || this._item.Name
+                // Pass along other context if needed, but Id and Type are the critical ones for PlayQueue
+            };
+        } else if (this._item.Type === 'BoxSet') {
+            try {
+                // Fetch first item in collection (recursive)
+                // We prefer Movies over Episodes to match the visual row priority
+                let sortBy = 'PremiereDate';
+                if (this._item?.DisplayOrder === 'SortName') {
+                    sortBy = 'SortName';
+                } else if (this._item?.DisplayOrder === 'Default') {
+                    sortBy = 'DateModified';
+                } else if (this._item?.DisplayOrder === 'PremiereDate') {
+                    sortBy = 'PremiereDate';
+                }
+
+                const sortParams = isShufflePlay ? { SortBy: 'Random' } : { SortBy: sortBy, SortOrder: 'Ascending' };
+                const [movies, episodes, audio] = await Promise.all([
+                    api.getItems({
+                        ParentId: this._item.Id,
+                        Recursive: true,
+                        IncludeItemTypes: 'Movie',
+                        Limit: 1,
+                        ...sortParams
+                    }),
+                    api.getItems({
+                        ParentId: this._item.Id,
+                        Recursive: true,
+                        IncludeItemTypes: 'Episode',
+                        Limit: 1,
+                        ...sortParams
+                    }),
+                    api.getItems({
+                        ParentId: this._item.Id,
+                        Recursive: true,
+                        IncludeItemTypes: 'Audio',
+                        Limit: 1,
+                        ...sortParams
+                    })
+                ]);
+
+                if (isShufflePlay) {
+                    const allItems = [...(movies.Items || []), ...(episodes.Items || []), ...(audio.Items || [])];
+                    if (allItems.length > 0) {
+                        itemToPlay = allItems[Math.floor(Math.random() * allItems.length)];
+                    } else {
+                        return; // Empty collection
+                    }
+                } else {
+                    if (movies.Items && movies.Items.length > 0) {
+                        itemToPlay = movies.Items[0];
+                    } else if (episodes.Items && episodes.Items.length > 0) {
+                        itemToPlay = episodes.Items[0];
+                    } else if (audio.Items && audio.Items.length > 0) {
+                        itemToPlay = audio.Items[0];
+                    } else {
+                        return; // Empty collection
+                    }
+                }
+                // If the item doesn't have a CollectionType, try to infer it from its Type
+                if (!itemToPlay.CollectionType) {
+                    if (['MusicAlbum', 'MusicArtist', 'Audio', 'MusicGenre'].includes(itemToPlay.Type)) {
+                        itemToPlay.CollectionType = 'music';
+                    } else if (['Series', 'Season', 'Episode', 'TvChannel'].includes(itemToPlay.Type)) {
+                        itemToPlay.CollectionType = 'tvshows';
+                    } else if (['Movie', 'BoxSet'].includes(itemToPlay.Type)) {
+                        itemToPlay.CollectionType = 'movies';
+                    }
+                }
+
+                // Attach context so PlayQueue knows this is a collection play.
+                // We also pass the resolved sortBy so _initBoxSetQueue can order
+                // the full queue the same way the display grid is ordered.
+                itemToPlay.contextType = 'boxset';
+                itemToPlay.contextId = this._item.Id;
+                itemToPlay.boxsetSortBy = sortBy;
+            } catch (e) {
+                log.error('Failed to play collection', e);
+                return;
+            }
+        } else if (this._item.Type === 'Season') {
+            if (this._episodes?.length > 0) {
+                let target;
+                if (isShufflePlay) {
+                    target = this._episodes[Math.floor(Math.random() * this._episodes.length)];
+                } else if (this._nextUp?.length > 0) {
+                    /*
+                     * If an upcoming episode within this season was resolved,
+                     * prioritize playing it when user triggers playback on the season.
+                     */
+                    target = this._nextUp[0];
+                    if (target.UserData?.PlaybackPositionTicks > 0) {
+                        resume = true;
+                    }
+                } else {
+                    target = this._episodes.find((ep) => !ep.UserData?.Played) || this._episodes[0];
+                }
+                itemToPlay = { ...target };
+            } else {
+                try {
+                    const fields = 'Overview,RunTimeTicks,Chapters';
+                    if (isShufflePlay) {
+                        const randomEp = await api.getItems({
+                            ParentId: this._item.Id,
+                            Recursive: true,
+                            IncludeItemTypes: 'Episode',
+                            Limit: 1,
+                            SortBy: 'Random',
+                            Fields: fields
+                        });
+                        if (randomEp && randomEp.Items && randomEp.Items.length > 0) {
+                            itemToPlay = randomEp.Items[0];
+                        } else {
+                            return;
+                        }
+                    } else {
+                        const firstEp = await api.getItems({
+                            ParentId: this._item.Id,
+                            Recursive: true,
+                            IncludeItemTypes: 'Episode',
+                            Limit: 1,
+                            SortBy: 'ParentIndexNumber,IndexNumber',
+                            Fields: fields
+                        });
+                        if (firstEp && firstEp.Items && firstEp.Items.length > 0) {
+                            itemToPlay = firstEp.Items[0];
+                        } else {
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    log.error('Failed to resolve season fallback playback', e);
+                    return;
+                }
+            }
+            // Attach context so PlayQueue knows this is a season play
+            itemToPlay.contextType = 'season';
+            itemToPlay.contextId = this._item.Id;
+        } else if (this._item.Type === 'Series') {
+            if (this._episodes?.length > 0) {
+                if (isShufflePlay) {
+                    itemToPlay = this._episodes[Math.floor(Math.random() * this._episodes.length)];
+                } else {
+                    itemToPlay = this._episodes.find((ep) => !ep.UserData?.Played) || this._episodes[0];
+                }
+            } else {
+                try {
+                    if (isShufflePlay) {
+                        const randomEp = await api.getItems({
+                            ParentId: this._item.Id,
+                            Recursive: true,
+                            IncludeItemTypes: 'Episode',
+                            Limit: 1,
+                            SortBy: 'Random'
+                        });
+                        if (randomEp && randomEp.Items && randomEp.Items.length > 0) {
+                            itemToPlay = randomEp.Items[0];
+                        } else {
+                            return;
+                        }
+                    } else {
+                        // 1. Try to get "Next Up" for this series
+                        let nextUp;
+                        if (api.isEmby()) {
+                            // On Emby, /Shows/NextUp does not filter by SeriesId.
+                            // We fetch the oldest unplayed episode of the series via /Items instead.
+                            nextUp = await api.getItems({
+                                ParentId: this._item.Id,
+                                Recursive: true,
+                                IncludeItemTypes: 'Episode',
+                                Limit: 1,
+                                Filters: 'IsUnplayed',
+                                SortBy: 'ParentIndexNumber,IndexNumber',
+                                Fields: 'SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags'
+                            });
+                        } else {
+                            // On Jellyfin, query next up directly using SeriesId parameter.
+                            nextUp = await api.getNextUp({ SeriesId: this._item.Id, Limit: 1 });
+                        }
+
+                        if (nextUp && nextUp.Items && nextUp.Items.length > 0) {
+                            itemToPlay = nextUp.Items[0];
+                            // Auto-resume if it has progress
+                            if (itemToPlay.UserData?.PlaybackPositionTicks > 0) {
+                                resume = true;
+                            }
+                        } else {
+                            // 2. Fallback to first episode ever (e.g. S1E1)
+                            const firstEp = await api.getItems({
+                                ParentId: this._item.Id,
+                                Recursive: true,
+                                IncludeItemTypes: 'Episode',
+                                Limit: 1,
+                                SortBy: 'SortName'
+                            });
+                            if (firstEp && firstEp.Items && firstEp.Items.length > 0) {
+                                itemToPlay = firstEp.Items[0];
+                            }
+                        }
+                    }
+                } catch (e) {
+                    log.error('Failed to resolve series playback', e);
+                    return;
+                }
+            }
+        }
+
+        // ── Playlist playback ────────────────────────────────────────────────
+        // Playlists have no direct MediaSource, so we resolve the first item
+        // (or a random one for shuffle) and hand contextType:'playlist' to the
+        // PlayQueue so it fetches and sequences the entire list for auto-advance.
+        if (this._item.Type === 'Playlist') {
+            if (this._playlistItems?.length > 0) {
+                // Use the already-fetched items (instant, no extra network round-trip)
+                itemToPlay = isShufflePlay
+                    ? this._playlistItems[Math.floor(Math.random() * this._playlistItems.length)]
+                    : this._playlistItems[0];
+            } else {
+                // Items not yet loaded (user pressed Play before the grid rendered)
+                try {
+                    const result = await api.getPlaylistItems(this._item.Id, { Limit: 1 });
+                    if (result?.Items?.length > 0) {
+                        itemToPlay = result.Items[0];
+                    } else {
+                        log.warn('Playlist is empty, nothing to play');
+                        return;
+                    }
+                } catch (e) {
+                    log.error('Failed to resolve playlist playback item', e);
+                    return;
+                }
+            }
+            // Tag context so PlayQueue._initPlaylistQueue() builds the full ordered list
+            itemToPlay.contextType = 'playlist';
+            itemToPlay.contextId = this._item.Id;
+        }
+
+        // ====================================================================
+        // Player Transition Backdrop Reuse
+        // ====================================================================
+        // Reuse the exact cached backdrop URL rendered in _loadImages() to
+        // ensure an immediate browser cache hit without forcing the server to
+        // perform on-the-fly 4K bilinear upscaling or lossy recompression.
+        // Falls back to imageService details-backdrop settings if called early.
+        // ====================================================================
+        const backdropParams = imageService.getParams('details-backdrop');
+        const backdropUrl =
+            this._backdropUrl ||
+            BackdropManager.getBackdropUrl(this._item, {
+                maxWidth: backdropParams.maxWidth,
+                quality: backdropParams.quality
+            });
+
+        eventBus.emit('player:play', {
+            item: itemToPlay,
+            resume: ghostMode ? false : resume,
+            mediaSourceId: this._selectedMediaSourceId,
+            audioStreamIndex: this._selectedAudioIndex,
+            subtitleStreamIndex: this._selectedSubtitleIndex,
+            backdropUrl,
+            ghostMode,
+            isShufflePlay
+        });
+    }
+
+    /**
+     * ========================================================================
+     * Shuffled Playback Entry Point
+     * ========================================================================
+     * Initiates playback in shuffle mode.
+     * The shuffle flag is forwarded directly in the `isShufflePlay` payload to
+     * the central player launcher in App.js. Shuffle mode is activated on the
+     * queue only once the item has been validated and playback starts, preventing
+     * premature state leakage if resolution fails or exits early.
+     */
+    _shufflePlay() {
+        // Delegate directly to _play with the shuffle intent enabled
+        this._play({ isShufflePlay: true });
+    }
+
+    _showAudioTrackMenu() {
+        const mediaSource =
+            this._item?.MediaSources?.find((m) => m.Id === this._selectedMediaSourceId) ||
+            this._item?.MediaSources?.[0];
+        if (!mediaSource?.MediaStreams) return;
+
+        const key = 'Audio';
+        const tracks = mediaSource.MediaStreams.filter((s) => s.Type === key);
+
+        // Find current selection (or default)
+        let currentIndex = this._selectedAudioIndex;
+        if (currentIndex === undefined) {
+            const bestStream = resolveBestAudioStream(mediaSource);
+            if (bestStream) {
+                currentIndex = bestStream.Index;
+            } else {
+                const defaultStream = tracks.find(
+                    (s) => s.Index === this._item.MediaSources[0].DefaultAudioStreamIndex
+                );
+                currentIndex = defaultStream ? defaultStream.Index : tracks[0]?.Index || 0;
+            }
+        }
+
+        this._renderTrackSelectionMenu(i18n.t('Audio'), tracks, currentIndex, (index) => {
+            if (this._selectedAudioIndex === index) return;
+
+            this._selectedAudioIndex = index;
+            log.info('Selected Audio Index:', index);
+
+            // Persist track selection per-item and series-wide with full metadata to survive re-indexing
+            const activeTrack = tracks.find((s) => s.Index === index);
+            MediaHelper.saveTrackMemory(
+                this._itemId,
+                'Audio',
+                activeTrack || index,
+                mediaSource,
+                this._item?.SeriesId || null
+            );
+
+            // Re-render hero header to update the audio specifications pill
+            this._renderHeroText();
+            // Re-trigger zero-latency prewarm with updated audio track selection
+            if (
+                this._item &&
+                (this._item.Type === 'Movie' ||
+                    this._item.Type === 'Episode' ||
+                    this._item.Type === 'Video' ||
+                    this._item.Type === 'Trailer')
+            ) {
+                prewarmManager.prewarm(this._item, {
+                    mediaSourceId: this._selectedMediaSourceId || this._item.MediaSources?.[0]?.Id,
+                    audioStreamIndex: index,
+                    subtitleStreamIndex: this._selectedSubtitleIndex
+                });
+            }
+        });
+    }
+
+    _showSubtitleTrackMenu() {
+        // Find the selected media source (or default to the first one)
+        const mediaSource =
+            this._item?.MediaSources?.find((m) => m.Id === this._selectedMediaSourceId) ||
+            this._item?.MediaSources?.[0];
+        // Guard check: Ensure media source streams exist
+        if (!mediaSource?.MediaStreams) return;
+
+        const key = 'Subtitle';
+
+        // =========================================================================
+        // PGS Subtitle Filter Guard
+        //
+        // If the user has disabled PGS rendering completely in settings ('disable'),
+        // we want to exclude PGS tracks from the list of subtitle tracks that the
+        // user can manually select in the details page subtitle menu.
+        // =========================================================================
+        const disablePgs = PlayerSettings.get('pgsPlaybackMode') === 'disable';
+        const tracks = mediaSource.MediaStreams.filter((s) => {
+            // Match subtitle type
+            if (s.Type !== key) return false;
+
+            // Skip disabled PGS tracks
+            if (disablePgs) {
+                const codec = (s.Codec || '').toLowerCase();
+                if (codec === 'pgs' || codec === 'pgssub') {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // ---------------------------------------------------------------------
+        // Determine Current Track Selection Index
+        // ---------------------------------------------------------------------
+        // If a selection has not yet been locked in, resolve it according to the
+        // active Subtitle Mode preference (e.g. None, OnlyForced, Default, Always)
+        let currentIndex = this._selectedSubtitleIndex;
+        const effectiveSubMode = getEffectiveSubtitleMode();
+        if (currentIndex === undefined || (effectiveSubMode === 'Always' && currentIndex === -1)) {
+            currentIndex = resolveSubtitleStream(mediaSource, {
+                audioStreamIndex: this._selectedAudioIndex
+            });
+        }
+
+        // Add "Off" option to the selection track list
+        const displayTracks = [{ Index: -1, DisplayTitle: i18n.t('Off'), Title: i18n.t('Off') }, ...tracks];
+
+        // Render the track selection menu modal on screen
+        this._renderTrackSelectionMenu(i18n.t('Subtitles'), displayTracks, currentIndex, (index) => {
+            // Guard check: If selection did not change, skip update
+            if (this._selectedSubtitleIndex === index) return;
+
+            // Update local selected index and log the choice
+            this._selectedSubtitleIndex = index;
+            log.info('Selected Subtitle Index:', index);
+
+            // Persist track selection per-item and series-wide with full metadata to survive re-indexing
+            const activeTrack = displayTracks.find((s) => s.Index === index);
+            MediaHelper.saveTrackMemory(
+                this._itemId,
+                'Subtitle',
+                activeTrack || index,
+                mediaSource,
+                this._item?.SeriesId || null
+            );
+
+            // Re-trigger zero-latency prewarm with updated subtitle track selection
+            if (
+                this._item &&
+                (this._item.Type === 'Movie' ||
+                    this._item.Type === 'Episode' ||
+                    this._item.Type === 'Video' ||
+                    this._item.Type === 'Trailer')
+            ) {
+                prewarmManager.prewarm(this._item, {
+                    mediaSourceId: this._selectedMediaSourceId || this._item.MediaSources?.[0]?.Id,
+                    audioStreamIndex: this._selectedAudioIndex,
+                    subtitleStreamIndex: index
+                });
+            }
+        });
+    }
+
+    _renderTrackSelectionMenu(title, tracks, currentIndex, onSelect) {
+        // Store focus context for restoration
+        this._prevFocus = focusManager.getFocused();
+        this._prevSection = focusManager.getActiveSection();
+
+        // Check if this is an audio or subtitle stream selection menu
+        const isTrackSelection = title.toLowerCase().includes('subtitle') || title.toLowerCase().includes('audio');
+        const totalRawTracks = tracks;
+        let displayTracks = tracks;
+        let isFiltered = false;
+
+        if (isTrackSelection && languageManager.hasFavorites()) {
+            if (!this._detailsShowAllTracks) {
+                const filtered = tracks.filter(
+                    (t) => t.Index === -1 || t.Index === currentIndex || languageManager.isFavoriteTrack(t)
+                );
+                if (filtered.length < tracks.length) {
+                    displayTracks = filtered;
+                    isFiltered = true;
+                }
+            } else {
+                isFiltered = true;
+            }
+        }
+
+        // Reuse or create overlay
+        let overlay = document.getElementById('details-track-menu');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'details-track-menu';
+            overlay.className = 'modal-overlay visible';
+            document.body.appendChild(overlay);
+        } else {
+            overlay.classList.add('visible');
+        }
+
+        // Generate HTML - Using settings-modal structure
+        let toggleAllHtml = '';
+        if (isFiltered) {
+            const toggleLabel = this._detailsShowAllTracks
+                ? `★ ${i18n.t('ShowFavoriteTracksOnly') || 'Show Favorites Only'}`
+                : `★ ${i18n.t('ShowAllTracks') || 'Show All Tracks'} (${totalRawTracks.length})`;
+            toggleAllHtml = `
+                <button class="modal-option-btn details-track-toggle-btn" tabindex="0">
+                    <span class="track-option-label">
+                        <span class="track-label-text">${toggleLabel}</span>
+                    </span>
+                </button>
+            `;
+        }
+
+        const optionsHtml = displayTracks
+            .map((track, i) => {
+                const isSelected = track.Index === currentIndex;
+                const label =
+                    track.DisplayTitle || track.Title || track.Language || i18n.t('TrackIndex', [track.Index]);
+                let metadataHtml = '';
+
+                // For subtitles, add Type and Location metadata
+                if (title.toLowerCase().includes('subtitle') && track.Index !== -1) {
+                    const type = (track.Codec || '').toUpperCase();
+                    const location = track.IsExternal ? 'EXT' : 'INT';
+                    metadataHtml = `
+                        <span class="track-badge">${type}</span>
+                        <span class="track-badge">${location}</span>
+                    `;
+                }
+
+                // For version selection, add resolution metadata
+                if (title === i18n.t('SelectVersion') && track.Id) {
+                    const resolution = track.Height ? `${track.Height}p` : '';
+
+                    if (resolution) {
+                        metadataHtml = `
+                            <span class="track-badge">${resolution}</span>
+                        `;
+                    }
+                }
+
+                return `
+                <button class="modal-option-btn ${isSelected ? 'selected' : ''}" data-index="${track.Index}" tabindex="0">
+                    <div class="check-icon">
+                        ${detailsIcons.check}
+                    </div>
+                    <span class="track-option-label">
+                        <span class="track-label-text">${label}</span>
+                        ${metadataHtml}
+                    </span>
+                </button>
+            `;
+            })
+            .join('');
+
+        overlay.innerHTML = `
+            <div class="settings-modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h2>${title}</h2>
+                </div>
+                <div class="modal-options">
+                    ${optionsHtml}
+                    ${toggleAllHtml}
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-action-btn" id="btn-modal-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+                </div>
+            </div>
+        `;
+
+        // Focus management - Register as a new section
+        const optionsContainer = overlay.querySelector('.modal-options');
+        const actionsContainer = overlay.querySelector('.modal-actions');
+        const optionsSection = 'details-track-menu';
+        const actionsSection = 'details-track-menu-actions';
+
+        this._isTrackMenuOpen = true;
+
+        // Register the options section
+        focusManager.register(optionsSection, optionsContainer, {
+            orientation: 'vertical',
+            leaveDown: actionsSection,
+            leaveUp: actionsSection,
+            enterTo: 'active-element',
+            defaultElement:
+                overlay.querySelector('.modal-option-btn.selected') || overlay.querySelector('.modal-option-btn')
+        });
+
+        // Register the actions section (Cancel button)
+        focusManager.register(actionsSection, actionsContainer, {
+            orientation: 'horizontal',
+            leaveUp: optionsSection,
+            onMove: (direction) => {
+                if (direction === 'down') {
+                    focusManager.setActiveSection(optionsSection, true, null, { enterTo: 'first' });
+                    return true;
+                }
+                return false;
+            }
+        });
+
+        // Set active immediately
+        focusManager.setActiveSection(optionsSection);
+
+        // Helper to close menu
+        this._closeTrackMenu = () => {
+            if (!this._isTrackMenuOpen) return;
+
+            this._isTrackMenuOpen = false;
+            overlay.classList.remove('visible');
+
+            // Unregister focus sections
+            focusManager.unregister(optionsSection);
+            focusManager.unregister(actionsSection);
+
+            // Clean up DOM after animation
+            setTimeout(() => {
+                if (!this._isTrackMenuOpen) overlay.remove();
+            }, 300);
+
+            // Restore focus to previous element specifically
+            if (this._prevSection) {
+                focusManager.setActiveSection(this._prevSection, false);
+            }
+            if (this._prevFocus) {
+                focusManager.focusElement(this._prevFocus);
+            } else {
+                focusManager.setActiveSection('details-actions');
+            }
+        };
+
+        // Click outside to close
+        overlay.onclick = (e) => {
+            if (e.target === overlay) this._closeTrackMenu();
+        };
+
+        // Bind click events for options
+        overlay.querySelectorAll('.modal-option-btn:not(.details-track-toggle-btn)').forEach((btn) => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                // data-index may be a numeric stream index OR a MediaSource GUID string.
+                // parseInt on a GUID always returns NaN, so we use the raw string value
+                // and only coerce to a number when it is actually numeric.
+                const rawIndex = btn.dataset.index;
+                const index = /^-?\d+$/.test(rawIndex) ? parseInt(rawIndex, 10) : rawIndex;
+                onSelect(index);
+                this._closeTrackMenu();
+            };
+        });
+
+        // Bind toggle all tracks button
+        const toggleAllBtn = overlay.querySelector('.details-track-toggle-btn');
+        if (toggleAllBtn) {
+            toggleAllBtn.onclick = (e) => {
+                e.stopPropagation();
+                this._detailsShowAllTracks = !this._detailsShowAllTracks;
+                this._renderTrackSelectionMenu(title, totalRawTracks, currentIndex, onSelect);
+            };
+        }
+
+        // Bind cancel button
+        overlay.querySelector('#btn-modal-cancel').onclick = (e) => {
+            e.stopPropagation();
+            this._closeTrackMenu();
+        };
+    }
+
+    async _showMoreOptionsModal(itemId, transitionContext = null) {
+        const oldOnBack = transitionContext?.oldOnBack || this.onBack;
+
+        // Ensure user policy & session information is fully available for permissions
+        if (!this._currentUser) {
+            this._currentUser = state.get('user:data');
+        }
+
+        // Auto-deactivate rich metadata trap if it was active to avoid trap stack conflicts
+        if (this._isRichMetaActive) {
+            this._deactivateRichMeta();
+        }
+
+        // Store focus context for restoration (prioritize transitionContext if provided)
+        if (transitionContext?.prevFocus && document.contains(transitionContext.prevFocus)) {
+            this._prevFocus = transitionContext.prevFocus;
+            this._prevSection = transitionContext.prevSection || 'details-actions';
+        } else if (!this._prevFocus || !document.contains(this._prevFocus)) {
+            const currentFocused = focusManager.getFocused();
+            if (currentFocused && document.contains(currentFocused)) {
+                this._prevFocus = currentFocused;
+                this._prevSection = focusManager.getActiveSection() || 'details-actions';
+            } else {
+                this._prevFocus =
+                    this.$('.more-btn') || this.$('.resume-btn') || this.$('.play-btn') || this.$('#actions button');
+                this._prevSection = 'details-actions';
+            }
+        }
+
+        // Record any pending artwork / metadata modifications from child modals
+        if (transitionContext?.hasModified) {
+            this._hasModifiedArtwork = true;
+        }
+
+        // Use standard track menu style modal (list of options)
+        let overlay = document.getElementById('details-more-menu');
+        if (overlay) {
+            // If already exists (possibly from a race or sub-modal return), remove it immediately
+            // to cancel any pending exit timeouts.
+            overlay.remove();
+        }
+
+        overlay = document.createElement('div');
+        overlay.id = 'details-more-menu';
+        overlay.className = 'modal-overlay visible';
+        document.body.appendChild(overlay);
+
+        const options = [];
+
+        // Episode/Song Shortcuts: Parent Navigation (Should be the first option)
+        if (this._item?.Type === 'Episode' && this._item.SeriesId) {
+            options.push({ id: 'go-to-series', label: i18n.t('GoToSeries') });
+        } else if (this._item?.Type === 'Audio' && this._item.AlbumId) {
+            options.push({ id: 'go-to-album', label: i18n.t('GoToAlbum') });
+        }
+
+        // ── Seerr Details Shortcut (Only if Seerr is configured and available) ──
+        if (!this._parentSeries && (this._item?.Type === 'Season' || this._item?.Type === 'Episode')) {
+            // Guarantee parent series metadata is loaded to retrieve Series TMDb ID
+            await this._getParentSeriesItem();
+        }
+
+        const tmdbId =
+            this._item?.ProviderIds?.Tmdb ||
+            this._item?.ProviderIds?.tmdb ||
+            this._item?.ProviderIds?.TMDB ||
+            this._item?.SeriesTmdbId ||
+            this._item?.SeriesProviderIds?.Tmdb ||
+            this._item?.SeriesProviderIds?.tmdb ||
+            this._parentSeries?.ProviderIds?.Tmdb ||
+            this._parentSeries?.ProviderIds?.tmdb ||
+            this._parentSeries?.SeriesTmdbId;
+
+        const isTvType =
+            this._item?.Type === 'Series' || this._item?.Type === 'Season' || this._item?.Type === 'Episode';
+
+        const isSeerrAvailable = await seerr.isAvailable();
+
+        if (isSeerrAvailable && tmdbId) {
+            options.push({ id: 'seerr-details', label: i18n.t('SeerrDetails') || 'Seerr Details' });
+        }
+
+        if (this._item?.MediaSources?.length > 1) {
+            options.push({ id: 'select-version', label: i18n.t('SelectVersion') });
+        }
+
+        if (this._item?.Type === 'BoxSet') {
+            options.push({ id: 'display-order', label: i18n.t('LabelDisplayOrder') || 'Display order' });
+        }
+
+        if (this._item?.MediaSources?.length > 0) {
+            options.push({ id: 'media-info', label: i18n.t('MoreMediaInfo') || 'Media Info' });
+        }
+
+        // ── Admin Permissions Check (Refresh, Identify, Edit Images) ─────────
+        // Following jellyfin-web logic: only administrators can manage metadata & images
+        if (this._currentUser?.Policy?.IsAdministrator) {
+            const i = this._item;
+            const invalidRefreshTypes = ['Timer', 'SeriesTimer', 'Program', 'TvChannel'];
+            const isLiveTv = i.CollectionType === 'livetv';
+            const isIncompleteRecording = i.Type === 'Recording' && i.Status !== 'Completed';
+
+            if (!invalidRefreshTypes.includes(i.Type) && !isLiveTv && !isIncompleteRecording) {
+                options.push({ id: 'refresh', label: i18n.t('RefreshMetadata') || 'Refresh metadata' });
+
+                // Identify Remote Metadata (supported on Movies, Series, BoxSets, MusicAlbums, Persons, etc.)
+                const invalidIdentifyTypes = [
+                    'Folder',
+                    'UserRootFolder',
+                    'CollectionFolder',
+                    'UserView',
+                    'TvChannel',
+                    'Program',
+                    'Timer',
+                    'SeriesTimer'
+                ];
+                if (!invalidIdentifyTypes.includes(i.Type)) {
+                    options.push({ id: 'identify', label: i18n.t('Identify') || 'Identify' });
+                }
+
+                // Edit Images (supported on all standard media items)
+                options.push({ id: 'edit-images', label: i18n.t('EditImages') || 'Edit Images' });
+            }
+        }
+
+        // ── Subtitle Editing Permission Check ────────────────────────────────
+        // Based on jellyfin-web canEditSubtitles logic
+        if (this._item && this._currentUser) {
+            const i = this._item;
+            const p = this._currentUser.Policy || {};
+            const isOffline = i.LocationType === 'Offline';
+            const isVirtual = i.LocationType === 'Virtual';
+            const invalidSubtitleTypes = ['TvChannel', 'Program', 'Timer', 'SeriesTimer', 'UserRootFolder', 'UserView'];
+
+            if (i.MediaType === 'Video' && !isOffline && !isVirtual && !invalidSubtitleTypes.includes(i.Type)) {
+                if (p.EnableSubtitleManagement || p.IsAdministrator) {
+                    options.push({ id: 'edit-subtitles', label: i18n.t('EditSubtitles') || 'Edit Subtitles' });
+                }
+            }
+
+            // ── Add to Playlist / Collection ────────────────────────────────────
+            // Show playlist/collection target options for supported media types.
+            // - Menus only surface actionable, permitted commands to keep interactions clean.
+            // - Playlists are user-level collections, permitted for all active accounts.
+            // - BoxSets / Collections alter shared server libraries and are strictly restricted
+            //   to administrators; hidden completely for standard users.
+            const nonPlayableTypes = ['Person', 'CollectionFolder', 'UserView', 'Folder', 'Genre', 'Studio', 'Year'];
+            if (this._item?.Id && !nonPlayableTypes.includes(this._item.Type)) {
+                // User playlist creation/addition
+                options.push({ id: 'add-to-playlist', label: i18n.t('AddToPlaylist') });
+
+                // Server collection creation/addition (Admin privilege required)
+                if (p.IsAdministrator) {
+                    options.push({ id: 'add-to-collection', label: i18n.t('AddToCollection') || 'Add to Collection' });
+                }
+            }
+
+            // ── Delete Media Permission Check ────────────────────────────────────
+            // Only show delete option if the item explicitly reports CanDelete=true
+            if (this._item.CanDelete) {
+                options.push({ id: 'delete', label: i18n.t('DeleteMedia') || 'Delete media' });
+            }
+        }
+
+        const optionsHtml =
+            options.length === 0
+                ? `
+            <div class="modal-empty-placeholder" style="padding: 24px 16px; text-align: center; opacity: 0.7; font-size: 1.1rem; pointer-events: none;" data-i18n="NoOptionsAvailable">
+                ${i18n.t('NoOptionsAvailable') || 'No options available'}
+            </div>
+        `
+                : options
+                      .map((opt, i) => {
+                          return `
+                <button class="modal-option-btn ${opt.id === 'delete' ? 'danger-action' : ''}" data-id="${opt.id}" tabindex="0">
+                    <span>${opt.label}</span>
+                </button>
+            `;
+                      })
+                      .join('');
+
+        overlay.innerHTML = `
+            <div class="settings-modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h2>${i18n.t('MoreOptions')}</h2>
+                </div>
+                <div class="modal-options">
+                    ${optionsHtml}
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-action-btn" id="btn-modal-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+                </div>
+            </div>
+        `;
+
+        // Focus management - Register as a new section
+        const optionsContainer = overlay.querySelector('.modal-options');
+        const actionsContainer = overlay.querySelector('.modal-actions');
+        const optionsSection = 'details-more-menu';
+        const actionsSection = 'details-more-menu-actions';
+
+        this._isMoreMenuOpen = true;
+
+        // Register the options section
+        focusManager.register(optionsSection, optionsContainer, {
+            orientation: 'vertical',
+            leaveDown: actionsSection,
+            leaveUp: actionsSection,
+            enterTo: 'last'
+        });
+
+        // Register the actions section (Cancel button)
+        focusManager.register(actionsSection, actionsContainer, {
+            orientation: 'horizontal',
+            leaveUp: optionsSection,
+            onMove: (direction) => {
+                if (direction === 'down') {
+                    focusManager.setActiveSection(optionsSection, true, null, { enterTo: 'first' });
+                    return true;
+                }
+                return false;
+            }
+        });
+
+        // Set active immediately
+        if (options.length === 0) {
+            focusManager.setActiveSection(actionsSection);
+            setTimeout(() => {
+                const cancelBtn = overlay.querySelector('#btn-modal-cancel');
+                if (cancelBtn) focusManager.focusElement(cancelBtn);
+            }, 50);
+        } else {
+            focusManager.setActiveSection(optionsSection);
+        }
+
+        // Helper to close menu
+        this._closeMoreMenu = () => {
+            if (!this._isMoreMenuOpen) return;
+
+            this._isMoreMenuOpen = false;
+            overlay.classList.remove('visible');
+
+            // Unregister focus sections
+            focusManager.unregister(optionsSection);
+            focusManager.unregister(actionsSection);
+
+            // Clean up DOM after animation
+            setTimeout(() => {
+                if (!this._isMoreMenuOpen) overlay.remove();
+            }, 300);
+
+            // Restore focus to previous element with reliable fallback chain
+            const targetSection = this._prevSection || 'details-actions';
+            focusManager.setActiveSection(targetSection, false);
+
+            if (this._prevFocus && document.contains(this._prevFocus)) {
+                focusManager.focusElement(this._prevFocus);
+            } else {
+                const fallbackEl =
+                    this.$('.more-btn') || this.$('.resume-btn') || this.$('.play-btn') || this.$('#actions button');
+                if (fallbackEl) {
+                    focusManager.focusElement(fallbackEl);
+                } else {
+                    focusManager.setActiveSection(targetSection, true);
+                }
+            }
+
+            // Restore state
+            this._prevFocus = null;
+            this._prevSection = null;
+            this.onBack = oldOnBack;
+
+            // If artwork or metadata was modified during the modal flow, refresh details page now that focus is safely restored
+            if (this._hasModifiedArtwork) {
+                this._hasModifiedArtwork = false;
+                if (typeof this._refreshItem === 'function') {
+                    this._refreshItem();
+                }
+            }
+        };
+
+        this.onBack = () => {
+            this._closeMoreMenu();
+            return true;
+        };
+
+        // Click outside to close
+        overlay.onclick = (e) => {
+            if (e.target === overlay) this._closeMoreMenu();
+        };
+
+        // Bind click events for options
+        overlay.querySelectorAll('.modal-option-btn').forEach((btn) => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                log.debug(`Selected more-option: ${id}`);
+
+                if (id === 'go-to-series') {
+                    this._closeMoreMenu(); // Close FIRST to restore focus/handler
+                    router.navigate(`/details/${this._item.SeriesId}`);
+                } else if (id === 'go-to-album') {
+                    this._closeMoreMenu();
+                    router.navigate(`/details/${this._item.AlbumId}`);
+                } else if (id === 'select-version') {
+                    // Snapshot focus state BEFORE closing the more-menu, because
+                    // _closeMoreMenu() nulls out _prevFocus / _prevSection, which
+                    // _renderTrackSelectionMenu would then capture as null — causing
+                    // focus to be lost when the version menu closes.
+                    const versionPrevFocus = this._prevFocus;
+                    const versionPrevSection = this._prevSection;
+
+                    // Tear down the more-menu without the normal focus-restore path
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister(optionsSection);
+                    focusManager.unregister(actionsSection);
+                    setTimeout(() => overlay.remove(), 300);
+                    this._prevFocus = null;
+                    this._prevSection = null;
+                    this.onBack = oldOnBack;
+
+                    // Re-seed focus state so the version menu restores correctly
+                    this._prevFocus = versionPrevFocus;
+                    this._prevSection = versionPrevSection;
+
+                    this._showVersionSelectionMenu();
+                } else if (id === 'display-order') {
+                    // Similar to select-version, we close this menu but keep focus state
+                    const versionPrevFocus = this._prevFocus;
+                    const versionPrevSection = this._prevSection;
+
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister(optionsSection);
+                    focusManager.unregister(actionsSection);
+                    setTimeout(() => overlay.remove(), 300);
+                    this._prevFocus = null;
+                    this._prevSection = null;
+                    this.onBack = oldOnBack;
+
+                    this._prevFocus = versionPrevFocus;
+                    this._prevSection = versionPrevSection;
+
+                    this._showDisplayOrderMenu();
+                } else if (id === 'media-info') {
+                    // Close menu but DON'T restore focus yet (MediaInfo will take it)
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister('details-more-menu');
+                    focusManager.unregister('details-more-menu-actions');
+                    setTimeout(() => overlay.remove(), 300);
+
+                    // Chain to Media Info with full context
+                    MediaInfoModal.show(itemId, this, {
+                        prevFocus: this._prevFocus,
+                        prevSection: this._prevSection,
+                        fromMoreOptions: true,
+                        oldOnBack: oldOnBack
+                    });
+                } else if (id === 'seerr-details') {
+                    this._closeMoreMenu();
+                    const targetMediaType = isTvType ? 'tv' : 'movie';
+                    router.navigate(`/seerr/${targetMediaType}/${tmdbId}`);
+                } else if (id === 'refresh') {
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister('details-more-menu');
+                    focusManager.unregister('details-more-menu-actions');
+                    setTimeout(() => overlay.remove(), 300);
+
+                    this._showRefreshMetadataModal(itemId, {
+                        prevFocus: this._prevFocus,
+                        prevSection: this._prevSection,
+                        fromMoreOptions: true,
+                        oldOnBack: oldOnBack
+                    });
+                } else if (id === 'identify') {
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister('details-more-menu');
+                    focusManager.unregister('details-more-menu-actions');
+                    setTimeout(() => overlay.remove(), 300);
+
+                    IdentifyModal.show(itemId, this, {
+                        prevFocus: this._prevFocus,
+                        prevSection: this._prevSection,
+                        fromMoreOptions: true,
+                        oldOnBack: oldOnBack
+                    });
+                } else if (id === 'edit-images') {
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister('details-more-menu');
+                    focusManager.unregister('details-more-menu-actions');
+                    setTimeout(() => overlay.remove(), 300);
+
+                    ImageEditorModal.show(itemId, this, {
+                        prevFocus: this._prevFocus,
+                        prevSection: this._prevSection,
+                        fromMoreOptions: true,
+                        oldOnBack: oldOnBack
+                    });
+                } else if (id === 'edit-subtitles') {
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister('details-more-menu');
+                    focusManager.unregister('details-more-menu-actions');
+                    setTimeout(() => overlay.remove(), 300);
+
+                    SubtitleEditorModal.show(itemId, this, {
+                        prevFocus: this._prevFocus,
+                        prevSection: this._prevSection,
+                        fromMoreOptions: true,
+                        oldOnBack: oldOnBack
+                    });
+                } else if (id === 'add-to-playlist' || id === 'add-to-collection') {
+                    // Defensively verify admin permissions if collection mode is selected
+                    if (id === 'add-to-collection' && !this._currentUser?.Policy?.IsAdministrator) {
+                        log.warn('Unauthorized attempt to trigger AddToTargetModal in collection mode');
+                        this._closeMoreMenu();
+                        return;
+                    }
+
+                    this._isMoreMenuOpen = false;
+                    overlay.classList.remove('visible');
+                    focusManager.unregister('details-more-menu');
+                    focusManager.unregister('details-more-menu-actions');
+                    setTimeout(() => overlay.remove(), 300);
+
+                    const mode = id === 'add-to-collection' ? 'collection' : 'playlist';
+                    AddToTargetModal.show(this, itemId, mode, {
+                        prevFocus: this._prevFocus,
+                        prevSection: this._prevSection,
+                        fromMoreOptions: true,
+                        oldOnBack: oldOnBack
+                    });
+                } else if (id === 'delete') {
+                    // Transition to confirmation dialog
+                    this._showDeleteConfirmation(itemId);
+                }
+            };
+        });
+
+        // Bind cancel button
+        overlay.querySelector('#btn-modal-cancel').onclick = (e) => {
+            e.stopPropagation();
+            this._closeMoreMenu();
+        };
+    }
+
+    /**
+     * Show Refresh Metadata Modal
+     */
+    _showRefreshMetadataModal(itemId, transitionContext = null) {
+        const oldOnBack = transitionContext?.oldOnBack || this.onBack;
+        const prevFocus = transitionContext?.prevFocus || focusManager.getFocused();
+        const prevSection = transitionContext?.prevSection || focusManager.getActiveSection();
+
+        let overlay = document.getElementById('details-refresh-menu');
+        if (overlay) overlay.remove();
+
+        overlay = document.createElement('div');
+        overlay.id = 'details-refresh-menu';
+        overlay.className = 'modal-overlay visible';
+        document.body.appendChild(overlay);
+
+        const options = [
+            { id: 'scan', label: i18n.t('ScanForNewAndUpdatedFiles'), mode: 'Default', replace: false },
+            { id: 'missing', label: i18n.t('SearchForMissingMetadata'), mode: 'FullRefresh', replace: false },
+            { id: 'all', label: i18n.t('ReplaceAllMetadata'), mode: 'FullRefresh', replace: true }
+        ];
+
+        const optionsHtml = options
+            .map(
+                (opt) => `
+                <button class="modal-option-btn" data-id="${opt.id}" tabindex="0">
+                    <span>${opt.label}</span>
+                </button>
+            `
+            )
+            .join('');
+
+        overlay.innerHTML = `
+            <div class="settings-modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h2>${i18n.t('RefreshMetadata')}</h2>
+                </div>
+                <div class="modal-options">
+                    ${optionsHtml}
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-action-btn" id="btn-refresh-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+                </div>
+            </div>
+        `;
+
+        const _close = (restoreFocus = true) => {
+            this.onBack = oldOnBack;
+            overlay.classList.remove('visible');
+            setTimeout(() => overlay.remove(), 300);
+
+            if (restoreFocus) {
+                if (prevFocus) focusManager.focusElement(prevFocus);
+                if (prevSection) focusManager.setActiveSection(prevSection, false);
+            }
+        };
+
+        const onSelect = async (optId) => {
+            const opt = options.find((o) => o.id === optId);
+            if (!opt) return;
+
+            try {
+                await api.refreshItem(itemId, {
+                    MetadataRefreshMode: opt.mode,
+                    ImageRefreshMode: opt.mode,
+                    ReplaceAllMetadata: opt.replace,
+                    ReplaceAllImages: opt.replace
+                });
+
+                // ── Purge ALL cached data so every page re-fetches fresh ───
+                // The ETag cache can return stale 304-cached bodies for the
+                // same URL — wiping it ensures the next request gets a 200.
+                api.clearEtagCache();
+
+                // Wipe all home and details page in-memory caches so the
+                // next visit to any page fetches fresh data from the server.
+                state.clearByPrefix('home:');
+                state.clearByPrefix('details:');
+
+                // Also clear the rendered-row cache used by the homepage
+                state.delete('home:pageCache');
+
+                // ── Re-fetch current page's episode data ─────────────────────
+                // The server may still be processing the scan, but clearing
+                // the cache and re-fetching gives the best chance of showing
+                // up-to-date content without requiring a page navigation.
+                if (this._item?.SeriesId && this._item?.SeasonId) {
+                    const cacheKey = `details:episodes:${this._item.SeriesId}:${this._item.SeasonId}`;
+                    state.delete(cacheKey);
+                    this._episodes = null;
+
+                    // Fire re-fetch after a short delay to let the server
+                    // begin processing before we re-render the sections.
+                    setTimeout(() => {
+                        if (!this._isMounted) return;
+                        this._loadEpisodes(this._item.SeriesId, this._itemId).catch(() => {});
+                        this._loadMoreFromSeason().catch(() => {});
+                    }, 500);
+                }
+
+                toast.show(i18n.t('MessageRefreshQueued'));
+            } catch (e) {
+                log.error('Failed to queue metadata refresh', e);
+                toast.show(i18n.t('MessageRefreshFailed'));
+            }
+        };
+
+        const section = 'details-refresh-menu';
+        const actionsSection = 'details-refresh-actions';
+
+        focusManager.register(section, overlay.querySelector('.modal-options'), {
+            orientation: 'vertical',
+            circular: false,
+            leaveDown: actionsSection
+        });
+
+        focusManager.register(actionsSection, overlay.querySelector('.modal-actions'), {
+            orientation: 'horizontal',
+            leaveUp: section
+        });
+
+        focusManager.setActiveSection(section);
+
+        overlay.querySelectorAll('.modal-option-btn').forEach((btn) => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                onSelect(btn.dataset.id);
+                _close();
+            };
+        });
+
+        overlay.querySelector('#btn-refresh-cancel').onclick = (e) => {
+            e.stopPropagation();
+            _close();
+        };
+
+        this.onBack = () => {
+            if (transitionContext?.fromMoreOptions) {
+                _close(false);
+                this._showMoreOptionsModal(itemId);
+            } else {
+                _close();
+            }
+            return true;
+        };
+    }
+
+    /**
+     * Show a confirmation dialog before deleting media
+     * @param {string} itemId - ID of the item to delete
+     */
+    _showDeleteConfirmation(itemId) {
+        log.info('Showing delete confirmation for:', itemId);
+
+        // Reuse standard modal styles but with danger branding
+        let overlay = document.getElementById('details-delete-confirm');
+        if (overlay) overlay.remove();
+
+        overlay = document.createElement('div');
+        overlay.id = 'details-delete-confirm';
+        overlay.className = 'modal-overlay visible delete-modal';
+        document.body.appendChild(overlay);
+
+        overlay.innerHTML = `
+            <div class="settings-modal confirm-modal danger" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h2 class="danger-title">${i18n.t('DeleteMediaConfirmTitle')}</h2>
+                </div>
+                <div class="modal-body" style="padding: 0 40px 20px 40px;">
+                    <p class="confirm-message" style="margin-bottom: 16px; font-size: 1.3rem;">${i18n.t('DeleteMediaConfirmMessage')}</p>
+                    <p class="confirm-item-name" style="font-weight: 700; color: var(--jf-accent); font-size: 1.4rem;">${i18n.ensureBiDi(this._item?.Name || '')}</p>
+                </div>
+                <div class="modal-actions horizontal" style="justify-content: center; padding-bottom: 30px;">
+                    <button class="modal-action-btn focusable danger" id="btn-delete-confirm" tabindex="0" style="margin-right: 20px;">${i18n.t('Delete')}</button>
+                    <button class="modal-action-btn focusable" id="btn-delete-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+                </div>
+            </div>
+        `;
+
+        const section = 'details-delete-confirm';
+        focusManager.register(section, overlay.querySelector('.modal-actions'), {
+            orientation: 'horizontal',
+            defaultElement: '#btn-delete-cancel' // Default to Cancel for safety
+        });
+
+        focusManager.setActiveSection(section);
+
+        const oldOnBack = this.onBack;
+
+        const close = () => {
+            overlay.classList.remove('visible');
+            focusManager.unregister(section);
+            setTimeout(() => overlay.remove(), 300);
+
+            // Restore previous back handler
+            this.onBack = oldOnBack;
+
+            // Bring focus back to the "Delete" option in the more menu if it's still open
+            if (this._isMoreMenuOpen) {
+                focusManager.setActiveSection('details-more-menu');
+                const deleteBtn = document.querySelector('.modal-option-btn[data-id="delete"]');
+                if (deleteBtn) focusManager.focusElement(deleteBtn);
+            }
+        };
+
+        // Bind back button
+        this.onBack = () => {
+            close();
+            return true; // Stop propagation
+        };
+
+        overlay.querySelector('#btn-delete-confirm').onclick = async (e) => {
+            e.stopPropagation();
+            await this._handleDelete(itemId);
+            overlay.remove(); // Remove immediately on success to avoid double clicks
+        };
+
+        overlay.querySelector('#btn-delete-cancel').onclick = (e) => {
+            e.stopPropagation();
+            close();
+        };
+
+        overlay.onclick = (e) => {
+            if (e.target === overlay) close();
+        };
+    }
+
+    /**
+     * Execute the item deletion API call
+     * @param {string} itemId - ID of the item to delete
+     */
+    async _handleDelete(itemId) {
+        log.info('Deleting item:', itemId);
+
+        try {
+            // Show loading state if we have a way, or just proceed
+            await api.delete(`/Items/${itemId}`);
+            log.info('Item deleted successfully');
+
+            // Success feedback
+            eventBus.emit('notify', {
+                text: i18n.t('Success'),
+                type: 'success'
+            });
+
+            // If we are on the details page for this item, we must leave
+            // Close all modals first
+            if (this._closeMoreMenu) this._closeMoreMenu();
+
+            // Navigate back to parent or home
+            setTimeout(() => {
+                router.back();
+            }, 100);
+        } catch (error) {
+            log.error('Failed to delete item:', error);
+            eventBus.emit('notify', {
+                text: i18n.t('LabelFailed'),
+                type: 'error'
+            });
+        }
+    }
+
+    /**
+     * Show Display Order selection menu
+     */
+    _showDisplayOrderMenu() {
+        const oldOnBack = this.onBack;
+        const prevFocus = this._prevFocus;
+        const prevSection = this._prevSection;
+
+        let overlay = document.getElementById('details-display-order-menu');
+        if (overlay) overlay.remove();
+
+        overlay = document.createElement('div');
+        overlay.id = 'details-display-order-menu';
+        overlay.className = 'modal-overlay visible';
+        document.body.appendChild(overlay);
+
+        // Options according to jellyfin-web: Default (DateModified), SortName, PremiereDate
+        const options = [
+            { id: 'Default', label: i18n.t('OptionDateModified') || 'Date Modified' },
+            { id: 'SortName', label: i18n.t('OptionSortName') || 'Sort Name' },
+            { id: 'PremiereDate', label: i18n.t('OptionReleaseDate') || 'Release Date' }
+        ];
+
+        const optionsHtml = options
+            .map(
+                (opt) => `
+                <button class="modal-option-btn" data-id="${opt.id}" tabindex="0">
+                    <span>${opt.label}</span>
+                </button>
+            `
+            )
+            .join('');
+
+        overlay.innerHTML = `
+            <div class="settings-modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h2>${i18n.t('LabelDisplayOrder') || 'Display Order'}</h2>
+                </div>
+                <div class="modal-options">
+                    ${optionsHtml}
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-action-btn" id="btn-display-order-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+                </div>
+            </div>
+        `;
+
+        const optionsSection = 'display-order-options';
+        const actionsSection = 'display-order-actions';
+
+        focusManager.register(optionsSection, overlay.querySelector('.modal-options'), {
+            orientation: 'vertical',
+            leaveDown: actionsSection,
+            enterTo: 'last'
+        });
+
+        focusManager.register(actionsSection, overlay.querySelector('.modal-actions'), {
+            orientation: 'horizontal',
+            leaveUp: optionsSection
+        });
+
+        focusManager.setActiveSection(optionsSection);
+
+        const closeMenu = () => {
+            overlay.classList.remove('visible');
+            focusManager.unregister(optionsSection);
+            focusManager.unregister(actionsSection);
+            setTimeout(() => overlay.remove(), 300);
+
+            this.onBack = oldOnBack;
+            if (prevSection) focusManager.setActiveSection(prevSection, false);
+            if (prevFocus) focusManager.focusElement(prevFocus);
+        };
+
+        this.onBack = () => {
+            closeMenu();
+            return true;
+        };
+
+        overlay.querySelectorAll('.modal-option-btn').forEach((btn) => {
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                const value = btn.dataset.id;
+                closeMenu();
+                await this._updateDisplayOrder(value);
+            };
+        });
+
+        overlay.querySelector('#btn-display-order-cancel').onclick = (e) => {
+            e.stopPropagation();
+            closeMenu();
+        };
+
+        overlay.onclick = (e) => {
+            if (e.target === overlay) closeMenu();
+        };
+    }
+
+    /**
+     * Update the display order via API and refresh content
+     */
+    async _updateDisplayOrder(value) {
+        log.info('Updating display order to:', value);
+
+        try {
+            // Update the local state first so the reload uses it immediately
+            this._item.DisplayOrder = value;
+
+            // Construct a clean metadata object to avoid corruption.
+            // We only send the fields that are intended for metadata updates,
+            // avoiding large, read-only data like MediaSources and MediaStreams.
+            const updateObj = {
+                Id: this._item.Id,
+                Name: this._item.Name,
+                OriginalTitle: this._item.OriginalTitle,
+                ForcedSortName: this._item.ForcedSortName,
+                DisplayOrder: value,
+                Overview: this._item.Overview,
+                PremiereDate: this._item.PremiereDate,
+                ProductionYear: this._item.ProductionYear,
+                Genres: this._item.Genres || [],
+                Tags: this._item.Tags || [],
+                Studios: (this._item.Studios || []).map((s) => ({ Name: s.Name || s })),
+                People: (this._item.People || []).map((p) => ({
+                    Name: p.Name,
+                    Id: p.Id,
+                    Role: p.Role,
+                    Type: p.Type,
+                    PrimaryImageTag: p.PrimaryImageTag
+                })),
+                LockData: this._item.LockData || false,
+                LockedFields: this._item.LockedFields || [],
+                ProviderIds: this._item.ProviderIds || {},
+                Taglines: this._item.Taglines || [],
+                DateCreated: this._item.DateCreated,
+                Status: this._item.Status
+            };
+
+            await api.updateItem(updateObj);
+
+            log.info('Display order updated on server');
+
+            eventBus.emit('notify', {
+                text: i18n.t('Success'),
+                type: 'success'
+            });
+
+            // Reload the collection items to reflect the new order
+            this._loadCollectionItems();
+        } catch (error) {
+            log.error('Failed to update display order:', error);
+            eventBus.emit('notify', {
+                text: i18n.t('LabelFailed'),
+                type: 'error'
+            });
+        }
+    }
+    // ── Trailer Playback ──────────────────────────────────────────────────────
+    // Phase 1: button visibility, selection dialog, local trailer playback.
+    // Phase 2: remote trailer via iframe (stub in _showRemoteTrailerPlayer).
+    // ============================================================================
+
+    /**
+     * Evaluate whether the current item has any trailers and show/hide
+     * the trailer button accordingly.
+     *
+     * Called immediately after the item is fetched, so no extra API round-trip
+     * is needed — both `LocalTrailerCount` and `RemoteTrailers` are included
+     * in the standard getItem response.
+     */
+    _updateTrailerButton() {
+        const item = this._item;
+
+        this._hasLocalTrailers = (item.LocalTrailerCount || 0) > 0;
+        this._hasRemoteTrailers = !!(item.RemoteTrailers && item.RemoteTrailers.length > 0);
+
+        // Fallback Crawler Activation: Force remote trailers flag for standard media
+        // if the node proxy is enabled, since the crawler can fetch them dynamically.
+        const isStandardMedia = ['Movie', 'Series', 'Season'].includes(item.Type);
+        const mode = PlayerSettings.get('trailerPlaybackMode');
+        const isProxyEnabled = mode === 'internal_proxy' && PlayerSettings.get('enableBackgroundService') !== false;
+
+        if (!this._hasRemoteTrailers && isStandardMedia && isProxyEnabled) {
+            this._hasRemoteTrailers = true;
+            this._isProxyFallback = true;
+        } else {
+            this._isProxyFallback = false;
+        }
+
+        const btn = this.$('.trailer-btn');
+        if (!btn) return;
+
+        if (this._hasLocalTrailers || this._hasRemoteTrailers) {
+            // Reveal the button and make it focusable
+            btn.classList.remove('hidden');
+            btn.setAttribute('tabindex', '0');
+
+            // Let FocusManager know there is a new element in this section
+            focusManager.invalidateCache('details-actions');
+            // Re-evaluate mobile portrait 2-row balancing with the new trailer button
+            this._balanceMobileActionRows();
+
+            log.debug(
+                `Trailer button visible — local: ${this._hasLocalTrailers}, remote: ${this._hasRemoteTrailers} (Fallback: ${this._isProxyFallback})`
+            );
+        }
+    }
+
+    /**
+     * Fetches or retrieves cached season episodes to identify adjacent previous and next episodes.
+     * Updates action bar buttons to allow instant remote navigation between episodes.
+     */
+    async _loadAdjacentEpisodes() {
+        // Only valid for Episode items with associated Series and Season IDs
+        if (!this._item || this._item.Type !== 'Episode' || !this._item.SeriesId || !this._item.SeasonId) {
+            this._prevEpisode = null;
+            this._nextEpisode = null;
+            this._updateAdjacentEpisodeButtons();
+            return;
+        }
+
+        const cacheKey = `details:episodes:${this._item.SeriesId}:${this._item.SeasonId}`;
+        let allEpisodes = state.get(cacheKey);
+
+        if (!allEpisodes) {
+            try {
+                // Fetch all episodes belonging to this season
+                const response = await api.getEpisodes(this._item.SeriesId, {
+                    SeasonId: this._item.SeasonId
+                });
+                allEpisodes = response?.Items || [];
+                // Cache for fast subsequent lookups
+                state.set(cacheKey, allEpisodes);
+            } catch (err) {
+                log.warn('Failed to load season episodes for navigation:', err);
+                allEpisodes = [];
+            }
+        }
+
+        // Find current episode index in the season list
+        const currentIndex = allEpisodes.findIndex((ep) => ep.Id === this._itemId);
+        if (currentIndex !== -1) {
+            this._prevEpisode = currentIndex > 0 ? allEpisodes[currentIndex - 1] : null;
+            this._nextEpisode = currentIndex < allEpisodes.length - 1 ? allEpisodes[currentIndex + 1] : null;
+        } else {
+            this._prevEpisode = null;
+            this._nextEpisode = null;
+        }
+
+        // Update button DOM states and tooltips
+        this._updateAdjacentEpisodeButtons();
+    }
+
+    /**
+     * Synchronizes the visibility, focusability, and tooltip descriptions
+     * of previous and next episode buttons in the details action bar.
+     */
+    _updateAdjacentEpisodeButtons() {
+        const prevBtn = this.$('.prev-episode-btn');
+        const nextBtn = this.$('.next-episode-btn');
+
+        if (prevBtn) {
+            if (this._prevEpisode) {
+                // Reveal previous episode button
+                prevBtn.classList.remove('hidden');
+                prevBtn.setAttribute('tabindex', '0');
+
+                // Build rich tooltip label
+                const seasonNum = (this._prevEpisode.ParentIndexNumber || 0).toString().padStart(2, '0');
+                const epNum = (this._prevEpisode.IndexNumber || 0).toString().padStart(2, '0');
+                const epLabel =
+                    this._prevEpisode.IndexNumber !== undefined ? `S${seasonNum}E${epNum}` : this._prevEpisode.Name;
+                const tooltipText = `${i18n.t('PreviousEpisode') || 'Previous Episode'}: ${epLabel}`;
+                prevBtn.setAttribute('data-tooltip', tooltipText);
+                prevBtn.setAttribute('aria-label', tooltipText);
+            } else {
+                // Hide and disable focus
+                prevBtn.classList.add('hidden');
+                prevBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        if (nextBtn) {
+            if (this._nextEpisode) {
+                // Reveal next episode button
+                nextBtn.classList.remove('hidden');
+                nextBtn.setAttribute('tabindex', '0');
+
+                // Build rich tooltip label
+                const seasonNum = (this._nextEpisode.ParentIndexNumber || 0).toString().padStart(2, '0');
+                const epNum = (this._nextEpisode.IndexNumber || 0).toString().padStart(2, '0');
+                const epLabel =
+                    this._nextEpisode.IndexNumber !== undefined ? `S${seasonNum}E${epNum}` : this._nextEpisode.Name;
+                const tooltipText = `${i18n.t('NextEpisode') || 'Next Episode'}: ${epLabel}`;
+                nextBtn.setAttribute('data-tooltip', tooltipText);
+                nextBtn.setAttribute('aria-label', tooltipText);
+            } else {
+                // Hide and disable focus
+                nextBtn.classList.add('hidden');
+                nextBtn.setAttribute('tabindex', '-1');
+            }
+        }
+
+        // Invalidate spatial navigation cache so focus immediately recognizes available buttons
+        focusManager.invalidateCache('details-actions');
+        // Re-evaluate mobile portrait 2-row balancing with adjacent episode navigation
+        this._balanceMobileActionRows();
+    }
+
+    /**
+     * Navigates directly to an adjacent episode details page.
+     *
+     * @param {Object|null} targetEpisode - The destination episode object
+     */
+    _navigateToAdjacentEpisode(targetEpisode) {
+        if (!targetEpisode?.Id) return;
+        log.info(`Navigating to adjacent episode: ${targetEpisode.Id} (${targetEpisode.Name})`);
+        router.navigate(`/details/${targetEpisode.Id}`);
+    }
+
+    /**
+     * Called when the trailer button is pressed.
+     *
+     * Decision tree:
+     *   - Both local AND remote trailers exist → show TrailerDialog selection
+     *   - Only local  → play immediately via native player
+     *   - Only remote → open inline iframe player (Phase 2)
+     */
+    _onTrailerClick() {
+        const hasLocal = this._hasLocalTrailers;
+        const hasRemote = this._hasRemoteTrailers;
+
+        if (hasLocal && hasRemote) {
+            // ----------------------------------------------------------------
+            // Auto-chain mode: skip the dialog entirely and play the local
+            // trailer immediately via the native player. When it ends (or the
+            // user presses Next on the OSD), the remote player opens instead.
+            // ----------------------------------------------------------------
+            if (PlayerSettings.get('trailerAutoChain')) {
+                this._playLocalTrailerThenChain();
+                return;
+            }
+
+            // Both available and auto-chain is OFF — let the user choose
+            TrailerDialog.show(
+                { hasLocal, hasRemote },
+                this,
+                () => this._playLocalTrailer(),
+                () => this._showRemoteTrailerPlayer()
+            );
+            return;
+        }
+
+        // Only one type available — skip the dialog entirely
+        if (hasLocal) {
+            this._playLocalTrailer();
+            return;
+        }
+        if (hasRemote) {
+            this._showRemoteTrailerPlayer();
+            return;
+        }
+    }
+
+    /**
+     * Fetch local trailers from the server and route the first one
+     * into the native player via the standard eventBus player:play event.
+     *
+     * Local trailers are proper Jellyfin items with their own Ids,
+     * so the existing player pipeline handles them without any modifications.
+     */
+    async _playLocalTrailer() {
+        try {
+            const trailers = await api.getLocalTrailers(this._itemId);
+
+            if (!trailers || trailers.length === 0) {
+                // Shouldn't normally happen (button is gated on LocalTrailerCount > 0),
+                // but guard against stale data anyway.
+                log.warn('getLocalTrailers returned empty for item', this._itemId);
+                toast.show(i18n.t('NoLocalTrailersFound') || 'No local trailers found.');
+                return;
+            }
+
+            const trailerItem = trailers[0];
+            const parentName = this._item?.Name || this._item?.OriginalTitle || 'Video';
+
+            // Jellyfin often names local trailers generically (e.g. "Trailer" or "Trailers").
+            // Prefix it with the parent item's name so it looks good in the OSD title.
+            // e.g. "Inception - Trailer (2010)" instead of "Trailers (2010)".
+            if (trailerItem.Name) {
+                // If it's just "trailer" or "trailers", or starts with the parent name, clean it up.
+                if (/^(trailer|trailers|official trailer)s?$/i.test(trailerItem.Name.trim())) {
+                    trailerItem.Name = `${parentName} - Trailer`;
+                } else if (!trailerItem.Name.toLowerCase().startsWith(parentName.toLowerCase())) {
+                    // Capitalize 'trailers' if it's oddly lowercased by the backend
+                    let tName = trailerItem.Name;
+                    if (tName === 'trailers') tName = 'Trailer';
+                    trailerItem.Name = `${parentName} - ${tName}`;
+                }
+            } else {
+                trailerItem.Name = `${parentName} - Trailer`;
+            }
+
+            // Sync the year so the OSD displays the Movie's year, not the trailer file's metadata year
+            if (this._item && this._item.ProductionYear) {
+                trailerItem.ProductionYear = this._item.ProductionYear;
+            } else {
+                delete trailerItem.ProductionYear;
+            }
+
+            log.info(`Playing local trailer "${trailerItem.Name}" (${trailerItem.Id})`);
+
+            // ================================================================
+            // Local Trailer Backdrop Alignment
+            // ================================================================
+            // Match the exact _loadImages parameters and pre-cached image URL
+            // so the loading screen seamlessly displays the parent background.
+            // ================================================================
+            const backdropParams = imageService.getParams('details-backdrop');
+            const backdropUrl =
+                this._backdropUrl ||
+                BackdropManager.getBackdropUrl(this._item, {
+                    maxWidth: backdropParams.maxWidth,
+                    quality: backdropParams.quality
+                });
+
+            // Emit the standard player:play event — same path as normal item playback.
+            // No resume position, no audio/subtitle override.
+            eventBus.emit('player:play', {
+                item: trailerItem,
+                resume: false,
+                backdropUrl
+            });
+        } catch (err) {
+            log.error('Failed to load local trailers', err);
+            toast.show(i18n.t('ErrorFetchingTrailers') || 'Could not load trailers.');
+        }
+    }
+
+    /**
+     * Auto-chain mode entry point.
+     *
+     * Writes a pending-chain intent to StateManager (a global in-memory
+     * singleton that persists across page instances), then launches the local
+     * trailer via the standard native player pipeline.
+     *
+     * When the local trailer finishes, the router calls router.back() which
+     * destroys PlayerPage and creates a fresh DetailsPage instance. onInit()
+     * on that fresh instance reads and clears the state flag, then calls
+     * _showRemoteTrailerPlayer() automatically.
+     *
+     * Navigation stack:
+     *   Details page (at rest)
+     *     → PlayerPage  (/player/<localTrailerId>/false)
+     *       → router.back() destroys PlayerPage, creates DetailsPage
+     *     ← DetailsPage.onInit() detects flag → _showRemoteTrailerPlayer()
+     *       → user presses Back in remote player → overlay closes
+     *       → Details page (at rest) ✅
+     */
+    async _playLocalTrailerThenChain() {
+        try {
+            const trailers = await api.getLocalTrailers(this._itemId);
+
+            if (!trailers || trailers.length === 0) {
+                log.warn('getLocalTrailers returned empty for item', this._itemId);
+                toast.show(i18n.t('NoLocalTrailersFound') || 'No local trailers found.');
+                return;
+            }
+
+            const trailerItem = trailers[0];
+            const parentName = this._item?.Name || this._item?.OriginalTitle || 'Video';
+
+            // Override generic local trailer names with the parent item's name
+            // so it reads cleanly in the player OSD.
+            if (trailerItem.Name) {
+                // If it's just "trailer" or "trailers", or starts with the parent name, clean it up.
+                if (/^(trailer|trailers|official trailer)s?$/i.test(trailerItem.Name.trim())) {
+                    trailerItem.Name = `${parentName} - Trailer`;
+                } else if (!trailerItem.Name.toLowerCase().startsWith(parentName.toLowerCase())) {
+                    // Capitalize 'trailers' if it's oddly lowercased by the backend
+                    let tName = trailerItem.Name;
+                    if (tName === 'trailers') tName = 'Trailer';
+                    trailerItem.Name = `${parentName} - ${tName}`;
+                }
+            } else {
+                trailerItem.Name = `${parentName} - Trailer`;
+            }
+
+            // Sync the year so the OSD displays the Movie's year, not the trailer file's metadata year
+            if (this._item && this._item.ProductionYear) {
+                trailerItem.ProductionYear = this._item.ProductionYear;
+            } else {
+                delete trailerItem.ProductionYear;
+            }
+
+            log.info(`[AutoChain] Playing local trailer "${trailerItem.Name}" (${trailerItem.Id}), remote will follow`);
+
+            // ================================================================
+            // Auto-Chain Trailer Backdrop Alignment
+            // ================================================================
+            // Ensure identical parameters to _loadImages for instant cache hit.
+            // ================================================================
+            const backdropParams = imageService.getParams('details-backdrop');
+            const backdropUrl =
+                this._backdropUrl ||
+                BackdropManager.getBackdropUrl(this._item, {
+                    maxWidth: backdropParams.maxWidth,
+                    quality: backdropParams.quality
+                });
+
+            // ----------------------------------------------------------------
+            // Write the chain intent to persistent in-memory state BEFORE
+            // navigating. The router will destroy this DetailsPage instance
+            // during navigation, so we cannot use an instance-level flag or
+            // EventBus listener. StateManager is a global singleton that
+            // outlives any individual page, making it the correct tool here.
+            // ----------------------------------------------------------------
+            state.set('details:autoChainRemote', this._itemId);
+            log.info('[AutoChain] Wrote state flag for item', this._itemId);
+
+            // Kick off the native player via the standard pipeline
+            eventBus.emit('player:play', {
+                item: trailerItem,
+                resume: false,
+                backdropUrl
+            });
+        } catch (err) {
+            log.error('[AutoChain] Failed to load local trailer for chain', err);
+            toast.show(i18n.t('ErrorFetchingTrailers') || 'Could not load trailers.');
+        }
+    }
+
+    _showRemoteTrailerPlayer() {
+        // --------------------------------------------------------------------
+        // Stop background ambient theme music instantly when starting a
+        // remote trailer. This prevents audio overlap since remote trailers
+        // are loaded inside a custom iframe overlay rather than navigating
+        // away to the dedicated native player page.
+        // --------------------------------------------------------------------
+        themeSongPlayer.stopInstant();
+
+        const mode = PlayerSettings.get('trailerPlaybackMode');
+
+        let trailers = this._item.RemoteTrailers || [];
+        if (this._isProxyFallback && trailers.length === 0) {
+            trailers = [
+                {
+                    Name: (this._item.Name || this._item.OriginalTitle || 'Video') + ' Trailer',
+                    Url: '',
+                    IsProxyFallback: true,
+                    TmdbId: this._item.ProviderIds?.Tmdb,
+                    ItemName: this._item.OriginalTitle || this._item.Name,
+                    ItemYear: this._item.ProductionYear,
+                    ItemType: this._item.Type
+                }
+            ];
+        }
+
+        if (mode === 'external') {
+            TrailerPlayer.launchExternal(trailers, this);
+        } else if (mode === 'internal_iframe') {
+            TrailerPlayer.showLegacy(trailers, this);
+        } else {
+            TrailerPlayer.show(trailers, this);
+        }
+    }
+
+    // ============================================================================
+
+    _setupFavoriteButton() {
+        const actionsContainer = this.$('#actions');
+        if (!actionsContainer || !this._item) return;
+
+        // Clean up previous FavoriteButton instance if present
+        if (this._favBtn) {
+            this._favBtn.destroy();
+            this._favBtn = null;
+        }
+
+        // Initialize fresh FavoriteButton component
+        this._favBtn = new FavoriteButton({
+            itemId: this._item.Id,
+            initialState: this._item.UserData?.IsFavorite,
+            className: 'btn btn-icon favorite-btn',
+            onChange: (isFav) => {
+                if (!this._item.UserData) this._item.UserData = {};
+                this._item.UserData.IsFavorite = isFav;
+            }
+        });
+
+        // Remove any orphaned static or duplicate Favorite buttons from DOM
+        const old = actionsContainer.querySelector('.favorite-btn');
+        if (old) old.remove();
+
+        // Mount the Favorite Button component into the action bar
+        this._favBtn.mount(actionsContainer);
+
+        if (this._favBtn.el) {
+            this._favBtn.el.setAttribute('data-tooltip', i18n.t('Favorite') || 'Favorite');
+            this._favBtn.el.setAttribute('tabindex', '0');
+        }
+
+        // Move Favorite Button BEFORE Audio, Subtitle, or More buttons if present
+        const anchorBtn =
+            actionsContainer.querySelector('.audio-btn') ||
+            actionsContainer.querySelector('.subtitle-btn') ||
+            actionsContainer.querySelector('.more-btn');
+        if (anchorBtn && this._favBtn.el) {
+            actionsContainer.insertBefore(this._favBtn.el, anchorBtn);
+        }
+
+        // Refresh focus cache so FocusManager sees the newly mounted button
+        focusManager.invalidateCache('details-actions');
+        // Re-evaluate mobile portrait 2-row balancing with mounted favorite button
+        this._balanceMobileActionRows();
+    }
+
+    async _toggleWatched() {
+        const isPlayed = this._item.UserData?.Played;
+        const btn = this.$('.watched-btn');
+
+        // Add pulse animation trigger
+        if (btn) {
+            btn.classList.remove('pulse-trigger');
+            void btn.offsetWidth; // Force reflow
+            btn.classList.add('pulse-trigger');
+
+            // Remove after animation finishes (0.4s in CSS)
+            setTimeout(() => btn.classList.remove('pulse-trigger'), 500);
+        }
+
+        try {
+            if (isPlayed) {
+                await api.unmarkPlayed(this._itemId);
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.innerHTML = detailsIcons.watchedOutline;
+                }
+            } else {
+                await api.markPlayed(this._itemId);
+                if (btn) {
+                    btn.classList.add('active');
+                    btn.innerHTML = detailsIcons.watchedFilled;
+                }
+            }
+
+            this._item.UserData = this._item.UserData || {};
+            this._item.UserData.Played = !isPlayed;
+
+            this._updateCachedPlayedStatus();
+        } catch (error) {
+            log.error('Failed to toggle watched', error);
+        }
+    }
+
+    _updateCachedPlayedStatus() {
+        const itemId = this._itemId;
+        const userData = this._item.UserData;
+
+        // 1. Patch library:state:* caches (library page grid items)
+        const allState = state.getAll();
+        for (const [key, val] of Object.entries(allState)) {
+            if (key.startsWith('library:state:') && val?.stateData?.items) {
+                const match = val.stateData.items.find(({ Id }) => Id === itemId);
+                if (match) match.UserData = { ...match.UserData, ...userData };
+            }
+        }
+
+        // 2. Patch details:episodes:* caches (season episode lists)
+        for (const [key, episodes] of Object.entries(allState)) {
+            if (key.startsWith('details:episodes:') && Array.isArray(episodes)) {
+                const match = episodes.find((ep) => ep.Id === itemId);
+                if (match) match.UserData = { ...match.UserData, ...userData };
+            }
+        }
+
+        // 3. Delete home:pageCache — row structure depends on server-side filters
+        // (e.g. continue watching = PlaybackPositionTicks > 0), so patching individual
+        // item UserData isn't enough. Force a full refetch on next HomePage visit.
+        state.delete('home:pageCache');
+
+        // 4. Re-render the More from Season row if on an Episode page
+        if (this._item?.Type === 'Episode' && this._item.SeriesId && this._item.SeasonId) {
+            this._refreshMoreFromSeason();
+        }
+    }
+
+    _refreshMoreFromSeason() {
+        const list = this.$('#more-from-season-row');
+        const section = this.$('#more-from-season-section');
+        if (!list || !section) return;
+
+        // Clear old virtual row so _loadMoreFromSeason renders fresh
+        delete this._virtualRows?.['more-from-season-section'];
+
+        // Re-render with current (now-patched) cached data
+        list.innerHTML = '';
+        this._loadMoreFromSeason();
+    }
+
+    async _resetProgress() {
+        try {
+            // Use unmarkPlayed API - this clears PlaybackPositionTicks AND marks as unwatched.
+            // Jellyfin doesn't have a dedicated "reset progress" endpoint.
+            // DELETE /Users/{userId}/PlayedItems/{itemId} does both.
+            await api.unmarkPlayed(this._itemId);
+
+            // Update local state to reflect changes
+            if (this._item.UserData) {
+                this._item.UserData.PlaybackPositionTicks = 0;
+                this._item.UserData.Played = false;
+            }
+
+            // Refresh button visibility
+            this._updateButtons();
+
+            // CRITICAL: Invalidate focus cache so FocusManager knows Resume/Reset are gone
+            // and Play button is now the primary focusable in this section.
+            focusManager.invalidateCache('details-actions');
+
+            // Force focus to Play button since Reset/Resume are now hidden
+            const playBtn = this.$('.play-btn');
+            if (playBtn) {
+                requestAnimationFrame(() => {
+                    focusManager.focusElement(playBtn);
+                });
+            }
+        } catch (error) {
+            log.error('Failed to reset progress', error);
+        }
+    }
+
+    /**
+     * Balances action buttons evenly across exactly 2 rows in mobile portrait orientation.
+     * Evaluates all visible action buttons inside the action bar and dynamically injects
+     * a .mobile-action-break element at Math.ceil(total / 2) so that:
+     * - 8 buttons split into exactly 4 and 4
+     * - 9 buttons split into 5 and 4
+     * - 7 buttons split into 4 and 3
+     * - 6 buttons split into 3 and 3
+     * On desktop/TV/landscape viewports, CSS suppresses the break with display: none.
+     */
+    _balanceMobileActionRows() {
+        const actionsContainer = this.$('#actions');
+        if (!actionsContainer) return;
+
+        // Clean up any previously inserted break elements
+        const existingBreaks = actionsContainer.querySelectorAll('.mobile-action-break');
+        existingBreaks.forEach((b) => b.remove());
+
+        // Select all currently visible button elements
+        const visibleBtns = Array.from(actionsContainer.querySelectorAll('button:not(.hidden)'));
+        if (visibleBtns.length < 4) return;
+
+        // Calculate the halfway mark to divide items into two uniform rows
+        const splitIndex = Math.ceil(visibleBtns.length / 2);
+        const breakEl = document.createElement('div');
+        breakEl.className = 'mobile-action-break';
+        visibleBtns[splitIndex - 1].after(breakEl);
+    }
+
+    destroy() {
+        // --------------------------------------------------------------------
+        // Flag this instance as destroyed.
+        // This acts as a circuit breaker for any pending, asynchronous API calls
+        // (such as getThemeMedia) resolving after page exit, preventing audio
+        // race conditions from launching theme playback in the background.
+        // --------------------------------------------------------------------
+        this._isDestroyed = true;
+
+        // --------------------------------------------------------------------
+        // Stop background ambient theme score loop playback.
+        // Elegant Sustain Logic: If the next destination is also a DetailsPage
+        // (e.g. going from a Series details to a Season/Episode details, or back),
+        // we defer stopping by a 2.0-second grace period. If the new page shares
+        // the same theme song (common parent owner), the play command cancels
+        // this deferred stop and playback continues seamlessly without a single
+        // audio hiccup! Otherwise, if we are leaving details entirely, stop and
+        // fade out immediately.
+        // --------------------------------------------------------------------
+        const nextPath = router.getCurrentPath?.() || '';
+        const isNextDetails = nextPath.startsWith('/details/');
+
+        if (isNextDetails) {
+            themeSongPlayer.stopDeferred(2000);
+        } else {
+            themeSongPlayer.stop();
+        }
+
+        if (this._tooltipTimers) {
+            this._tooltipTimers.forEach((t) => clearTimeout(t));
+            this._tooltipTimers = null;
+        }
+
+        if (this._onFocusChangedForTooltip) {
+            eventBus.off('focus:changed', this._onFocusChangedForTooltip);
+            this._onFocusChangedForTooltip = null;
+        }
+
+        if (this._header) {
+            this._header.destroy();
+            this._header = null;
+        }
+        if (this._favBtn) {
+            this._favBtn.destroy();
+            this._favBtn = null;
+        }
+
+        // Release cached backdrop URL reference
+        this._backdropUrl = null;
+
+        if (this._isRichMetaActive) {
+            this._deactivateRichMeta();
+        }
+
+        if (this._playlistGrid) {
+            this._playlistGrid.destroy();
+            this._playlistGrid = null;
+        }
+        if (this._songsGrid) {
+            this._songsGrid.destroy();
+            this._songsGrid = null;
+        }
+        if (this._episodeGrid) {
+            this._episodeGrid.destroy();
+            this._episodeGrid = null;
+        }
+
+        const currentPath = router.getCurrentPath?.() || '';
+        if (!currentPath.startsWith('/player')) {
+            prewarmManager.clear();
+        }
+
+        super.destroy();
+    }
+}
+
+export default DetailsPage;

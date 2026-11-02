@@ -1,0 +1,2030 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Sidebar Component
+ * ============================================================================
+ * Global navigation sidebar that replaces the top header.
+ * Supports collapsed (icon-only) and expanded (icon+text) states.
+ * ============================================================================
+ */
+
+import Component from '../core/Component.js';
+import { api, auth } from '../api/index.js';
+import { router } from '../core/Router.js';
+import { focusManager } from '../ui/FocusManager.js';
+import { eventBus } from '../core/EventBus.js';
+import { logger } from '../utils/Logger.js';
+import { i18n } from '../utils/i18n.js';
+import { syncPlayGroupMenu } from '../core/syncplay/SyncPlayGroupMenu.js';
+import { pluginManager } from '../plugins/PluginManager.js';
+import { storage } from '../utils/StorageService.js';
+import { sidebarLayoutManager } from '../utils/SidebarLayoutManager.js';
+import { sidebarIcons, getLibraryIcon } from '../utils/Icons.js';
+import { layoutManager } from '../ui/LayoutManager.js';
+import { platformInfo } from '../utils/PlatformInfo.js';
+
+const log = logger.create('Sidebar');
+
+class Sidebar extends Component {
+    constructor(options = {}) {
+        super(options);
+
+        this.expanded = false;
+        this.librariesExpanded = false;
+        this.floatingLibrariesOpen = false;
+        this.libraries = [];
+        this.activePath = '';
+
+        /**
+         * Tracks whether the current expansion was triggered by mouse hover.
+         * This is the key to preventing the sidebar from getting stuck open:
+         * when the mouse leaves, we collapse unconditionally if hover caused
+         * the expansion — the .focused class from FocusManager is irrelevant
+         * in that scenario and should NOT block the collapse.
+         * @type {boolean}
+         */
+        this._expandedByMouse = false;
+
+        /**
+         * Cached result of the last resolved Seerr availability check.
+         * Starts as false (hidden) and is updated reactively once the probe
+         * completes. _applySidebarLayout() reads this to decide whether to
+         * show the Discover sidebar button, so it survives any layout rebuild.
+         * @type {boolean}
+         */
+        this._seerrAvailable = false;
+    }
+
+    render() {
+        return `
+            <nav class="sidebar collapsed" id="main-sidebar">
+                <!-- Logo Section -->
+                <!-- Kept as the first flex child so the brand logo always stays anchored to the top. -->
+                <div class="sidebar-header" id="sidebar-logo-header">
+                    <div class="logo-icon">
+                        <img src="assets/icon-130.png" class="sidebar-logo-img" alt="Litefin Logo" />
+                        ${sidebarIcons.logo}
+                    </div>
+                    <span class="logo-text">Litefin</span>
+                </div>
+
+                <!-- Native Back Navigation Control (Web & Desktop) -->
+                <!-- Displayed when viewing 2nd-level routes in desktop/web environments with spring animation -->
+                <button class="sidebar-item sidebar-back-btn" id="sidebar-back-btn" tabindex="0" aria-label="${i18n.t('Back') || 'Back'}" style="display: none;">
+                    <div class="item-icon back-icon">
+                        ${sidebarIcons.back}
+                    </div>
+                    <span class="item-text back-text" data-i18n="Back">${i18n.t('Back') || 'Back'}</span>
+                </button>
+
+                <!-- Floating Island Stationary Capsule Track -->
+                <!-- Renders the fixed background capsule for floating-island layout during scrolling -->
+                <div class="floating-island-pill" id="floating-island-pill"></div>
+
+                <!-- Scrollable Sidebar Content -->
+                <div class="sidebar-content">
+                    <button class="sidebar-item" id="sidebar-home" tabindex="0" data-path="/home">
+                        <div class="item-icon">
+                            ${sidebarIcons.home}
+                        </div>
+                        <span class="item-text" data-i18n="Home">Home</span>
+                    </button>
+
+                    <button class="sidebar-item" id="sidebar-discover" tabindex="0" data-path="/discover" style="display: none;">
+                        <div class="item-icon">
+                            ${sidebarIcons.discover}
+                        </div>
+                        <span class="item-text" data-i18n="SeerrDiscover">Discover</span>
+                    </button>
+
+                    <button class="sidebar-item" id="sidebar-favorites" tabindex="0" data-path="/favorites">
+                        <div class="item-icon">
+                            ${sidebarIcons.favorites}
+                        </div>
+                        <span class="item-text" data-i18n="Favorites">Favorites</span>
+                    </button>
+
+                    <button class="sidebar-item" id="sidebar-search" tabindex="0" data-path="/search">
+                        <div class="item-icon">
+                            ${sidebarIcons.search}
+                        </div>
+                        <span class="item-text" data-i18n="Search">Search</span>
+                    </button>
+
+                    <button class="sidebar-item" id="sidebar-random" tabindex="0">
+                        <div class="item-icon">
+                            ${sidebarIcons.random}
+                        </div>
+                        <span class="item-text" data-i18n="Random">Random</span>
+                    </button>
+
+                    <!-- SyncPlay Section -->
+                    <button class="sidebar-item sidebar-syncplay-btn" id="sidebar-syncplay" tabindex="0" style="display: none;">
+                        <div class="item-icon sidebar-syncplay-icon-wrap">
+                            <!-- User Provided Icon (3 people) -->
+                            ${sidebarIcons.syncplay}
+                            <!-- Pulsing dot — visible only when in a group -->
+                            <span class="sidebar-syncplay-dot" id="sidebar-syncplay-dot"></span>
+                        </div>
+                        <span class="item-text sidebar-syncplay-label" id="sidebar-syncplay-label">SyncPlay</span>
+                    </button>
+                    
+                    <button class="sidebar-item" id="sidebar-livetv" tabindex="0" data-path="/livetv" style="display: none;">
+                        <div class="item-icon">
+                            ${sidebarIcons.livetv}
+                        </div>
+                        <span class="item-text" data-i18n="LiveTV">Live TV</span>
+                    </button>
+
+                    <!-- Modern Libraries Accordion Toggle (Collections / Books Icon) -->
+                    <button class="sidebar-item" id="sidebar-libraries" tabindex="0">
+                        <div class="item-icon">
+                            ${sidebarIcons.libraries}
+                        </div>
+                        <span class="item-text" data-i18n="Libraries">Libraries</span>
+                        <span class="sidebar-chevron">${sidebarIcons.chevronDown}</span>
+                    </button>
+
+                    <!-- Modern Sub-Libraries Container (Hidden by default) -->
+                    <div class="sidebar-sub-libraries hidden" id="sidebar-sub-libraries" style="display: none;" hidden></div>
+
+                    <button class="sidebar-item" id="sidebar-settings" tabindex="0" data-path="/settings">
+                        <div class="item-icon">
+                            ${sidebarIcons.settings}
+                        </div>
+                        <span class="item-text" data-i18n="Settings">Settings</span>
+                    </button>
+                </div>
+
+                <!-- Footer Section (User Profile pinned at the very bottom in Modern) -->
+                <div class="sidebar-footer" id="sidebar-footer">
+                    <!-- User Profile -->
+                    <button class="sidebar-item user-profile-btn" id="sidebar-user" tabindex="0">
+                        <div class="item-icon user-avatar-container">
+                            ${this._renderUserAvatar()}
+                        </div>
+                        <span class="item-text sidebar-user-name">${this._getUserName()}</span>
+                    </button>
+                </div>
+
+                <!-- Sliding Focus Indicator -->
+                <div class="sidebar-focus-indicator"></div>
+            </nav>
+        `;
+    }
+
+    onMounted() {
+        this._bindEvents();
+        this._loadLibraries().then(() => this._updateSeerrVisibility());
+        this._updateActiveState();
+
+        // Hydrate DOM with translations
+        i18n.translateDOM(this.el);
+
+        // Listen for auth events to update user profile
+        eventBus.on('auth:login', this._onAuthChange.bind(this));
+        eventBus.on('auth:logout', this._onAuthChange.bind(this));
+        eventBus.on('auth:restored', this._onAuthChange.bind(this));
+
+        // Listen for SyncPlay state changes to update the sidebar button
+        this._onSyncPlayEnabled = () => this._updateSyncPlayBtn(true);
+        this._onSyncPlayDisabled = () => this._updateSyncPlayBtn(false);
+        eventBus.on('syncplay:enabled', this._onSyncPlayEnabled);
+        eventBus.on('syncplay:disabled', this._onSyncPlayDisabled);
+
+        // Initialize visibility in case the plugin is disabled at startup
+        // The default active state is retrieved dynamically from the Manager if it exists,
+        //. but fallback to false if it hasn't started yet.
+        this._updateSyncPlayBtn(window.__syncPlayManager?.isActive || false);
+
+        // Sidebar Logo clickability configuration
+        this._updateLogoSettings();
+        this._onLogoSettingsChanged = () => this._updateLogoSettings();
+        eventBus.on('pref:logoSettings', this._onLogoSettingsChanged);
+        eventBus.on('pref:keepSidebarNavButton', this._onLogoSettingsChanged);
+
+        this._updateSidebarItemsAlign();
+        this._onSidebarItemsAlignChanged = () => this._updateSidebarItemsAlign();
+        eventBus.on('pref:sidebarItemsAlign', this._onSidebarItemsAlignChanged);
+
+        // ---------------------------------------------------------------------
+        // SIDEBAR BACK BUTTON PREFERENCE LISTENER
+        // ---------------------------------------------------------------------
+        // Re-evaluates back button visibility dynamically when user modifies the
+        // back button platform preference in Settings.
+        // ---------------------------------------------------------------------
+        this._onBackButtonPrefChanged = () => this._updateBackButtonState();
+        eventBus.on('pref:sidebarBackButton', this._onBackButtonPrefChanged);
+
+        this._updateAnimationMode();
+        this._onAnimationModeChanged = () => this._updateAnimationMode();
+        eventBus.on('prefChanged:disableSidebarAnimation', this._onAnimationModeChanged);
+
+        // ---------------------------------------------------------------------
+        // SIDEBAR ICON SHADOWS CONFIGURATION
+        // ---------------------------------------------------------------------
+        // Read preference via LayoutManager and apply reactive .has-icon-shadows
+        // class to root sidebar DOM node. Subscribe to event bus for live updates.
+        // ---------------------------------------------------------------------
+        const initialIconShadows = layoutManager.getSidebarIconShadows();
+        this.el.classList.toggle('has-icon-shadows', initialIconShadows);
+
+        this._onIconShadowsChanged = () => {
+            const hasShadows = layoutManager.getSidebarIconShadows();
+            this.el.classList.toggle('has-icon-shadows', hasShadows);
+        };
+        eventBus.on('sidebarIconShadows:changed', this._onIconShadowsChanged);
+        eventBus.on('pref:sidebarIconShadows', this._onIconShadowsChanged);
+
+        // ---------------------------------------------------------------------
+        // COLLAPSED SIDEBAR LIBRARY SHORTCUT ICONS CONFIGURATION
+        // ---------------------------------------------------------------------
+        // Read the user preference for collapsed library shortcuts. If enabled,
+        // we append the reactive class 'show-lib-icons-collapsed' directly to the
+        // root sidebar container. Register event bus subscription to listen for
+        // user changes dynamically and perform clean layout hot-reloads.
+        // ---------------------------------------------------------------------
+        const showLibIcons = storage.getItem('pref:showCollapsedLibraryIcons') === 'true';
+        this.el.classList.toggle('show-lib-icons-collapsed', showLibIcons);
+
+        this._onShowLibIconsChanged = (newValue) => {
+            // Determine boolean state from incoming event payload or storage
+            const enabled = newValue === true || newValue === 'true';
+            this.el.classList.toggle('show-lib-icons-collapsed', enabled);
+
+            // In normal mode, ensure sidebar content remains anchored to the top
+            const scrollContainer = this.el.querySelector('.sidebar-content');
+            if (scrollContainer && !enabled) {
+                scrollContainer.scrollTop = 0;
+            }
+
+            // Re-apply full DOM layout tree to reposition library elements into rail or sub-container
+            this._applySidebarLayout();
+            this._updateActiveState();
+
+            // Invalidate FocusManager cache so D-pad navigation picks up the reordered items immediately
+            focusManager.resetDOMCache();
+            focusManager.invalidateCache('sidebar');
+
+            // Re-evaluate sidebar item alignment with updated element heights
+            setTimeout(() => this._updateSidebarItemsAlign(), 0);
+        };
+        eventBus.on('prefChanged:showCollapsedLibraryIcons', this._onShowLibIconsChanged);
+
+        // ---------------------------------------------------------------------
+        // COLLAPSED SIDEBAR BACKGROUND CONFIGURATION
+        // ---------------------------------------------------------------------
+        this.activePath = router.getCurrentPath() || '';
+        this._updateTransparentCollapsed();
+
+        this._onTransparentCollapsedChanged = () => {
+            this._updateTransparentCollapsed();
+        };
+        eventBus.on('pref:collapsedSidebarColor', this._onTransparentCollapsedChanged);
+        eventBus.on('pref:expandedSidebarColor', this._onTransparentCollapsedChanged);
+        eventBus.on('pref:sidebarMode', this._onTransparentCollapsedChanged);
+
+        this._onHideLibraryHeaderChanged = () => {
+            this._loadLibraries();
+        };
+        eventBus.on('prefChanged:hideSidebarLibraryHeader', this._onHideLibraryHeaderChanged);
+
+        // ── Sidebar Layout customization ──────────────────────────────────────
+        // Hot-reload the sidebar layout when the user saves changes in Settings.
+        this._onSidebarLayoutChanged = () => {
+            // Re-apply order/visibility and update the default focus target
+            this._applySidebarLayout();
+        };
+        eventBus.on('prefChanged:sidebarLayout', this._onSidebarLayoutChanged);
+
+        // Listen for layout mode switches (classic vs modern)
+        this._onSidebarLayoutModeChanged = () => {
+            this._loadLibraries();
+        };
+        eventBus.on('sidebarLayout:changed', this._onSidebarLayoutModeChanged);
+
+        // React to seerr status being resolved (after auth is set up and server responds).
+        // This fires from SeerrClient after a successful status probe, allowing us to
+        // update the Discover button without a separate network call.
+        this._onSeerrStatusResolved = (status) => {
+            const available = !!(status && status.configured && status.available);
+            if (this._seerrAvailable !== available) {
+                this._seerrAvailable = available;
+                this._applySidebarLayout();
+            }
+        };
+        eventBus.on('seerr:statusResolved', this._onSeerrStatusResolved);
+
+        // ---------------------------------------------------------------------
+        // FLOATING ISLAND GEOMETRY RESIZE LISTENER
+        // ---------------------------------------------------------------------
+        // Keep stationary pill bounds and floating popovers in sync with screen dimension adjustments
+        this._onResizeGeometry = () => {
+            this._updateFloatingIslandGeometry();
+            if (this.floatingLibrariesOpen) {
+                this._toggleFloatingLibraries(true);
+            }
+        };
+        window.addEventListener('resize', this._onResizeGeometry);
+
+        // Initial geometry calculation once DOM tree mounts and reflow settles
+        this._updateFloatingIslandGeometry();
+        setTimeout(() => this._updateFloatingIslandGeometry(), 50);
+
+        // Resolve the default focus item from saved prefs (falls back to 'home')
+        const defaultFocusId = sidebarLayoutManager.getDefaultFocus();
+
+        // Register focus
+        focusManager.register('sidebar', this.el, {
+            orientation: 'vertical',
+            selector: '.sidebar-item',
+            /*
+             * Use the saved default focus preference. The defaultFocusSelector is
+             * stored on the section config and re-read each time focus enters the
+             * sidebar, so updating it via _applySidebarLayout() also takes effect
+             * immediately without re-registering the entire section.
+             */
+            defaultFocusSelector: `#sidebar-${defaultFocusId}`,
+            onMove: (direction, focusedEl) => {
+                const isRtl = document.documentElement.dir === 'rtl';
+                const exitDirection = isRtl ? 'left' : 'right';
+                const backDirection = isRtl ? 'right' : 'left';
+
+                // Handle D-pad navigation inside Modern Collapsed floating libraries popover
+                if (layoutManager.isModernCollapsedSidebarLayout() && this.floatingLibrariesOpen) {
+                    const subLibs = this.el.querySelector('#sidebar-sub-libraries');
+                    if (subLibs && (subLibs.contains(focusedEl) || subLibs.querySelector('.focused'))) {
+                        const items = Array.from(subLibs.querySelectorAll('.library-item:not(.hidden)'));
+                        const currentEl = subLibs.contains(focusedEl) ? focusedEl : subLibs.querySelector('.focused');
+                        const currentIndex = items.indexOf(currentEl);
+
+                        // Up on first item -> close popover and return focus to libraries button
+                        if (direction === 'up' && currentIndex === 0) {
+                            this._toggleFloatingLibraries(false);
+                            return true;
+                        }
+
+                        // Down on last item -> close popover and return focus to libraries button
+                        if (direction === 'down' && currentIndex === items.length - 1) {
+                            this._toggleFloatingLibraries(false);
+                            return true;
+                        }
+
+                        // Pressing Left (or Right in RTL) returns to Libraries button and closes popover
+                        if (direction === backDirection) {
+                            this._toggleFloatingLibraries(false);
+                            return true;
+                        }
+                        // Pressing Right (or Left in RTL) exits to page content and closes popover
+                        if (direction === exitDirection) {
+                            this._toggleFloatingLibraries(false);
+                        }
+                    }
+                }
+
+                if (direction === exitDirection) {
+                    const pageContainer = document.getElementById('page-container');
+                    if (!pageContainer) return false;
+
+                    // 1. Try to resume previous section (Smart Resume)
+                    const prevSection = focusManager.getPreviousSection();
+                    if (prevSection) {
+                        const config = focusManager.getSectionConfig(prevSection);
+                        // Check if section still exists and is part of the current page structure
+                        if (config && pageContainer.contains(config.container)) {
+                            // Pass null as 3rd arg to force Memory restore instead of Spatial
+                            focusManager.setActiveSection(prevSection, true, null);
+                            return true;
+                        }
+                    }
+
+                    // 2. Fallback: Find first visible focusable to identify valid section
+                    const selector = 'button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+                    const candidates = pageContainer.querySelectorAll(selector);
+                    const target = Array.from(candidates).find((el) => el.offsetParent !== null);
+
+                    if (target) {
+                        const section = focusManager.getSectionForElement(target);
+                        if (section) {
+                            focusManager.setActiveSection(section, true, null);
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+        });
+
+        // Apply the layout immediately after registration so the first render
+        // already reflects the user's saved order and visibility prefs.
+        this._applySidebarLayout();
+
+        // Listen for route changes
+        eventBus.on('router:navigate', this._onNavigate.bind(this));
+
+        // Initial setup of indicator
+        this._updateIndicator();
+
+        // Initial setup of Desktop & Web back button state
+        this._updateBackButtonState();
+    }
+
+    async _updateSeerrVisibility() {
+        const button = this.$('#sidebar-discover');
+        if (!button) return;
+
+        // Don't probe while unauthenticated — the API call will fail and may
+        // cause other pages to read a stale 'false' result from the in-memory cache.
+        // The auth:restored → _onAuthChange path ensures we re-run once ready.
+        if (!auth.isAuthenticated()) return;
+
+        // seerrClient is dynamically imported so it (and its normalize/genre
+        // helpers) stay out of the initial main bundle on TV tiers. Only the
+        // Discover-visibility probe needs it on the app shell.
+        let isAvailable = false;
+        try {
+            const { seerr } = await import('../api/seerrClient.js');
+            isAvailable = await seerr.isAvailable();
+        } catch (err) {
+            log.warn('Seerr availability probe failed', err);
+        }
+
+        // Cache locally so _applySidebarLayout() can preserve this state
+        // across any layout rebuild without an additional network call
+        this._seerrAvailable = isAvailable;
+        button.style.display = isAvailable ? '' : 'none';
+        focusManager.invalidateCache('sidebar');
+        this._updateFloatingIslandGeometry();
+    }
+
+    onDestroyed() {
+        if (this._focusObserver) {
+            this._focusObserver.disconnect();
+            this._focusObserver = null;
+        }
+        focusManager.unregister('sidebar');
+        eventBus.off('router:navigate', this._onNavigate.bind(this));
+
+        // Remove auth listeners
+        eventBus.off('auth:login', this._onAuthChange.bind(this));
+        eventBus.off('auth:logout', this._onAuthChange.bind(this));
+        eventBus.off('auth:restored', this._onAuthChange.bind(this));
+
+        // Remove SyncPlay listeners
+        if (this._onSyncPlayEnabled) eventBus.off('syncplay:enabled', this._onSyncPlayEnabled);
+        if (this._onSyncPlayDisabled) eventBus.off('syncplay:disabled', this._onSyncPlayDisabled);
+
+        // Remove sidebar layout hot-reload listener
+        if (this._onSidebarLayoutChanged) {
+            eventBus.off('prefChanged:sidebarLayout', this._onSidebarLayoutChanged);
+        }
+
+        if (this._onSidebarLayoutModeChanged) {
+            eventBus.off('sidebarLayout:changed', this._onSidebarLayoutModeChanged);
+        }
+
+        if (this._onSeerrStatusResolved) {
+            eventBus.off('seerr:statusResolved', this._onSeerrStatusResolved);
+        }
+
+        if (this._onLogoSettingsChanged) {
+            eventBus.off('pref:logoSettings', this._onLogoSettingsChanged);
+        }
+
+        if (this._onAnimationModeChanged) {
+            eventBus.off('prefChanged:disableSidebarAnimation', this._onAnimationModeChanged);
+        }
+
+        // Unsubscribe from preference change events cleanly
+        if (this._onShowLibIconsChanged) {
+            eventBus.off('prefChanged:showCollapsedLibraryIcons', this._onShowLibIconsChanged);
+        }
+
+        if (this._onTransparentCollapsedChanged) {
+            eventBus.off('pref:collapsedSidebarColor', this._onTransparentCollapsedChanged);
+            eventBus.off('pref:expandedSidebarColor', this._onTransparentCollapsedChanged);
+            eventBus.off('pref:sidebarMode', this._onTransparentCollapsedChanged);
+        }
+
+        if (this._onHideLibraryHeaderChanged) {
+            eventBus.off('prefChanged:hideSidebarLibraryHeader', this._onHideLibraryHeaderChanged);
+        }
+
+        if (this._onSidebarItemsAlignChanged) {
+            eventBus.off('pref:sidebarItemsAlign', this._onSidebarItemsAlignChanged);
+        }
+
+        // Clean up sidebar back button preference listener
+        if (this._onBackButtonPrefChanged) {
+            eventBus.off('pref:sidebarBackButton', this._onBackButtonPrefChanged);
+        }
+
+        // Clean up sidebar icon shadows preference listener
+        if (this._onIconShadowsChanged) {
+            eventBus.off('sidebarIconShadows:changed', this._onIconShadowsChanged);
+            eventBus.off('pref:sidebarIconShadows', this._onIconShadowsChanged);
+            this._onIconShadowsChanged = null;
+        }
+
+        // Clean up floating island resize listener
+        if (this._onResizeGeometry) {
+            window.removeEventListener('resize', this._onResizeGeometry);
+            this._onResizeGeometry = null;
+        }
+
+        // Clean up floating popover event listeners
+        if (this._onBackFloatingLibs) {
+            eventBus.off('key:back', this._onBackFloatingLibs);
+        }
+        if (this._onDocKeyDown) {
+            document.removeEventListener('keydown', this._onDocKeyDown, true);
+        }
+        if (this._onDocClickOutside) {
+            document.removeEventListener('mousedown', this._onDocClickOutside, true);
+        }
+    }
+
+    /**
+     * Handle auth changes (login/logout)
+     */
+    _onAuthChange() {
+        const userBtn = this.el.querySelector('#sidebar-user');
+        if (userBtn) {
+            // Update Avatar
+            const avatarContainer = userBtn.querySelector('.user-avatar-container');
+            if (avatarContainer) {
+                avatarContainer.innerHTML = this._renderUserAvatar();
+            }
+            // Update Name
+            const nameSpan = userBtn.querySelector('.sidebar-user-name');
+            if (nameSpan) {
+                nameSpan.textContent = this._getUserName();
+            }
+        }
+
+        // Reload libraries if logged in
+        if (auth.isAuthenticated()) {
+            // Re-check seerr availability after auth change so the discover button
+            // and any other seerr UI reflects the current session state correctly
+            this._loadLibraries().then(() => this._updateSeerrVisibility());
+        } else {
+            // Clear loaded library items from the sub-libraries container on logout.
+            // NOTE: Do NOT clear #sidebar-libraries (the toggle button itself) — that would wipe its
+            // icon, label, and chevron, leaving it as an invisible-but-focusable empty element.
+            const subContainer = this.el.querySelector('#sidebar-sub-libraries');
+            if (subContainer) {
+                subContainer.innerHTML = '';
+                focusManager.resetDOMCache();
+            }
+        }
+    }
+
+    /**
+     * Set visibility mode
+     * @param {'visible'|'hidden'} mode
+     */
+    setMode(mode) {
+        this.el.classList.toggle('hidden', mode === 'hidden');
+        // Invalidate FocusManager cache so switching to visible allows entering the sidebar
+        focusManager.invalidateCache('sidebar');
+        // Re-evaluate alignment once visibility changes (resolving clientHeight 0 state)
+        setTimeout(() => this._updateSidebarItemsAlign(), 0);
+    }
+
+    _updateLogoSettings() {
+        // ---------------------------------------------------------------
+        // Wrap entire function in try/catch — if ANY DOM call throws on
+        // ultra-legacy WebKit (e.g. setAttribute with an unexpected type),
+        // we must NOT silently swallow it and leave boot frozen.
+        // ---------------------------------------------------------------
+        try {
+            // Retrieve logo preference from persistent storage
+            let logoPref = storage.getItem('pref:logoSettings') || 'visible';
+
+            // Migrate legacy boolean values to new string keys
+            if (logoPref === 'true') {
+                logoPref = 'settings';
+            } else if (logoPref === 'false') {
+                logoPref = 'visible';
+            }
+
+            // Locate elements in the sidebar DOM
+            const logoHeader = this.el.querySelector('#sidebar-logo-header');
+            const settingsBtn = this.el.querySelector('#sidebar-settings');
+            const homeBtn = this.el.querySelector('#sidebar-home');
+
+            if (logoHeader) {
+                // Determine whether the logo is visible or hidden
+                const isLogoVisible = logoPref !== 'hidden';
+                logoHeader.style.display = isLogoVisible ? '' : 'none';
+
+                // Track logo visibility state on parent container for CSS layout headroom adjustments
+                this.el.classList.toggle('sidebar-logo-hidden', !isLogoVisible);
+
+                // Determine if logo behaves as an interactive/focusable button
+                const isClickable = logoPref === 'settings' || logoPref === 'home';
+                logoHeader.classList.toggle('sidebar-item', isClickable);
+                logoHeader.setAttribute('data-focusable', isClickable.toString());
+                logoHeader.setAttribute('tabindex', isClickable ? '0' : '-1');
+
+                // Manage dynamic action tooltip for modern-collapsed and floating-buttons layouts
+                let tooltipEl = logoHeader.querySelector('.logo-tooltip');
+                if (!tooltipEl) {
+                    tooltipEl = document.createElement('span');
+                    tooltipEl.className = 'item-text logo-tooltip';
+                    logoHeader.appendChild(tooltipEl);
+                }
+
+                /*
+                 * On older webOS web engines (like webOS 2.x), mutating or deleting
+                 * properties on the dataset object directly can throw TypeErrors.
+                 * We use standard setAttribute and removeAttribute calls while keeping dataset in sync.
+                 */
+                if (logoPref === 'settings') {
+                    logoHeader.setAttribute('data-path', '/settings');
+                    if (logoHeader.dataset) logoHeader.dataset.path = '/settings';
+                    tooltipEl.textContent = i18n.t('Settings') || 'Settings';
+                    tooltipEl.setAttribute('data-i18n', 'Settings');
+                    tooltipEl.style.display = '';
+                } else if (logoPref === 'home') {
+                    logoHeader.setAttribute('data-path', '/home');
+                    if (logoHeader.dataset) logoHeader.dataset.path = '/home';
+                    tooltipEl.textContent = i18n.t('Home') || 'Home';
+                    tooltipEl.setAttribute('data-i18n', 'Home');
+                    tooltipEl.style.display = '';
+                } else {
+                    logoHeader.removeAttribute('data-path');
+                    try {
+                        if (logoHeader.dataset) delete logoHeader.dataset.path;
+                    } catch (e) {}
+                    tooltipEl.textContent = '';
+                    tooltipEl.style.display = 'none';
+                }
+
+                // Determine whether dedicated Home or Settings button should remain visible
+                const keepNavBtn = storage.getItem('pref:keepSidebarNavButton') === 'true';
+
+                // Show/hide dedicated settings button if logo is set to settings
+                if (settingsBtn) {
+                    settingsBtn.classList.toggle('hidden', logoPref === 'settings' && !keepNavBtn);
+                }
+
+                // Show/hide dedicated home button if logo is set to home
+                if (homeBtn) {
+                    homeBtn.classList.toggle('hidden', logoPref === 'home' && !keepNavBtn);
+                }
+
+                // Invalidate focusManager cache since focusability of a header element changed
+                focusManager.invalidateCache('sidebar');
+
+                // Synchronize floating island pill geometry with the updated logo headroom
+                this._updateFloatingIslandGeometry();
+            }
+        } catch (err) {
+            log.error('Failed to update sidebar logo settings due to DOM error:', err);
+        }
+    }
+
+    /**
+     * Update sidebar animation mode based on user preference
+     * @private
+     */
+    _updateAnimationMode() {
+        const disabled = storage.getItem('pref:disableSidebarAnimation') === 'true';
+        this.el.classList.toggle('no-animation', disabled);
+    }
+
+    /**
+     * Bind interaction handlers to a sidebar item.
+     * Uses onmousedown for snappy mouse/pointer response and onclick for D-pad.
+     * Includes a 400ms debounce to prevent double-activation on WebOS Magic Remote,
+     * where a pointer click synthesizes a mousedown followed by a key:enter.
+     * @param {HTMLElement} el - Item element
+     * @param {Function} callback - Activation handler
+     * @private
+     */
+    _bindItem(el, callback) {
+        if (!el) return;
+
+        let lastActiveTime = 0;
+        const handleActivate = (e) => {
+            const now = Date.now();
+            if (now - lastActiveTime < 400) return;
+            lastActiveTime = now;
+
+            callback(e);
+        };
+
+        // Pointer/Magic Remote: snap to mousedown for zero lag
+        el.onmousedown = (e) => {
+            if (e.button === 0) {
+                // Left click only
+                handleActivate(e);
+            }
+        };
+
+        // D-pad/Synthetic: fallback to onclick
+        el.onclick = (e) => {
+            handleActivate(e);
+        };
+    }
+
+    _bindEvents() {
+        if (!this.el) return;
+
+        // MutationObserver to watch for focus changes (used to expand/collapse sidebar)
+        if (!this._focusObserver) {
+            this._focusObserver = new MutationObserver((mutations) => {
+                // ── Feedback-loop guard ───────────────────────────────────────
+                // The MutationObserver watches the entire sidebar subtree, which
+                // includes this.el itself. When _expand() toggles 'expanded' /
+                // 'collapsed' / 'has-focus' on the root nav element, that class
+                // change fires this callback. If we don't bail here, the callback
+                // sees a .focused child item and immediately re-expands, undoing
+                // the collapse — the visible "fading then returning" bug.
+                //
+                // Rule: only react to class changes on *child* elements (the
+                // sidebar items). Mutations on the root element are always caused
+                // by _expand() itself and must be ignored to break the loop.
+                const hasChildMutation = mutations.some((m) => m.target !== this.el);
+                if (!hasChildMutation) return;
+
+                const focusedItem = this.el.querySelector('.focused');
+                const hasFocus = !!focusedItem;
+
+                // ---------------------------------------------------------------------
+                // SIDEBAR CONTENT SCROLL ANCHORING & OVERFLOW HANDLING
+                // ---------------------------------------------------------------------
+                // When sidebar content fits comfortably within the visible viewport height
+                // without overflowing, ensure scrollTop remains strictly anchored to 0.
+                // When content overflows (e.g. extensive library lists or compact displays),
+                // ScrollController manages smooth focus-driven scrolling across D-pad
+                // navigation events on TV hardware without manual scrollTop clobbering.
+                // ---------------------------------------------------------------------
+                const scrollContainer = this.el.querySelector('.sidebar-content');
+
+                if (scrollContainer && scrollContainer.scrollHeight <= scrollContainer.clientHeight) {
+                    // Container does not overflow viewport; keep safely anchored to top
+                    if (scrollContainer.scrollTop !== 0) {
+                        scrollContainer.scrollTop = 0;
+                    }
+                }
+
+                // Update indicator FIRST while transition is still disabled (collapsed state)
+                // to ensure it snaps to the correct position before we expand.
+                this._updateIndicator(focusedItem);
+
+                // Then handle expansion — but ONLY via D-pad/keyboard focus paths.
+                // When the mouse is hovering, hover already opened the sidebar and
+                // we must NOT let the MutationObserver re-expand it on mouseleave
+                // (which clears .focused). The _expandedByMouse flag separates
+                // the two independent open mechanisms cleanly.
+                if (!this._expandedByMouse) {
+                    if (hasFocus) {
+                        this._expand(true);
+                    } else {
+                        this._expand(false);
+                    }
+                }
+            });
+
+            this._focusObserver.observe(this.el, {
+                attributes: true,
+                subtree: true,
+                attributeFilter: ['class']
+            });
+        }
+
+        // ── Mouse hover expand/collapse ───────────────────────────────────
+        // mouseenter always expands; mouseleave always collapses — no guards.
+        //
+        // Why no guards? The previous `.focused` check caused the sidebar to
+        // get stuck open after any click (FocusManager stamps .focused on the
+        // clicked item, leaving the check permanently true). The `_expandedByMouse`
+        // flag was a better attempt but still fails on double-click: a spurious
+        // mouseleave event (triggered mid-click by page transitions) clears the
+        // flag, putting the MutationObserver back in control with .focused set.
+        //
+        // The correct mental model:
+        //   • Mouse physically leaving the sidebar = always collapse. Period.
+        //   • D-pad entering the sidebar = MutationObserver handles expand/collapse.
+        //   • Both paths are mutually exclusive in practice (D-pad users don't hover).
+        this.el.addEventListener('mouseenter', () => {
+            this._expandedByMouse = true;
+            this._expand(true);
+        });
+        this.el.addEventListener('mouseleave', () => {
+            // Always collapse when the mouse leaves — no .focused guard, no flag check.
+            // If the user is navigating via D-pad, this event never fires so D-pad
+            // behaviour is completely unaffected.
+            this._expandedByMouse = false;
+            this._expand(false);
+        });
+
+        // Logo click handler (supports both Settings and Home target paths)
+        this._bindItem(this.el.querySelector('#sidebar-logo-header'), () => {
+            const logoEl = this.el.querySelector('#sidebar-logo-header');
+            const targetPath = logoEl?.getAttribute
+                ? logoEl.getAttribute('data-path') || logoEl.dataset?.path
+                : logoEl?.dataset?.path;
+            if (targetPath) {
+                if (targetPath === '/home') {
+                    router.reset(targetPath);
+                } else {
+                    router.navigate(targetPath);
+                }
+            }
+        });
+
+        // Navigation Clicks for other standard items
+        const items = this.el.querySelectorAll('.sidebar-item');
+        items.forEach((item) => {
+            if (item.id === 'sidebar-logo-header') return; // Handled above
+            if (item.id === 'sidebar-back-btn') return; // Handled explicitly below
+            if (item.id === 'sidebar-libraries') return; // Handled by accordion toggle
+
+            this._bindItem(item, () => {
+                const path = item.dataset.path;
+                if (path) {
+                    if (path === '/home') {
+                        router.reset(path);
+                    } else {
+                        router.navigate(path);
+                    }
+                } else if (item.id === 'sidebar-user') {
+                    // Clicking the user profile tile opens the "Who's Watching" profiles screen.
+                    // From there the user can switch profiles, add a user, or switch servers.
+                    router.navigate('/profiles');
+                } else if (item.id === 'sidebar-syncplay') {
+                    // Open the SyncPlay group menu overlay (works from any screen)
+                    syncPlayGroupMenu.open();
+                } else if (item.id === 'sidebar-random') {
+                    this._onRandomClick();
+                } else if (item.id === 'sidebar-logout') {
+                    // AuthManager.logout() handles the routing based on remaining sessions:
+                    //   • Other sessions remain → auth:switchToProfiles → App.js routes to /profiles
+                    //   • No sessions remain    → auth:logout           → App.js routes to /login
+                    // auth.logout();
+                }
+            });
+        });
+
+        // macOS-style back button click and keyboard activation
+        const backBtn = this.el.querySelector('#sidebar-back-btn');
+        if (backBtn) {
+            this._bindItem(backBtn, (e) => {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                router.back();
+            });
+        }
+
+        // Libraries accordion toggle button handler
+        const librariesBtn = this.el.querySelector('#sidebar-libraries');
+        if (librariesBtn) {
+            this._bindItem(librariesBtn, () => {
+                if (layoutManager.isModernCollapsedSidebarLayout()) {
+                    this._toggleFloatingLibraries();
+                    return;
+                }
+                if (!this.expanded) {
+                    this._expandedByMouse = true;
+                    this._expand(true);
+                    this._toggleLibraries(true);
+                } else {
+                    this._toggleLibraries();
+                }
+            });
+        }
+
+        // Back key listener for floating libraries popover in modern-collapsed
+        this._onBackFloatingLibs = () => {
+            if (layoutManager.isModernCollapsedSidebarLayout() && this.floatingLibrariesOpen) {
+                this._toggleFloatingLibraries(false);
+                return true;
+            }
+            return false;
+        };
+        eventBus.on('key:back', this._onBackFloatingLibs);
+
+        // Document keydown for Escape / Remote Back and boundary Up/Down dismiss
+        this._onDocKeyDown = (e) => {
+            if (layoutManager.isModernCollapsedSidebarLayout() && this.floatingLibrariesOpen) {
+                const isEscape = e.key === 'Escape' || e.keyCode === 10009 || e.keyCode === 27;
+                if (isEscape) {
+                    this._toggleFloatingLibraries(false);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+
+                const subLibs = this.el.querySelector('#sidebar-sub-libraries');
+                if (subLibs && subLibs.contains(document.activeElement)) {
+                    const items = Array.from(subLibs.querySelectorAll('.library-item:not(.hidden)'));
+                    const currentIndex = items.indexOf(document.activeElement);
+
+                    // Up on first item -> close popover and return focus to libraries button
+                    if ((e.key === 'ArrowUp' || e.keyCode === 38) && currentIndex === 0) {
+                        this._toggleFloatingLibraries(false);
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+
+                    // Down on last item -> close popover and return focus to libraries button
+                    if ((e.key === 'ArrowDown' || e.keyCode === 40) && currentIndex === items.length - 1) {
+                        this._toggleFloatingLibraries(false);
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+
+                    // Left arrow (or Right in RTL) -> close popover and return focus to libraries button
+                    const isRTL = document.documentElement.dir === 'rtl';
+                    const isBackDirection = isRTL
+                        ? e.key === 'ArrowRight' || e.keyCode === 39
+                        : e.key === 'ArrowLeft' || e.keyCode === 37;
+                    if (isBackDirection) {
+                        this._toggleFloatingLibraries(false);
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                }
+            }
+        };
+        document.addEventListener('keydown', this._onDocKeyDown, true);
+
+        // Click outside floating popover to dismiss
+        this._onDocClickOutside = (e) => {
+            if (layoutManager.isModernCollapsedSidebarLayout() && this.floatingLibrariesOpen) {
+                const subLibs = this.el.querySelector('#sidebar-sub-libraries');
+                const libBtn = this.el.querySelector('#sidebar-libraries');
+                if (subLibs && !subLibs.contains(e.target) && libBtn && !libBtn.contains(e.target)) {
+                    this._toggleFloatingLibraries(false);
+                }
+            }
+        };
+        document.addEventListener('mousedown', this._onDocClickOutside, true);
+
+        // Sync indicator during scrolling
+        const contentContainer = this.el.querySelector('.sidebar-content');
+        if (contentContainer) {
+            contentContainer.addEventListener('scroll', () => {
+                const focused = this.el.querySelector('.sidebar-item.focused');
+                // Only sync if the focused element is actually INSIDE the scrolling container
+                if (focused && contentContainer.contains(focused)) {
+                    this._updateIndicator(focused, { instant: true });
+                }
+            });
+        }
+    }
+
+    _expand(expanded) {
+        if (storage.getItem('pref:sidebarMode') === 'collapsed' || layoutManager.isModernCollapsedSidebarLayout()) {
+            expanded = false;
+        }
+        if (this.expanded === expanded) return;
+        this.expanded = expanded;
+
+        this.el.classList.toggle('expanded', expanded);
+        this.el.classList.toggle('collapsed', !expanded);
+
+        // Recheck items alignment since library visibility changes between collapsed and expanded states
+        this._updateSidebarItemsAlign();
+        setTimeout(() => this._updateSidebarItemsAlign(), 0);
+
+        // ====================================================================
+        // COLLAPSE VISUAL RESET
+        // ====================================================================
+        // When collapsing, we must ensure all focus indicators and focus state
+        // classes are immediately removed from the sidebar DOM elements.
+        // --------------------------------------------------------------------
+        if (!expanded) {
+            // Hide the sliding focus indicator wrapper
+            this.el.classList.remove('has-focus');
+
+            // Strip the .focused class from all sidebar items (static and library ones).
+            // This is critical when double-clicking or clicking the already-active
+            // sidebar button: since the router doesn't navigate to a different hash,
+            // the focus never shifts to a page element, leaving the sidebar item
+            // permanently marked as focused. Removing it here restores the clean,
+            // unselected collapsed state visually.
+            this.el.querySelectorAll('.focused').forEach((el) => {
+                el.classList.remove('focused');
+            });
+
+            // ====================================================================
+            // NATIVE BROWSER FOCUS DEFEAT
+            // ====================================================================
+            // When mouse-clicking a sidebar item, the browser applies native focus
+            // to the clicked button element. When the sidebar collapses, this native
+            // focus remains, triggering theme selectors like `.sidebar-item:focus`
+            // (often with !important). Blurring it removes the native :focus state.
+            // --------------------------------------------------------------------
+            if (this.el.contains(document.activeElement)) {
+                document.activeElement.blur();
+            }
+
+            // If not active on a library page, auto-close the libraries accordion on sidebar collapse
+            const isModern = !layoutManager.isClassicSidebarLayout();
+            const isLibraryActive =
+                this.activePath &&
+                (this.activePath.startsWith('/library/') || !!this.el.querySelector('.library-item.active'));
+            if (isModern && !isLibraryActive && this.librariesExpanded) {
+                this._toggleLibraries(false);
+            }
+
+            // In collapsed mode, child library items must never receive focus
+            const subLibs = this.el.querySelector('#sidebar-sub-libraries');
+            if (subLibs) {
+                subLibs.style.display = 'none';
+                subLibs.classList.add('hidden');
+                subLibs.setAttribute('hidden', '');
+                subLibs.querySelectorAll('.library-item').forEach((btn) => {
+                    btn.classList.add('hidden');
+                    btn.style.display = 'none';
+                    btn.tabIndex = -1;
+                    btn.classList.remove('focused');
+                });
+            }
+            focusManager.invalidateCache('sidebar');
+        } else {
+            // When expanded, if libraries accordion is open (or if currently in a library route), restore focusability
+            const isModern = !layoutManager.isClassicSidebarLayout();
+            const isLibraryActive =
+                this.activePath &&
+                (this.activePath.startsWith('/library/') || !!this.el.querySelector('.library-item.active'));
+            if (isModern && isLibraryActive && !this.librariesExpanded) {
+                this._toggleLibraries(true);
+            } else if (this.librariesExpanded) {
+                const subLibs = this.el.querySelector('#sidebar-sub-libraries');
+                if (subLibs) {
+                    subLibs.style.display = 'flex';
+                    subLibs.classList.remove('hidden');
+                    subLibs.removeAttribute('hidden');
+                    subLibs.querySelectorAll('.library-item').forEach((btn) => {
+                        btn.classList.remove('hidden');
+                        btn.style.display = '';
+                        btn.tabIndex = 0;
+                    });
+                }
+                focusManager.invalidateCache('sidebar');
+            }
+        }
+
+        const pageContainer = document.getElementById('page-container');
+        if (pageContainer) {
+            pageContainer.classList.toggle('sidebar-expanded', expanded);
+        }
+    }
+
+    async _loadLibraries() {
+        if (!auth.isAuthenticated()) return;
+
+        try {
+            const views = await api.getUserViews();
+            const items = views.Items || [];
+
+            const sidebarContent = this.el.querySelector('.sidebar-content');
+            if (!sidebarContent) return;
+
+            const subContainer = this.el.querySelector('#sidebar-sub-libraries');
+            if (subContainer) subContainer.innerHTML = '';
+
+            // Remove any previously rendered libraries and headers to allow clean reloading
+            sidebarContent.querySelectorAll('.library-item, .sidebar-section-header').forEach((el) => el.remove());
+
+            const isModern = !layoutManager.isClassicSidebarLayout();
+            const showCollapsedLibIcons = storage.getItem('pref:showCollapsedLibraryIcons') === 'true';
+            const hideHeader = storage.getItem('pref:hideSidebarLibraryHeader') === 'true';
+
+            if (!isModern && items.length > 0 && !hideHeader) {
+                // Determine header label based on layout block ('My Media')
+                const header = document.createElement('div');
+                header.className = 'sidebar-section-header';
+                header.id = 'section-header';
+                header.dataset.i18n = 'HeaderMyMedia';
+                header.textContent = i18n.t('HeaderMyMedia');
+                sidebarContent.appendChild(header);
+            }
+
+            items.forEach((lib) => {
+                const btn = document.createElement('button');
+                btn.className = 'sidebar-item library-item';
+
+                // In modern layouts without collapsed icons, focus is gated by expansion state.
+                // When collapsed library icons are enabled (or in classic mode), library buttons
+                // are always focusable direct children.
+                const canFocus = isModern && !showCollapsedLibIcons ? this.expanded && this.librariesExpanded : true;
+                btn.tabIndex = canFocus ? 0 : -1;
+
+                if (isModern && !showCollapsedLibIcons && !this.librariesExpanded) {
+                    btn.classList.add('hidden');
+                    btn.style.display = 'none';
+                }
+
+                // Route livetv to the unified Live TV page
+                const isLiveTv = lib.CollectionType === 'livetv';
+                const buttonPath = isLiveTv ? '/livetv' : `/library/${lib.Id}`;
+
+                // Attach both the path (for nav) AND a layout-id so _applySidebarLayout
+                // can match this button against the saved config (id: 'lib-{Id}')
+                btn.dataset.path = buttonPath;
+                btn.dataset.layoutId = `lib-${lib.Id}`;
+
+                // Detect if this library represents gaming / JellyEmu ROMs
+                // Jellyfin imports JellyEmu games under 'games', or generic collections
+                // with keywords like "Game", "ROM", "Emulator", or "JellyEmu" in the name.
+                let iconCollectionType = lib.CollectionType;
+                const libNameLower = (lib.Name || '').toLowerCase();
+                const isMediaCol =
+                    lib.CollectionType === 'homevideos' ||
+                    lib.CollectionType === 'photos' ||
+                    lib.CollectionType === 'movies' ||
+                    lib.CollectionType === 'tvshows' ||
+                    lib.CollectionType === 'music' ||
+                    lib.CollectionType === 'musicvideos';
+
+                const isGameLibrary =
+                    !isMediaCol &&
+                    (lib.CollectionType === 'games' ||
+                        /\b(games?|roms?|emulators?|emulation|jellyemu|retroarch|retrogames?)\b/i.test(libNameLower));
+
+                if (isGameLibrary) {
+                    iconCollectionType = 'games';
+                }
+
+                btn.innerHTML = `
+                    <div class="item-icon">
+                        ${getLibraryIcon(iconCollectionType)}
+                    </div>
+                    <span class="item-text">${lib.Name}</span>
+                `;
+
+                this._bindItem(btn, () => {
+                    if (layoutManager.isModernCollapsedSidebarLayout() && this.floatingLibrariesOpen) {
+                        this._toggleFloatingLibraries(false);
+                    }
+                    router.navigate(buttonPath);
+                });
+
+                // When showCollapsedLibIcons is enabled, append to sidebarContent directly;
+                // otherwise nest inside subContainer accordion for modern layout.
+                if (isModern && !showCollapsedLibIcons && subContainer) {
+                    subContainer.appendChild(btn);
+                } else {
+                    sidebarContent.appendChild(btn);
+                }
+            });
+
+            /*
+             * After building all library buttons, re-apply the sidebar layout so
+             * newly loaded library items are placed in their saved position and
+             * any that the user has hidden are correctly suppressed.
+             */
+            this._applySidebarLayout();
+            this._updateActiveState();
+
+            // Re-evaluate alignment now that libraries are loaded and overflow metrics are active
+            setTimeout(() => this._updateSidebarItemsAlign(), 0);
+
+            // Invalidate focus manager cache to discover dynamically added libraries
+            focusManager.resetDOMCache();
+        } catch (e) {
+            log.warn('Failed to load libraries', e);
+        }
+    }
+
+    /**
+     * Toggles the floating libraries popover window in Modern Collapsed layout.
+     * @param {boolean|null} forceState
+     * @private
+     */
+    _toggleFloatingLibraries(forceState = null) {
+        const subLibs = this.el.querySelector('#sidebar-sub-libraries');
+        const libBtn = this.el.querySelector('#sidebar-libraries');
+        if (!subLibs || !libBtn) return;
+
+        // If parent button is hidden, force-close and prevent opening
+        if (libBtn.style.display === 'none' || libBtn.hasAttribute('hidden')) {
+            this.floatingLibrariesOpen = false;
+            subLibs.classList.remove('open');
+            subLibs.classList.add('hidden');
+            subLibs.style.display = 'none';
+            subLibs.setAttribute('hidden', '');
+            return;
+        }
+
+        const next = forceState !== null ? forceState : !this.floatingLibrariesOpen;
+        this.floatingLibrariesOpen = next;
+
+        subLibs.classList.toggle('open', next);
+        subLibs.classList.toggle('hidden', !next);
+        libBtn.classList.toggle('open', next);
+
+        const childBtns = subLibs.querySelectorAll('.library-item');
+
+        if (next) {
+            /*
+             * =================================================================
+             * FLOATING SUB-LIBRARIES ATTACHMENT & STACKING ISOLATION
+             * =================================================================
+             * In modern collapsed, floating-buttons, and floating-island modes,
+             * the sub-libraries menu acts as a standalone floating popover.
+             * We ensure it is attached directly to the root sidebar element (this.el)
+             * so it is not constrained or shifted by .sidebar-content's flexbox
+             * auto margins or overflow scrolling.
+             * =================================================================
+             */
+            if (layoutManager.isModernCollapsedSidebarLayout() && subLibs.parentElement !== this.el) {
+                this.el.appendChild(subLibs);
+            }
+
+            subLibs.removeAttribute('hidden');
+            subLibs.style.display = 'flex';
+
+            // Guarantee sidebar-content remains anchored to top only when not overflowing
+            const scrollContainer = this.el.querySelector('.sidebar-content');
+            if (
+                scrollContainer &&
+                scrollContainer.scrollHeight <= scrollContainer.clientHeight &&
+                scrollContainer.scrollTop !== 0
+            ) {
+                // Content fits within viewport, reset any accidental offset
+                scrollContainer.scrollTop = 0;
+            }
+
+            /*
+             * =================================================================
+             * POPOVER VERTICAL ALIGNMENT BESIDE LIBRARIES BUTTON
+             * =================================================================
+             * Popover Positioning & Viewport Clamping:
+             * - Accurately aligns the popover directly adjacent to the anchor icon
+             * - Measures against the actual offsetParent to prevent double offsets
+             * - Clamps top offset within screen viewport bounds for TV safe areas
+             * =================================================================
+             */
+            const libRect = libBtn.getBoundingClientRect();
+            const parentEl = subLibs.offsetParent || this.el;
+            const parentRect = parentEl.getBoundingClientRect();
+            const topOffset =
+                libRect && parentRect && libRect.top > 0
+                    ? libRect.top - parentRect.top
+                    : typeof libBtn.offsetTop === 'number'
+                      ? libBtn.offsetTop
+                      : 150;
+
+            // Keep popover safely within the TV screen viewport bounds.
+            // On Android the document is scaled with CSS zoom (root.style.zoom),
+            // so window.innerHeight is RAW visual px while top/rects here are in
+            // design-canvas px — convert innerHeight into the same design space
+            // (innerHeight / zoom) or the clamp fires far too early and parks
+            // the popover high above the libraries button. Unscaled platforms
+            // (TV, zoom = 1 or unsupported) get exactly the old behavior.
+            const rootZoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+            const viewportHeight = (window.innerHeight || 1080) / rootZoom;
+            const subLibsHeight = subLibs.offsetHeight || 250;
+            // Portrait (phone) UX: center the panel vertically against the
+            // libraries button with a small breathing gap. Applied in BOTH
+            // orientations on the touch (Android) layout — each orientation
+            // gets its own horizontal anchor via its own stylesheet. TV
+            // layouts (no data-litefin-touch gate) keep the stock top-aligned
+            // (button top − 6px) placement.
+            const isTouchLayout = document.documentElement.hasAttribute('data-litefin-touch');
+            const unclampedTop = isTouchLayout
+                ? topOffset + ((libBtn.offsetHeight || 0) - subLibsHeight) / 2
+                : topOffset - 6;
+            const maxTop = Math.max(10, viewportHeight - subLibsHeight - 20);
+            const clampedTop = Math.min(Math.max(10, unclampedTop), maxTop);
+            subLibs.style.top = `${clampedTop}px`;
+
+            childBtns.forEach((btn) => {
+                btn.classList.remove('hidden');
+                btn.style.display = 'flex';
+                btn.tabIndex = 0;
+            });
+
+            // Refresh DOM focus cache
+            focusManager.resetDOMCache();
+            focusManager.invalidateCache('sidebar');
+
+            // Set active focus inside floating window
+            const activeLib = subLibs.querySelector('.library-item.active') || childBtns[0];
+            if (activeLib) {
+                focusManager.focusElement(activeLib);
+            }
+        } else {
+            const wasFocusInside =
+                subLibs.contains(document.activeElement) || Boolean(subLibs.querySelector('.focused'));
+
+            subLibs.setAttribute('hidden', '');
+            subLibs.style.display = 'none';
+            childBtns.forEach((btn) => {
+                btn.classList.add('hidden');
+                btn.style.display = 'none';
+                btn.tabIndex = -1;
+                btn.classList.remove('focused');
+            });
+
+            // Clear inline style
+            subLibs.style.top = '';
+
+            focusManager.resetDOMCache();
+            focusManager.invalidateCache('sidebar');
+
+            // Only restore focus to libBtn if focus was actually inside the popover
+            if (wasFocusInside) {
+                focusManager.focusElement(libBtn);
+            }
+        }
+    }
+
+    /**
+     * Checks if the floating libraries window is currently open.
+     * @returns {boolean}
+     */
+    isFloatingLibrariesOpen() {
+        return !!this.floatingLibrariesOpen;
+    }
+
+    /**
+     * Closes the floating libraries popover if open.
+     */
+    closeFloatingLibraries() {
+        if (this.floatingLibrariesOpen) {
+            this._toggleFloatingLibraries(false);
+        }
+    }
+
+    /**
+     * Toggles the open/collapsed state of the sub-libraries list in Modern layout.
+     * @param {boolean|null} forceState
+     * @private
+     */
+    _toggleLibraries(forceState = null) {
+        const subLibs = this.el.querySelector('#sidebar-sub-libraries');
+        const libBtn = this.el.querySelector('#sidebar-libraries');
+        if (!subLibs || !libBtn) return;
+
+        // If parent libraries button is hidden, force-close and prevent opening
+        if (libBtn.style.display === 'none' || libBtn.hasAttribute('hidden')) {
+            this.librariesExpanded = false;
+            subLibs.classList.remove('open');
+            subLibs.classList.add('hidden');
+            subLibs.style.display = 'none';
+            subLibs.setAttribute('hidden', '');
+            return;
+        }
+
+        const next = forceState !== null ? forceState : !this.librariesExpanded;
+        this.librariesExpanded = next;
+
+        subLibs.classList.toggle('open', next);
+        subLibs.classList.toggle('hidden', !next);
+        libBtn.classList.toggle('open', next);
+
+        // Update tabindex, visibility classes, and display on child library buttons
+        const childBtns = subLibs.querySelectorAll('.library-item');
+        if (next) {
+            subLibs.removeAttribute('hidden');
+            subLibs.style.display = 'flex';
+            childBtns.forEach((btn) => {
+                btn.classList.remove('hidden');
+                btn.style.display = '';
+                btn.tabIndex = this.expanded ? 0 : -1;
+            });
+        } else {
+            subLibs.setAttribute('hidden', '');
+            subLibs.style.display = 'none';
+            childBtns.forEach((btn) => {
+                btn.classList.add('hidden');
+                btn.style.display = 'none';
+                btn.tabIndex = -1;
+                btn.classList.remove('focused');
+            });
+        }
+
+        // Re-evaluate alignment metrics and refresh focus manager cache
+        this._updateSidebarItemsAlign();
+        focusManager.invalidateCache('sidebar');
+    }
+
+    _renderUserAvatar() {
+        const user = auth.getCurrentUser();
+        if (user && user.PrimaryImageTag) {
+            const url = api.getUserImageUrl(user.Id, { maxWidth: 50 });
+            return `<img src="${url}" class="sidebar-avatar" />`;
+        }
+        return sidebarIcons.userDefault;
+    }
+
+    _getUserName() {
+        const user = auth.getCurrentUser();
+        return user && user.Name ? user.Name : i18n.t('LabelUsername');
+    }
+
+    /**
+     * Update the SyncPlay button's visual state.
+     *
+     * When `active` is true (we joined a group):
+     *   - The button gets the CSS class `syncplay-active` for an accent glow.
+     *   - A pulsing green dot appears inside the icon area.
+     *   - The label changes to the current group name (or "In Group").
+     *
+     * When `active` is false (we left the group or are not in one):
+     *   - All of the above are cleared back to the default "SyncPlay" state.
+     *
+     * @param {boolean} active - Whether SyncPlay is currently enabled
+     * @private
+     */
+    _updateSyncPlayBtn(active) {
+        const btn = this.el.querySelector('#sidebar-syncplay');
+        const dot = this.el.querySelector('#sidebar-syncplay-dot');
+        const label = this.el.querySelector('#sidebar-syncplay-label');
+        if (!btn) return;
+
+        // Hide completely if the plugin is disabled
+        btn.style.display = pluginManager.isEnabled('syncplay') ? '' : 'none';
+
+        btn.classList.toggle('syncplay-active', active);
+
+        if (dot) {
+            dot.classList.toggle('visible', active);
+        }
+
+        if (label) {
+            if (active) {
+                // Try to get the human-readable group name from SyncPlayManager
+                const manager = window.__syncPlayManager;
+                const groupName = manager?.groupName || 'In Group';
+                label.textContent = groupName;
+            } else {
+                label.textContent = 'SyncPlay';
+            }
+        }
+    }
+
+    _onNavigate({ path }) {
+        this.activePath = path;
+        this._updateActiveState();
+        this._updateTransparentCollapsed();
+        this._updateBackButtonState();
+        setTimeout(() => this._updateSidebarItemsAlign(), 0);
+    }
+
+    /**
+     * ============================================================================
+     * COLLAPSED / EXPANDED SIDEBAR BACKGROUND ENGINE
+     * ============================================================================
+     * Evaluates active transparency, tinting, and color override preferences
+     * stored in local configuration for both collapsed and expanded states.
+     *
+     * Special Rule: When on the Settings page, if the collapsed sidebar is set
+     * to 'transparent', it is overridden to solid theme background for visual
+     * consistency and surface alignment with the settings split-view sidebar.
+     * ============================================================================
+     */
+    _updateTransparentCollapsed() {
+        // Detect whether the sidebar is operating in hidden mode.
+        // Hidden mode is active when pref:sidebarMode is explicitly 'hidden',
+        // when in 'mixed' mode on a details page, or when body has .sidebar-mode-hidden.
+        const sidebarMode = storage.getItem('pref:sidebarMode') || 'shown';
+        const isHiddenMode = Boolean(
+            sidebarMode === 'hidden' ||
+            (sidebarMode === 'mixed' &&
+                (this.activePath === '/details' ||
+                    this.activePath?.startsWith('/details') ||
+                    (typeof window !== 'undefined' && window.location.hash.startsWith('#/details')))) ||
+            (typeof document !== 'undefined' &&
+                document.body &&
+                document.body.classList.contains('sidebar-mode-hidden'))
+        );
+
+        // Retrieve configured background preferences from local storage
+        const collapsedColorPref = storage.getItem('pref:collapsedSidebarColor') || 'transparent';
+        const expandedColorPref = storage.getItem('pref:expandedSidebarColor') || 'theme';
+
+        // In normal non-hidden collapsed mode, strictly follow the collapsed color setting.
+        // In hidden mode (revealed over media or page content), use the expanded background color
+        // to provide a solid backdrop behind the icons when sliding into view.
+        const colorPref = isHiddenMode ? expandedColorPref : collapsedColorPref;
+
+        // Check if current active route corresponds to the Settings screen
+        const isSettings = Boolean(
+            this.activePath === '/settings' ||
+            this.activePath?.startsWith('/settings') ||
+            (typeof window !== 'undefined' && window.location.hash.startsWith('#/settings'))
+        );
+
+        // Apply collapsed style classes to element DOM
+        this.el.classList.toggle('transparent-collapsed', colorPref === 'transparent');
+        this.el.classList.toggle('semi-transparent-collapsed', colorPref === 'semi');
+        this.el.classList.toggle('tinted-semi-collapsed', colorPref === 'tinted-semi');
+        this.el.classList.toggle('black-collapsed', colorPref === 'black');
+
+        // Apply expanded style classes to element DOM
+        this.el.classList.toggle('transparent-expanded', expandedColorPref === 'transparent');
+        this.el.classList.toggle('semi-transparent-expanded', expandedColorPref === 'semi');
+        this.el.classList.toggle('tinted-semi-expanded', expandedColorPref === 'tinted-semi');
+        this.el.classList.toggle('black-expanded', expandedColorPref === 'black');
+
+        // Apply in-settings state class to element DOM for modern layout overrides
+        this.el.classList.toggle('in-settings', isSettings);
+    }
+
+    _updateSidebarItemsAlign() {
+        const alignPref = storage.getItem('pref:sidebarItemsAlign') || 'center';
+        const scrollContainer = this.el.querySelector('.sidebar-content');
+
+        let shouldAlign = false;
+        if (alignPref !== 'top' && scrollContainer) {
+            // Check if all sidebar items fit inside the scrollable view without overflow
+            const hasOverflow = scrollContainer.scrollHeight > scrollContainer.clientHeight;
+            shouldAlign = !hasOverflow;
+        }
+
+        // Toggle alignment classes based on container overflow constraints
+        this.el.classList.toggle('align-center', alignPref === 'center' && shouldAlign);
+        this.el.classList.toggle('align-bottom', alignPref === 'bottom' && shouldAlign);
+
+        // Synchronize floating island pill geometry with the updated vertical alignment
+        this._updateFloatingIslandGeometry();
+
+        const focused = this.el.querySelector('.sidebar-item.focused');
+        if (focused) {
+            // Update immediately for engines that reflow synchronously
+            this._updateIndicator(focused, { instant: true });
+            // And defer a 50ms update to ensure the TV rendering layout paint has fully settled
+            setTimeout(() => {
+                this._updateIndicator(focused, { instant: true });
+            }, 50);
+        }
+    }
+
+    /**
+     * =========================================================================
+     * FLOATING ISLAND GEOMETRY SYNCHRONIZATION
+     * =========================================================================
+     * - Dynamically calculates the offset and height of .sidebar-content so the
+     *   stationary background pill perfectly hugs the navigation items when
+     *   compact (no awkward empty tail), and stays stationary at max-height when
+     *   scrolling is active.
+     * - Re-computes whenever library items, logo visibility, or window dimensions
+     *   change to keep the UI pixel-perfect across all screen sizes.
+     * =========================================================================
+     * @private
+     */
+    _updateFloatingIslandGeometry() {
+        // Guard check: ensure root sidebar element exists
+        if (!this.el) return;
+
+        // Query the stationary pill capsule and scrolling content container
+        const pill = this.el.querySelector('#floating-island-pill');
+        const content = this.el.querySelector('.sidebar-content');
+
+        // Only compute when layout is configured as floating-island. Reset any
+        // geometry left behind by a previous floating-island session: in every
+        // other layout the pill has no absolute positioning, so a stale inline
+        // height would reserve space in the sidebar's flex column and push the
+        // navigation items and footer down towards the bottom.
+        if (!layoutManager.isFloatingIslandSidebarLayout()) {
+            if (pill) {
+                pill.style.top = '';
+                pill.style.height = '';
+            }
+            return;
+        }
+
+        if (!pill || !content) return;
+
+        // Compute relative bounding box of content inside the fixed sidebar container
+        const update = () => {
+            if (!this.el || !pill || !content) return;
+
+            // Measure relative coordinates between fixed sidebar container and content box.
+            // getBoundingClientRect() reports viewport pixels (which include the root CSS
+            // zoom), while the values assigned to top/height are layout pixels that the
+            // browser zooms again. Divide by the root zoom so displays scaled away from
+            // the native 16:9 canvas (desktop auto-scale, Android) keep the capsule
+            // aligned instead of shrinking to zoom² of the content height.
+            const rootZoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+            const sidebarRect = this.el.getBoundingClientRect();
+            const contentRect = content.getBoundingClientRect();
+            const top = (contentRect.top - sidebarRect.top) / rootZoom;
+            const height = contentRect.height / rootZoom;
+
+            // Only apply valid non-zero bounding box values
+            if (height > 0) {
+                pill.style.top = `${Math.round(top)}px`;
+                pill.style.height = `${Math.round(height)}px`;
+            }
+        };
+
+        // Run immediately for snappy UI response
+        update();
+
+        // Also schedule in requestAnimationFrame to catch reflows once TV paint settles
+        if (typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(update);
+        }
+    }
+
+    _updateActiveState() {
+        const isModern = !layoutManager.isClassicSidebarLayout();
+        const items = this.el.querySelectorAll('.sidebar-item');
+        let hasActiveLibrary = false;
+
+        items.forEach((item) => {
+            if (item.id === 'sidebar-libraries') return; // Handled separately below
+            const itemPath = item.dataset.path;
+            if (itemPath && this.activePath.startsWith(itemPath)) {
+                // Approximate match (e.g. /home matches /home)
+                // Exception: /library/:id needs exact start logic
+                item.classList.add('active');
+                if (item.classList.contains('library-item')) {
+                    hasActiveLibrary = true;
+                }
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+        // In Modern mode, if any library is active, highlight the parent Libraries toggle button as active too (when not showing collapsed icons)
+        const libToggle = this.el.querySelector('#sidebar-libraries');
+        const showCollapsedLibIcons = storage.getItem('pref:showCollapsedLibraryIcons') === 'true';
+        if (libToggle) {
+            libToggle.classList.toggle('active', isModern && hasActiveLibrary && !showCollapsedLibIcons);
+            if (isModern && !showCollapsedLibIcons) {
+                if (layoutManager.isModernCollapsedSidebarLayout()) {
+                    if (this.floatingLibrariesOpen) {
+                        this._toggleFloatingLibraries(false);
+                    }
+                } else if (hasActiveLibrary) {
+                    // When in an active library route, keep libraries accordion open
+                    this._toggleLibraries(true);
+                } else if (this.librariesExpanded && !this.expanded) {
+                    // If not on an active library route and sidebar is collapsed, close it
+                    this._toggleLibraries(false);
+                }
+            }
+        }
+    }
+
+    /**
+     * Update the sliding focus indicator position
+     * @param {HTMLElement} [focusedItem] - Optionally pass the focused element
+     * @param {Object} [options] - Update options
+     * @param {boolean} [options.instant] - If true, disable transitions for this update
+     */
+    _updateIndicator(focusedItem, options = {}) {
+        const indicator = this.el.querySelector('.sidebar-focus-indicator');
+        if (!indicator) return;
+
+        const target = focusedItem || this.el.querySelector('.sidebar-item.focused');
+
+        if (target) {
+            // If we are currently NOT expanded, we want to snap instantly
+            const isExpanding = !this.el.classList.contains('expanded');
+            const forceInstant = options.instant || isExpanding;
+
+            const contentContainer = this.el.querySelector('.sidebar-content');
+            const scrollTop = contentContainer ? contentContainer.scrollTop : 0;
+
+            // Compute offsetTop cumulatively relative to the main sidebar nav container.
+            // Bypasses getBoundingClientRect() which yields unstable values during active CSS transform animations.
+            let y = 0;
+            let current = target;
+            while (current && current !== this.el && current !== document.body) {
+                y += current.offsetTop || 0;
+                current = current.offsetParent;
+            }
+
+            // Compensate for the internal scroll position of the sidebar links list container
+            if (contentContainer && contentContainer.contains(target)) {
+                y -= scrollTop;
+            }
+
+            const targetHeight = target.offsetHeight || 72;
+
+            if (forceInstant) {
+                // Force an instant snap
+                indicator.style.webkitTransition = 'none';
+                indicator.style.transition = 'none';
+                indicator.style.webkitTransform = `translate3d(0, ${y}px, 0)`;
+                indicator.style.transform = `translate3d(0, ${y}px, 0)`;
+                indicator.style.height = `${targetHeight}px`;
+                // Force reflow to ensure the style is applied before transition is re-enabled
+                indicator.offsetHeight;
+                indicator.style.webkitTransition = '';
+                indicator.style.transition = '';
+            } else {
+                indicator.style.webkitTransform = `translate3d(0, ${y}px, 0)`;
+                indicator.style.transform = `translate3d(0, ${y}px, 0)`;
+                indicator.style.height = `${targetHeight}px`;
+            }
+
+            if (!this.el.classList.contains('has-focus')) {
+                this.el.classList.add('has-focus');
+            }
+        } else {
+            if (this.el.classList.contains('has-focus')) {
+                this.el.classList.remove('has-focus');
+            }
+        }
+    }
+
+    /**
+     * Apply the saved sidebar layout to the live DOM.
+     *
+     * This method:
+     *   1. Collects all sidebar-item elements from within .sidebar-content
+     *   2. Asks SidebarLayoutManager to order and annotate them.
+     *   3. Re-inserts them into .sidebar-content in the new sequential order.
+     *   4. Toggles visibility (display: none) based on the `hidden` flag.
+     *   5. Updates the FocusManager's defaultFocusSelector for this section.
+     *
+     * It is safe to call at any time (mount, library load, hot-reload from settings).
+     * @private
+     */
+    _applySidebarLayout() {
+        const sidebarEl = this.el.id === 'main-sidebar' ? this.el : this.el.querySelector('#main-sidebar');
+        if (!sidebarEl) return;
+
+        const sidebarContent = sidebarEl.querySelector('.sidebar-content');
+        if (!sidebarContent) return;
+
+        const isModern = !layoutManager.isClassicSidebarLayout();
+        const subLibrariesContainer = sidebarEl.querySelector('#sidebar-sub-libraries');
+        const librariesToggleBtn = sidebarEl.querySelector('#sidebar-libraries');
+        const sidebarFooter = sidebarEl.querySelector('#sidebar-footer');
+
+        /* ── 1. Collect all sidebar items with their layout IDs ────────────── */
+        /*
+         * Avoid using querySelectorAll with ':scope > ...' selector because the ':scope'
+         * pseudo-class was introduced in Chrome 27. On Chromium 26 (webOS 1.x/2.x),
+         * it throws a DOMException 12 (SyntaxError).
+         *
+         * Instead, we query all sidebar items and section headers across the sidebar container
+         * (.sidebar-content, #sidebar-sub-libraries, and #sidebar-footer) without using ':scope'.
+         */
+        const allItems = [];
+        const items = sidebarEl.querySelectorAll('.sidebar-item, .sidebar-section-header');
+        const itemsLen = items.length;
+
+        // Iterate over collected items using a safe loop
+        for (let i = 0; i < itemsLen; i++) {
+            const el = items[i];
+            if (el.id === 'sidebar-logo-header') continue;
+            if (el.id === 'sidebar-back-btn') continue;
+
+            if (el.classList.contains('library-item')) {
+                // Dynamically injected library shortcut
+                const layoutId = el.dataset?.layoutId || el.getAttribute('data-layout-id');
+                allItems.push({ id: layoutId, el: el });
+            } else if (el.id === 'section-header') {
+                // Classic library section header
+                allItems.push({ id: 'section-header', el: el });
+            } else if (el.id === 'sidebar-libraries') {
+                // Modern libraries accordion toggle button
+                allItems.push({ id: 'librariesContainer', el: el });
+            } else {
+                // Static navigation item (Home, Search, Settings, etc.)
+                const rawId = el.id ? el.id.replace('sidebar-', '') : null;
+                if (rawId) allItems.push({ id: rawId, el: el });
+            }
+        }
+
+        /* ── 2. Ask the manager to order and annotate items ────────────────── */
+        const ordered = sidebarLayoutManager.applyLayout(allItems);
+        const showCollapsedLibIcons = storage.getItem('pref:showCollapsedLibraryIcons') === 'true';
+
+        /* ── 3. Re-insert items and apply visibility ───────────────────────── */
+        if (isModern) {
+            // Modern Mode: Single expandable item + nested sub-libraries container (or individual collapsed items if showCollapsedLibIcons) + pinned footer
+            if (librariesToggleBtn) {
+                if (showCollapsedLibIcons) {
+                    librariesToggleBtn.style.display = 'none';
+                    librariesToggleBtn.classList.add('hidden');
+                    librariesToggleBtn.tabIndex = -1;
+                } else {
+                    librariesToggleBtn.style.display = '';
+                    librariesToggleBtn.classList.remove('hidden');
+                }
+            }
+
+            if (subLibrariesContainer && showCollapsedLibIcons) {
+                subLibrariesContainer.style.display = 'none';
+                subLibrariesContainer.classList.add('hidden');
+                subLibrariesContainer.setAttribute('hidden', '');
+            }
+
+            ordered.forEach(({ id, el, hidden }) => {
+                if (!el) return;
+
+                if (id === 'section-header') {
+                    el.style.display = 'none';
+                    return;
+                }
+
+                if (id === 'librariesContainer' && showCollapsedLibIcons) {
+                    // Suppress generic libraries toggle accordion button when showing individual collapsed library shortcuts
+                    el.style.display = 'none';
+                    el.classList.add('hidden');
+                    el.tabIndex = -1;
+                    return;
+                }
+
+                if (id.startsWith('lib-')) {
+                    if (showCollapsedLibIcons) {
+                        // Place library directly as a first-class collapsed sidebar rail item
+                        el.tabIndex = hidden ? -1 : 0;
+                        el.classList.toggle('hidden', !!hidden);
+                        el.style.display = hidden ? 'none' : '';
+                        sidebarContent.appendChild(el);
+                    } else {
+                        // Place child library inside the sub-libraries container accordion / popover
+                        const canFocus = this.expanded && this.librariesExpanded;
+                        el.tabIndex = canFocus ? 0 : -1;
+                        if (!this.librariesExpanded) {
+                            el.classList.add('hidden');
+                            el.style.display = 'none';
+                        } else {
+                            el.classList.toggle('hidden', !!hidden);
+                            el.style.display = hidden ? 'none' : '';
+                        }
+                        if (subLibrariesContainer) {
+                            subLibrariesContainer.appendChild(el);
+                        }
+                    }
+                    return;
+                }
+
+                if (id === 'user') {
+                    // In Modern mode, pin user profile in the dedicated sidebar-footer at the bottom
+                    if (sidebarFooter) {
+                        sidebarFooter.appendChild(el);
+                    }
+                    el.style.display = hidden ? 'none' : '';
+                    return;
+                }
+
+                const isSyncPlay = id === 'syncplay';
+                const pluginHidden = isSyncPlay && !pluginManager.isEnabled('syncplay');
+                // Discover requires Seerr to be available — hide it if the probe hasn't
+                // confirmed availability yet, regardless of the saved layout preference
+                const isDiscover = id === 'discover';
+                const seerrHidden = isDiscover && !this._seerrAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden;
+
+                el.style.display = shouldHide ? 'none' : '';
+                sidebarContent.appendChild(el);
+
+                // If this is the modern libraries container, place sub-libraries container accordingly
+                if (id === 'librariesContainer' && subLibrariesContainer && !showCollapsedLibIcons) {
+                    if (shouldHide) {
+                        subLibrariesContainer.style.display = 'none';
+                        subLibrariesContainer.classList.add('hidden');
+                        subLibrariesContainer.setAttribute('hidden', '');
+                    }
+                    /*
+                     * In collapsed/floating layouts, attach subLibrariesContainer directly to
+                     * sidebarEl so that the floating popover is positioned in the root sidebar's
+                     * coordinate space without getting displaced by sidebarContent flexbox centering.
+                     */
+                    if (layoutManager.isModernCollapsedSidebarLayout()) {
+                        sidebarEl.appendChild(subLibrariesContainer);
+                    } else {
+                        sidebarContent.appendChild(subLibrariesContainer);
+                    }
+                }
+            });
+        } else {
+            // Classic Mode: Flat list with section header
+            if (librariesToggleBtn) librariesToggleBtn.style.display = 'none';
+            if (subLibrariesContainer) subLibrariesContainer.style.display = 'none';
+
+            ordered.forEach(({ id, el, hidden }) => {
+                if (!el) return;
+
+                if (id === 'librariesContainer') {
+                    // Suppress modern toggle in classic mode
+                    el.style.display = 'none';
+                    return;
+                }
+
+                if (id.startsWith('lib-')) {
+                    el.tabIndex = hidden ? -1 : 0;
+                    el.classList.toggle('hidden', !!hidden);
+                    el.style.display = hidden ? 'none' : '';
+                    sidebarContent.appendChild(el);
+                    return;
+                }
+
+                const isSyncPlay = id === 'syncplay';
+                const pluginHidden = isSyncPlay && !pluginManager.isEnabled('syncplay');
+                // Same seerr-awareness as Modern mode — discover stays hidden until probed
+                const isDiscover = id === 'discover';
+                const seerrHidden = isDiscover && !this._seerrAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden;
+
+                el.style.display = shouldHide ? 'none' : '';
+                sidebarContent.appendChild(el);
+            });
+        }
+
+        /* ── 4. Update the FocusManager's defaultFocusSelector ─────────────── */
+        const defaultFocusId = sidebarLayoutManager.getDefaultFocus();
+        const sectionConfig = focusManager.getSectionConfig('sidebar');
+        if (sectionConfig) {
+            sectionConfig.defaultFocusSelector = `#sidebar-${defaultFocusId}`;
+        }
+
+        // Invalidate the focus cache so the updated DOM structure is re-scanned
+        focusManager.invalidateCache('sidebar');
+
+        // Re-evaluate back button state for desktop and web layouts
+        this._updateBackButtonState();
+
+        // Re-evaluate sidebar vertical alignment (center vs top) and floating island geometry once DOM reflow settles
+        setTimeout(() => {
+            this._updateSidebarItemsAlign();
+            this._updateFloatingIslandGeometry();
+        }, 0);
+    }
+
+    /**
+     * =========================================================================
+     * Sidebar Back Button State Synchronizer
+     * =========================================================================
+     * Evaluates route depth and navigation history across target platforms.
+     * Respects user preference `pref:sidebarBackButton`:
+     *   - 'all' / 'true': Available across all platforms (including TV environments)
+     *   - 'disabled' / 'never' / 'false': Explicitly hidden
+     *   - 'auto' (default): Automatically enabled for pointer-focused Desktop and Web
+     * When an ancestor route is present in navigation history (router.canGoBack()),
+     * dynamically surfaces the sleek capsule back button and repositions the
+     * Litefin brand logo downward with smooth spring transitions.
+     * =========================================================================
+     * @private
+     */
+    _updateBackButtonState() {
+        if (!this.el) return;
+
+        // Fetch user setting for sidebar back button targeting (defaults to 'auto')
+        const pref = storage.getItem('pref:sidebarBackButton') || 'auto';
+        let isPlatformAllowed = false;
+
+        // Resolve whether the current runtime environment is eligible
+        if (pref === 'all' || pref === 'true') {
+            // Unconditionally allow on all platforms including TV systems
+            isPlatformAllowed = true;
+        } else if (pref === 'disabled' || pref === 'never' || pref === 'false') {
+            // Explicitly disabled by user
+            isPlatformAllowed = false;
+        } else {
+            // Default auto mode: pointer-driven Desktop and Web environments
+            isPlatformAllowed = platformInfo.isWeb || platformInfo.isDesktop;
+        }
+
+        // Determine if back navigation is valid for the current route stack
+        const canBack = isPlatformAllowed && router.canGoBack();
+
+        // Toggle state class on parent container to trigger the back control's entrance animation
+        this.el.classList.toggle('has-back-button', canBack);
+
+        // Control interactive display and accessibility tabindex on the back button
+        const backBtn = this.el.querySelector('#sidebar-back-btn');
+        if (backBtn) {
+            backBtn.style.display = canBack ? 'flex' : 'none';
+            backBtn.tabIndex = canBack ? 0 : -1;
+        }
+
+        // Invalidate FocusManager DOM cache so spatial navigation and arrow keys recognize state
+        focusManager.invalidateCache('sidebar');
+    }
+
+    /**
+     * Handle the 'Random' button click.
+     * Fetches a random item using the API and navigates to its details page.
+     * @private
+     */
+    async _onRandomClick() {
+        try {
+            log.info('Fetching random item...');
+            const item = await api.getRandomItem();
+            if (item) {
+                log.info(`Random item found: ${item.Name} (${item.Id})`);
+                router.navigate(`/details/${item.Id}`);
+            } else {
+                log.warn('No random item found.');
+                // Optional: Show a toast/notification if no items are found
+            }
+        } catch (e) {
+            log.error('Failed to fetch random item', e);
+        }
+    }
+}
+
+export default Sidebar;

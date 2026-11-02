@@ -1,0 +1,1852 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Hero Carousel Styles
+ * ============================================================================
+ * PERFORMANCE NOTES (Tizen/WebKit):
+ *   - NO -webkit-mask-image: it forces a software compositing pass that
+ *     serializes ALL sibling animations through the CPU. Use overflow:hidden
+ *     + translateZ(0) instead for border-radius clipping.
+ *   - NO margin transitions: margin changes trigger layout reflow on every
+ *     frame. Use transform:translate instead (GPU-only, no reflow).
+ *   - will-change tells the compositor to pre-allocate a GPU layer so the
+ *     very first animation frame is already on the GPU.
+ *   - contain:layout style paint isolates the carousel's repaint from the
+ *     rest of the page, preventing the sidebar from being invalidated.
+ * ============================================================================
+ */
+
+/* ============================================================================
+   Base Carousel wrapper
+   ============================================================================ */
+
+:root {
+    /* 
+     * Hero Carousel Vignette Variables:
+     * Controls dark shadow intensity behind text titles and metadata.
+     * Can be adjusted from 0.0 (fully transparent) to 0.9 (deep dark contrast).
+     */
+    --hero-vignette-start: rgba(0, 0, 0, 0.9);
+    --hero-vignette-mid: rgba(0, 0, 0, 0.4);
+    --hero-vignette-end: rgba(0, 0, 0, 0);
+
+    /*
+     * Hero Carousel Canvas Sizing Variables (1080p Reference Canvas):
+     * Standardizes carousel height, row overlap, content padding, and indicators
+     * to eliminate extreme layout squishing and shifts across variable window heights.
+     */
+    --hero-carousel-height-immersive: 972px;
+    --hero-carousel-overlap-immersive: -450px;
+    --hero-carousel-padding-immersive: 470px;
+    --hero-indicators-bottom-immersive: 430px;
+
+    --hero-carousel-height-compact: 972px;
+    --hero-carousel-overlap-compact: -550px;
+    --hero-carousel-padding-compact: 570px;
+    --hero-indicators-bottom-compact: 530px;
+
+    --hero-carousel-height-semi: 756px;
+    --hero-carousel-padding-semi: 120px;
+    --hero-carousel-height-semi-compact: 540px;
+    --hero-carousel-padding-semi-compact: 80px;
+
+    --hero-carousel-height-banner: 648px;
+    --hero-carousel-height-banner-compact: 432px;
+}
+
+.hero-carousel {
+    position: relative;
+    width: 100%;
+    /* Use standardized canvas height to preserve proportion across viewport heights */
+    height: var(--hero-carousel-height-semi, 756px);
+    min-height: 500px;
+    overflow: hidden;
+    touch-action: pan-y;
+    /* Promote to its own GPU composite layer */
+    transform: translateZ(0);
+}
+
+.hero-carousel-container.compact .hero-carousel {
+    /* Standardized compact semi-immersive canvas height */
+    height: var(--hero-carousel-height-semi-compact, 540px);
+    min-height: 400px;
+}
+
+.hero-carousel-container.compact .hero-item {
+    padding-bottom: 80px;
+}
+
+.hero-carousel-container.compact .hero-backdrop {
+    background-position: 50% 20%;
+}
+
+.hero-carousel-container.compact .hero-item-title {
+    font-size: 3rem;
+}
+
+.hero-carousel-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* ============================================================================
+   Hero items — slides
+   ============================================================================ */
+
+.hero-item {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    z-index: 1;
+    transition: opacity 1000ms cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 120px;
+    /* 
+     * CRITICAL BUG RESOLUTION: Changed overflow to visible.
+     * With deep-overlap immersive mode, padding-bottom is elevated to 420px/570px.
+     * On smaller viewports (or logical canvas heights below 1080p), the remaining
+     * content box height shrinks below the actual height of the title/overview info.
+     * Keeping overflow: hidden would clip and completely hide the text details.
+     * Outer container retains overflow: hidden, keeping boundaries clean on GPU.
+     */
+    overflow: visible;
+    transform: translateZ(0);
+}
+
+.hero-item.active {
+    opacity: 1;
+    z-index: 2;
+    will-change: opacity;
+}
+
+/* ============================================================================
+   Backdrop image layer
+   ============================================================================ */
+
+.hero-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background-size: cover;
+    background-position: top;
+    background-repeat: no-repeat;
+    /* Isolate the backdrop's own GPU layer for the Ken Burns animation */
+    transform: translateZ(0);
+}
+
+/*
+ * ============================================================================
+ * Gradient Overlays
+ * (::before — left-to-right text shadow vignette | ::after — bottom blend)
+ * ============================================================================
+ * The ::before pseudo-element creates a dark vignette overlay behind the text
+ * content. Using dynamic CSS variables (--hero-vignette-start, etc.) allows us
+ * to mirror this vignette automatically in RTL layouts without rewriting the 
+ * whole rule block.
+ * ============================================================================
+ */
+
+.hero-item::before {
+    /* 
+     * Default center offset of the text shadow:
+     * 0% (left) for standard left-to-right languages.
+     */
+    --hero-gradient-x: 0%;
+
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* 
+     * PERFORMANCE OPTIMIZATION (Geometry Bounding):
+     * Restrict width to 65% (where typography and logos live).
+     * Eliminates 35% of redundant transparent fragment shader overdraw
+     * across the right side of the screen over the backdrop image.
+     */
+    width: 65%;
+    height: 100%;
+    /* 
+     * PERFORMANCE OPTIMIZATION (Stop Simplification):
+     * Simplified 3-stop gradient reduces fragment shader ALU instructions.
+     */
+    background: linear-gradient(
+        to right,
+        var(--hero-vignette-start) 0%,
+        var(--hero-vignette-mid) 45%,
+        var(--hero-vignette-end) 100%
+    );
+    z-index: 1;
+    pointer-events: none;
+    transform: translateZ(0);
+}
+
+/*
+ * RTL specific text shadow mirror rule.
+ * Positions on the right side and flips gradient direction to left.
+ */
+[dir="rtl"] .hero-item::before {
+    --hero-gradient-x: 100%;
+    left: auto;
+    right: 0;
+    background: linear-gradient(
+        to left,
+        var(--hero-vignette-start) 0%,
+        var(--hero-vignette-mid) 45%,
+        var(--hero-vignette-end) 100%
+    );
+}
+
+
+.hero-item::after {
+    content: '';
+    position: absolute;
+    /* 
+     * PERFORMANCE OPTIMIZATION (Geometry Bounding):
+     * Instead of spanning 100% height with 60% transparent overdraw,
+     * physically bound the element to the bottom 42% where the fade actually lives.
+     * Instantly cuts GPU fragment shader fill-rate for this layer by ~58%!
+     */
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 42%;
+    /* Simplified 2-stop bottom gradient for smooth background blending into theme background */
+    background: linear-gradient(
+        to top,
+        var(--jf-background) 0%,
+        transparent 100%
+    );
+    z-index: 2;
+    pointer-events: none;
+    transform: translateZ(0);
+}
+
+/* ============================================================================
+   Content (logo / title / meta / description)
+   ============================================================================ */
+
+.hero-content {
+    position: relative;
+    z-index: 10;
+    padding: 0 80px;
+    max-width: 1600px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(20px);
+    -webkit-transform: translateY(20px);
+    transition: transform 800ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                opacity 800ms ease;
+    -webkit-transition: -webkit-transform 800ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                        opacity 800ms ease;
+}
+
+.hero-item.active .hero-content {
+    opacity: 1;
+    transform: translateY(0);
+    -webkit-transform: translateY(0);
+    will-change: transform, opacity;
+}
+
+/* ============================================================================
+   Ken Burns effect — only when explicitly enabled via .with-zoom
+   ============================================================================ */
+
+.hero-carousel-container.with-zoom .hero-item.active .hero-backdrop {
+    -webkit-animation: hero-ken-burns 12000ms linear forwards;
+    animation: hero-ken-burns 12000ms linear forwards;
+    will-change: transform;
+}
+
+.hero-carousel-container:not(.with-zoom) .hero-backdrop {
+    -webkit-animation: none !important;
+    animation: none !important;
+}
+
+@-webkit-keyframes hero-ken-burns {
+    from { -webkit-transform: scale(1) translateZ(0); }
+    to   { -webkit-transform: scale(1.08) translateZ(0); }
+}
+
+@keyframes hero-ken-burns {
+    from { transform: scale(1) translateZ(0); }
+    to   { transform: scale(1.08) translateZ(0); }
+}
+
+/* ============================================================================
+   Logo / title / meta / description
+   ============================================================================ */
+
+.hero-logo-container {
+    height: 130px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-end;
+}
+
+.hero-logo {
+    max-height: 100%;
+    max-width: 400px;
+    object-fit: contain;
+}
+
+.hero-item-title {
+    font-size: 4rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 0 16px 0;
+    line-height: 1;
+    letter-spacing: -2px;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.hero-meta-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+    font-size: 1.3rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+}
+
+.hero-meta-item {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 16px;
+}
+
+.hero-meta-item:last-child {
+    margin-right: 0;
+    margin-left: 0;
+}
+
+.hero-meta-badge {
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+/* ============================================================================
+   MDBList Ratings & Awards Integration
+   ============================================================================ */
+
+.hero-mdb-item {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 16px;
+    background: hsla(0, 0%, 100%, .2);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.hero-mdb-icon {
+    height: 18px;
+    width: auto;
+    margin-right: 6px;
+    object-fit: contain;
+}
+
+.hero-mdb-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.hero-description {
+    font-size: 1.4rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.8);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 40px;
+}
+
+.hero-description a {
+    pointer-events: none;
+    cursor: default;
+    text-decoration: none;
+    color: inherit;
+}
+
+/* ============================================================================
+   Dot indicators
+   ============================================================================ */
+
+.hero-indicators {
+    position: absolute;
+    bottom: 40px;
+    right: 80px;
+    display: flex;
+    z-index: 20;
+}
+
+.hero-dot {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    margin-right: 12px;
+    /* width + background are cheap GPU ops — short duration for responsiveness */
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.2s ease;
+    overflow: hidden;
+}
+
+.hero-dot:last-child {
+    margin-right: 0;
+    margin-left: 0;
+}
+
+.hero-dot.active {
+    width: 32px;
+    background: var(--jf-accent-content-color);
+}
+
+/* ============================================================================
+   Container base
+   ============================================================================ */
+
+.hero-carousel-container {
+    position: relative;
+    overflow: hidden;
+    touch-action: pan-y;
+    /*
+     * Isolates layout and style so internal changes within the carousel
+     * do not cascade layout invalidations outward to neighboring sections.
+     */
+    contain: layout style;
+}
+
+/*
+ * Accent ring overlay — fades in on focus.
+ * Uses a simple gradient rather than mask-image for GPU compositing.
+ */
+.hero-carousel-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to top,
+        transparent 0%,
+        rgba(0, 0, 0, 0) 5%,
+        var(--jf-accent) 20%,
+        transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.hero-carousel-container:focus,
+.hero-carousel-container.focused,
+.hero-carousel-container:hover,
+.hero-carousel-container.hovered {
+    outline: none;
+}
+
+.hero-carousel-container:focus::after,
+.hero-carousel-container.focused::after,
+.hero-carousel-container:hover::after,
+.hero-carousel-container.hovered::after {
+    opacity: 0.15;
+}
+
+/* 
+ * Remove the focus glow in banner mode — the border ring is enough. 
+ * We keep it for immersive mode where there is no border.
+ */
+.hero-carousel-container.banner::after {
+    display: none !important;
+}
+
+/* ============================================================================
+   Banner mode
+   ============================================================================ */
+
+.hero-carousel-container.banner {
+    margin: 90px 75px 30px 75px;
+    border-radius: var(--jf-border-radius-lg);
+    background: #000;
+    border: 4px solid transparent;
+    background-clip: padding-box;
+    /* Faster border transition — 0.2s is plenty for TV focus ring */
+    transition: border-color 0.2s ease;
+    overflow: hidden !important;
+}
+
+/* Inner carousel — no scale on focus, border ring on outer container is sufficient */
+.hero-carousel-container.banner .hero-carousel {
+    border-radius: calc(var(--jf-border-radius-lg) - 4px);
+    /* Standardized banner mode canvas height */
+    height: var(--hero-carousel-height-banner, 648px);
+    overflow: hidden;
+    /* Static transform to promote to its own GPU layer without causing
+       a compositing merge whenever the outer container's border changes */
+    transform: translateZ(0);
+}
+
+/* Remove the two lines that scaled the inner carousel on focus — now dead code */
+
+/* Round children explicitly for legacy WebKit (overflow:hidden alone isn't
+   enough on older Tizen versions — but avoid mask-image!) */
+.hero-carousel-container.banner .hero-item,
+.hero-carousel-container.banner .hero-backdrop {
+    border-radius: calc(var(--jf-border-radius-lg) - 4px);
+}
+
+.hero-carousel-container.banner.compact {
+    margin: 90px 75px 20px 75px;
+}
+
+.hero-carousel-container.banner.compact .hero-carousel {
+    /* Standardized compact banner canvas height */
+    height: var(--hero-carousel-height-banner-compact, 432px);
+    min-height: 320px;
+}
+
+.hero-carousel-container.banner.compact .hero-logo-container {
+    height: 110px;
+    margin-bottom: 12px;
+}
+
+.hero-carousel-container.banner.compact .hero-item-title {
+    font-size: 2.2rem;
+    margin-bottom: 12px;
+}
+
+.hero-carousel-container.banner.compact .hero-description {
+    font-size: 1.15rem;
+    margin-bottom: 20px;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+.hero-carousel-container.banner.compact .hero-indicators {
+    bottom: 20px;
+    right: 30px;
+}
+
+/* ============================================================================
+   Banner focus: border ring (no transform on outer container = no reflow)
+   ============================================================================ */
+
+.hero-carousel-container.banner:focus,
+.hero-carousel-container.banner.focused,
+.hero-carousel-container.banner:hover,
+.hero-carousel-container.banner.hovered {
+    border-color: var(--jf-accent);
+    z-index: 1000;
+}
+
+/* Inner glow rim — static pseudo, no animation cost */
+.hero-carousel-container.banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: calc(var(--jf-border-radius-lg) - 4px);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+    z-index: 5;
+    transition: border-color 0.4s ease;
+}
+
+.hero-carousel-container.banner:focus::before,
+.hero-carousel-container.banner.focused::before {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Banner-specific gradient override */
+.hero-carousel-container.banner .hero-item::after {
+    background: linear-gradient(to top,
+        rgba(0, 0, 0, 0.9) 0%,
+        rgba(0, 0, 0, 0.5) 20%,
+        transparent 80%);
+}
+
+/* Banner indicators */
+.hero-carousel-container.banner .hero-indicators {
+    bottom: 30px;
+    right: 40px;
+}
+
+[dir="rtl"] .hero-carousel-container.banner .hero-indicators {
+    right: auto;
+    left: 40px;
+}
+
+/* ============================================================================
+   Dot progress animation
+   ============================================================================
+   PERFORMANCE CRITICAL (TV SoCs / Tizen / webOS):
+   Animating 'width' is NOT a GPU-composited property; it forces continuous style
+   recalculations and layout reflows on every single frame (60fps) for 8 seconds.
+   On low-power smart TV chipsets, this saturates the main thread and introduces
+   severe input latency or dropped frames when navigating or scrolling.
+
+   By animating transform: scaleX() from 0 to 1 with transform-origin: left,
+   the animation runs entirely on the GPU compositor thread with ZERO CPU layout
+   reflows, looking 100% visually identical down to the pixel.
+   ============================================================================ */
+
+@-webkit-keyframes heroProgress {
+    /* Scale from 0 to full width on compositor layer */
+    from {
+        -webkit-transform: scaleX(0);
+        transform: scaleX(0);
+    }
+    to {
+        -webkit-transform: scaleX(1);
+        transform: scaleX(1);
+    }
+}
+
+@keyframes heroProgress {
+    /* Hardware accelerated scale on GPU */
+    from {
+        -webkit-transform: scaleX(0);
+        transform: scaleX(0);
+    }
+    to {
+        -webkit-transform: scaleX(1);
+        transform: scaleX(1);
+    }
+}
+
+.hero-dot-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Full width container, transformed via scaleX */
+    width: 100%;
+    height: 100%;
+    background: var(--jf-accent);
+    border-radius: 4px;
+    /* Anchor scaling to left edge for LTR layouts */
+    -webkit-transform-origin: left center;
+    transform-origin: left center;
+    -webkit-transform: scaleX(0);
+    transform: scaleX(0);
+    /* Promote to GPU composite layer for hardware-accelerated transform */
+    will-change: transform;
+}
+
+/* RTL layout support: anchor scaling to the right edge */
+[dir="rtl"] .hero-dot-progress {
+    -webkit-transform-origin: right center;
+    transform-origin: right center;
+}
+
+.hero-dot.active .hero-dot-progress {
+    /* Apply smooth linear fill over the active interval duration */
+    -webkit-animation: heroProgress var(--indicator-duration, 8s) linear;
+    animation: heroProgress var(--indicator-duration, 8s) linear;
+}
+
+/* 
+ * Disabled Indicator Animation
+ * When the setting is off, the progress bar is simply shown at 100% scale
+ * instantly for the active slide.
+ */
+.hero-carousel-container.no-indicator-animation .hero-dot.active .hero-dot-progress {
+    -webkit-transform: scaleX(1);
+    transform: scaleX(1);
+    -webkit-animation: none !important;
+    animation: none !important;
+}
+
+/* ============================================================================
+   Zero-Animation Indicator Styles (Lines & Simple Dots)
+   ============================================================================
+/* ----------------------------------------------------------------------------
+   Style 1: Big Lines (Segmented Horizontal Progress Bars)
+   Sleek wide horizontal segmented bars inspired by modern luxury interfaces.
+   ---------------------------------------------------------------------------- */
+.hero-carousel-container.indicator-lines .hero-indicators {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    width: 280px;
+    max-width: 40vw;
+}
+
+/* Base line segment styling */
+.hero-carousel-container.indicator-lines .hero-dot {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1 1 0%;
+    flex: 1 1 0%;
+    min-width: 24px;
+    height: 3px;
+    border-radius: 2px;
+    border: none;
+    background: rgba(255, 255, 255, 0.25);
+    margin-right: 8px;
+    padding: 0;
+    width: auto;
+    -webkit-transition: none !important;
+    transition: none !important;
+    overflow: hidden;
+}
+
+/* Last child removes trailing right margin */
+.hero-carousel-container.indicator-lines .hero-dot:last-child {
+    margin-right: 0;
+    margin-left: 0;
+}
+
+/* Active line segment: bright solid white with full opacity */
+.hero-carousel-container.indicator-lines .hero-dot.active {
+    background: #ffffff;
+    width: auto;
+    opacity: 1;
+}
+
+/* Suppress internal progress fill completely */
+.hero-carousel-container.indicator-lines .hero-dot-progress {
+    display: none !important;
+}
+
+/* Banner mode specific width expansion for Big Lines */
+.hero-carousel-container.banner.indicator-lines .hero-indicators {
+    width: calc(100% - 80px);
+    max-width: none;
+    left: 40px;
+    right: 40px;
+    bottom: 24px;
+}
+
+.hero-carousel-container.banner.compact.indicator-lines .hero-indicators {
+    width: calc(100% - 60px);
+    left: 30px;
+    right: 30px;
+    bottom: 16px;
+}
+
+/* ----------------------------------------------------------------------------
+   Style 2: Simple Dots (Classic Minimalist Circular Indicators)
+   ---------------------------------------------------------------------------- */
+.hero-carousel-container.indicator-dots .hero-indicators {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+/* Base dot circle */
+.hero-carousel-container.indicator-dots .hero-dot {
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.28);
+    margin-right: 10px;
+    padding: 0;
+    -webkit-transition: none !important;
+    transition: none !important;
+    overflow: hidden;
+}
+
+/* Last child removes trailing right margin */
+.hero-carousel-container.indicator-dots .hero-dot:last-child {
+    margin-right: 0;
+    margin-left: 0;
+}
+
+/* Active dot circle: fixed 8px diameter, solid white */
+.hero-carousel-container.indicator-dots .hero-dot.active {
+    width: 8px;
+    background: #ffffff;
+    opacity: 1;
+}
+
+/* Suppress internal progress fill completely */
+.hero-carousel-container.indicator-dots .hero-dot-progress {
+    display: none !important;
+}
+
+/* ============================================================================
+   Web-only Navigation Arrows
+   ============================================================================ */
+
+.hero-nav-arrows {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+    padding: 0 18px;
+    z-index: 500;
+    pointer-events: none; /* Let clicks pass through container */
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.hero-carousel-container:hover .hero-nav-arrows {
+    opacity: 1;
+}
+
+.hero-arrow {
+    pointer-events: auto; /* Re-enable clicks for buttons */
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hero-arrow:hover {
+    background: var(--jf-accent-content-color);
+    color: var(--jf-accent);
+    transform: scale(1.05);
+    transition: background .2s, transform .2s, color .2s;
+}
+
+.hero-arrow:active {
+    transform: scale(0.95);
+}
+
+[dir="rtl"] .hero-arrow svg {
+    transform: rotate(180deg);
+}
+
+/* ============================================================================
+   Immersive Home Carousel Layout Overrides
+   ============================================================================
+   This section defines the new 'immersive' mode. It expands the backdrop taller,
+   and overlaps it elegantly behind the first horizontal media row, replicating
+   the premium tvOS user interface standard. It features strict composite isolation
+   for smooth rendering on low-power TV chipsets.
+   ============================================================================ */
+
+/* Push backdrop artwork up slightly to focus on characters' faces and actions */
+.hero-carousel-container.immersive .hero-backdrop {
+    background-position: center 15%;
+}
+
+/* Tall Canvas Height for Immersive mode */
+.hero-carousel-container.immersive .hero-carousel,
+.hero-carousel-container.immersive-performance .hero-carousel {
+    /* 
+     * Calibrated canvas height for the immersive background artwork.
+     * Retains full artwork presence without warping across window height changes.
+     */
+    height: var(--hero-carousel-height-immersive, 972px);
+    min-height: 650px;
+}
+
+/* Compact Immersive Canvas Height */
+.hero-carousel-container.immersive.compact .hero-carousel,
+.hero-carousel-container.immersive-performance.compact .hero-carousel {
+    /* 
+     * In compact mode, maintains deep-overlap immersive canvas proportions.
+     * Preserves stable geometry across variable display scaling factors.
+     */
+    height: var(--hero-carousel-height-compact, 972px);
+    min-height: 650px;
+}
+
+/* Upward Section Overlap to place home-rows over the lower section of immersive backdrop */
+#home-hero-placeholder.style-immersive + .home-rows,
+#home-hero-placeholder.style-immersive-performance + .home-rows {
+    /* 
+     * Pull content rows higher up over the backdrop image in standard mode.
+     * Shifted up to the -450px range for an incredibly sleek, high-end overlap.
+     * Creates an extremely elegant, balanced TV home layout.
+     */
+    margin-top: var(--hero-carousel-overlap-immersive, -450px);
+    position: relative;
+    /* Ensure the row cards float cleanly above the lower backdrop layer for spatial focus */
+    z-index: 10;
+}
+
+/* Upward Section Overlap for compact mode */
+#home-hero-placeholder.style-immersive.style-compact + .home-rows,
+#home-hero-placeholder.style-immersive-performance.style-compact + .home-rows {
+    /* 
+     * Compact layout inherits the deeply immersive standard.
+     * Pulls the home-rows high (-550px) over the background for dense card visibility.
+     */
+    margin-top: var(--hero-carousel-overlap-compact, -550px);
+    position: relative;
+    z-index: 10;
+}
+
+/* Elevated Text Content padding to push meta/description above the home-rows overlap */
+.hero-carousel-container.immersive .hero-item,
+.hero-carousel-container.immersive-performance .hero-item {
+    /* 
+     * Elevate text content by 470px to match the -450px sibling overlap.
+     * Keeps titles, ratings, and descriptions perfectly aligned above the row.
+     */
+    padding-bottom: var(--hero-carousel-padding-immersive, 470px);
+}
+
+/* Elevated Text Content padding for compact immersive mode */
+.hero-carousel-container.immersive.compact .hero-item,
+.hero-carousel-container.immersive-performance.compact .hero-item {
+    /* 
+     * Pushes text up by 570px in compact mode to avoid occlusion 
+     * from the deep -550px overlap.
+     */
+    padding-bottom: var(--hero-carousel-padding-compact, 570px);
+}
+
+/* 
+ * ============================================================================
+ * Responsive Space & Density Controls
+ * ============================================================================
+ * Since TV viewports have a strict 1080p logical grid canvas, we must balance
+ * the vertical space extremely carefully. By scaling down logo heights, font
+ * sizes, line-clamping, and margins, we protect the upper boundaries of the 
+ * screen from clipping (out-of-bounds rendering) while keeping text aligned
+ * with the gorgeous card rows.
+ * ============================================================================
+ */
+
+/* Standard Immersive Size Tuning */
+.hero-carousel-container.immersive .hero-logo-container,
+.hero-carousel-container.immersive-performance .hero-logo-container {
+    /* 
+     * Sleek logo dimensions scaled down to give 20px of extra vertical relief.
+     * Preserves visual presence while avoiding crowding on 1080p screens.
+     */
+    height: 130px;
+    margin-bottom: 16px;
+}
+
+.hero-carousel-container.immersive .hero-item-title,
+.hero-carousel-container.immersive-performance .hero-item-title {
+    /* 
+     * Text title typography fallback (when logo assets are missing).
+     * Scaled down from 4rem to 3.2rem (approx 51px) to prevent vertical bloat.
+     */
+    font-size: 3.2rem;
+    margin-bottom: 12px;
+}
+
+.hero-carousel-container.immersive .hero-meta-row,
+.hero-carousel-container.immersive-performance .hero-meta-row {
+    /* Tighten spatial gap between metadata badges and description text */
+    margin-bottom: 16px;
+}
+
+.hero-carousel-container.immersive .hero-description,
+.hero-carousel-container.immersive-performance .hero-description {
+    /* 
+     * High-legibility standard text size (20px).
+     * Keeps synopsis clear while conserving screen real estate.
+     * Restrict horizontal width to left 50% to prevent collision with right artwork.
+     */
+    font-size: 1.25rem;
+    margin-bottom: 20px;
+    max-width: 70%;
+}
+
+/* Compact Immersive Size Tuning */
+.hero-carousel-container.immersive.compact .hero-logo-container,
+.hero-carousel-container.immersive-performance.compact .hero-logo-container {
+    /* 
+     * Ultra-compact 80px height designed for extreme information density.
+     */
+    height: 110px;
+    margin-bottom: 12px;
+}
+
+.hero-carousel-container.immersive.compact .hero-item-title,
+.hero-carousel-container.immersive-performance.compact .hero-item-title {
+    /* Elegant, slim text title for the compact immersive configuration */
+    font-size: 2.4rem;
+    margin-bottom: 10px;
+}
+
+.hero-carousel-container.immersive.compact .hero-meta-row,
+.hero-carousel-container.immersive-performance.compact .hero-meta-row {
+    /* Minimum possible spacing to keep items perfectly clustered */
+    margin-bottom: 12px;
+}
+
+.hero-carousel-container.immersive.compact .hero-description,
+.hero-carousel-container.immersive-performance.compact .hero-description {
+    /* 
+     * Sleek 18px body copy typography.
+     * Clamp to 2 lines instead of 3 to save massive vertical space.
+     * Prevents any clipping while maintaining deep backdrop transparency.
+     */
+    font-size: 1.15rem;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    margin-bottom: 14px;
+    max-width: 70%;
+}
+
+/* 
+ * ============================================================================
+ * Immersive (Performance) Layout Overrides
+ * ============================================================================
+ * Provides high-speed TV scrolling by bounding the background texture canvas
+ * to the right side of the screen (~60% width), dramatically reducing
+ * GPU texture allocation and eliminating overdraw beneath the home row cards.
+ * Artwork is feathered with circular gradient masks for seamless visual flow.
+ * ============================================================================
+ */
+
+.hero-carousel-container.immersive-performance .hero-backdrop {
+    /* 
+     * Position artwork on the right quadrant, spanning 65% width and 100% height.
+     * Full height allows the bottom fade to extend across the entire 972px canvas,
+     * seamlessly dissolving behind the row cards into the section below without
+     * any premature horizontal shelf cutoff at 750px.
+     */
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: auto;
+    width: 65%;
+    height: 100%;
+    background-size: cover;
+    background-position: center 15%;
+    background-repeat: no-repeat;
+    transform: translateZ(0);
+
+    /*
+     * Horizontal Alpha Masking:
+     * Feathers the left edge of the backdrop image into the typography side.
+     * The vertical bottom fade is handled universally on the parent (.hero-item),
+     * avoiding multi-mask compositing bugs across different TV browser engines.
+     */
+    -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 8%,
+        rgba(0, 0, 0, 0.10) 18%,
+        rgba(0, 0, 0, 0.26) 30%,
+        rgba(0, 0, 0, 0.48) 44%,
+        rgba(0, 0, 0, 0.70) 58%,
+        rgba(0, 0, 0, 0.86) 70%,
+        rgba(0, 0, 0, 0.96) 82%,
+        black 92%
+    );
+    mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 8%,
+        rgba(0, 0, 0, 0.10) 18%,
+        rgba(0, 0, 0, 0.26) 30%,
+        rgba(0, 0, 0, 0.48) 44%,
+        rgba(0, 0, 0, 0.70) 58%,
+        rgba(0, 0, 0, 0.86) 70%,
+        rgba(0, 0, 0, 0.96) 82%,
+        black 92%
+    );
+}
+
+[dir="rtl"] .hero-carousel-container.immersive-performance .hero-backdrop {
+    /* Mirrored horizontal alpha mask for RTL reading direction */
+    right: auto;
+    left: 0;
+    -webkit-mask-image: linear-gradient(
+        to left,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 8%,
+        rgba(0, 0, 0, 0.10) 18%,
+        rgba(0, 0, 0, 0.26) 30%,
+        rgba(0, 0, 0, 0.48) 44%,
+        rgba(0, 0, 0, 0.70) 58%,
+        rgba(0, 0, 0, 0.86) 70%,
+        rgba(0, 0, 0, 0.96) 82%,
+        black 92%
+    );
+    mask-image: linear-gradient(
+        to left,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 8%,
+        rgba(0, 0, 0, 0.10) 18%,
+        rgba(0, 0, 0, 0.26) 30%,
+        rgba(0, 0, 0, 0.48) 44%,
+        rgba(0, 0, 0, 0.70) 58%,
+        rgba(0, 0, 0, 0.86) 70%,
+        rgba(0, 0, 0, 0.96) 82%,
+        black 92%
+    );
+}
+
+/*
+ * Suppress full-screen linear gradient vignettes & solid color overlays:
+ * Because the hardware alpha mask handles the transparent falloff on the GPU,
+ * hardcoded black overlays on ::before and ::after are disabled to prevent
+ * stamping black paint over colorful themes (e.g. Purple Haze, Blue Radiance).
+ */
+.hero-carousel-container.immersive-performance .hero-item::before,
+.hero-carousel-container.immersive-performance .hero-item::after,
+.hero-carousel-container.immersive-performance .hero-backdrop::after {
+    display: none !important;
+}
+
+/* 
+ * ============================================================================
+ * BlurHash Ambient Color Fill
+ * ============================================================================
+ * Fills the remaining background area behind the hero artwork with low-frequency
+ * ambient colors decoded from the current item's BlurHash.
+ *
+ * Layers:
+ * - .hero-blurhash-fill-wrap: Container placed at z-index -2 (behind .hero-backdrop).
+ * - .hero-blurhash-fill-canvas: Stretched 32x18 low-resolution canvas magnified
+ *   using hardware-accelerated bilinear filtering and scale(1.06) to avoid edge bleed.
+ * - .hero-blurhash-fill-vignette: Horizontal contrast gradient on the text side
+ *   plus vertical bottom gradient transitioning smoothly into --jf-background.
+ * ============================================================================
+ */
+
+.hero-blurhash-fill-wrap {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    overflow: hidden;
+    pointer-events: none;
+    transform: translateZ(0);
+}
+
+.hero-blurhash-fill-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.06);
+    opacity: 0;
+    transition: opacity 600ms ease-out;
+    pointer-events: none;
+    image-rendering: auto;
+    /*
+     * Soft Bottom Feathering:
+     * Fades the low-frequency ambient canvas softly into the background body mesh
+     * without introducing any artificial black pigment or dark bands beneath rows.
+     */
+    -webkit-mask-image: linear-gradient(
+        to top,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 6%,
+        rgba(0, 0, 0, 0.12) 16%,
+        rgba(0, 0, 0, 0.38) 28%,
+        rgba(0, 0, 0, 0.75) 42%,
+        black 58%
+    );
+    mask-image: linear-gradient(
+        to top,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 6%,
+        rgba(0, 0, 0, 0.12) 16%,
+        rgba(0, 0, 0, 0.38) 28%,
+        rgba(0, 0, 0, 0.75) 42%,
+        black 58%
+    );
+}
+
+.hero-blurhash-fill-vignette {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    /*
+     * Text-Side Contrast Protection Vignette:
+     * Provides solid contrast behind title typography and metadata on the left quadrant,
+     * while completely preserving clean bottom transparency for the active theme colors.
+     */
+    background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.92) 0%,
+        rgba(0, 0, 0, 0.80) 16%,
+        rgba(0, 0, 0, 0.56) 36%,
+        rgba(0, 0, 0, 0.28) 58%,
+        rgba(0, 0, 0, 0.08) 78%,
+        transparent 92%
+    );
+}
+
+[dir="rtl"] .hero-blurhash-fill-vignette {
+    background: linear-gradient(
+        to left,
+        rgba(0, 0, 0, 0.92) 0%,
+        rgba(0, 0, 0, 0.80) 16%,
+        rgba(0, 0, 0, 0.56) 36%,
+        rgba(0, 0, 0, 0.28) 58%,
+        rgba(0, 0, 0, 0.08) 78%,
+        transparent 92%
+    );
+}
+
+
+/* 
+ * ============================================================================
+ * Backdrop Fade (Immersive & Semi-Immersive)
+ * ============================================================================
+ * Uses -webkit-mask-image on the backdrop only (not on ::before).
+ * The mask forces a CPU compositing pass for this single element, but this is
+ * acceptable because only the active slide carries the mask — inactive slides
+ * use visibility:hidden and are not composited at all. The ::before text shadow
+ * uses a GPU radial gradient instead of a mask, so animations are not serialized
+ * through the CPU.
+ * ============================================================================
+ */
+
+/* 
+ * ============================================================================
+ * Backdrop Fade (Immersive & Semi-Immersive)
+ * ============================================================================
+ * Masking is strictly applied ONLY in Ambient Glow mode ([data-theme-mode="ambient"]).
+ * Why:
+ * 1. In Ambient Glow mode, true alpha transparency on .hero-backdrop is essential
+ *    so the dynamic colorful ambient mesh on the body can bleed through behind
+ *    the carousel and rows.
+ * 2. In non-ambient modes (Dark, OLED Black, etc.), the background is a solid color.
+ *    Using linear-gradient on ::after blends into var(--jf-background) completely
+ *    on the GPU, avoiding the expensive WebKit/Tizen CPU raster compositing pass.
+ * 3. In Ambient Glow mode with masking active, the faint ::after gradient is redundant
+ *    and causes unnecessary overdraw, so it is disabled.
+ * ============================================================================
+ */
+
+/*
+ * Single-mask approach: apply mask-image to .hero-item (the parent), which clips
+ * both the .hero-backdrop image AND the ::before vignette overlay in one operation.
+ * Universal across ALL themes (Ambient, Tinted, Classic Dark, Classic Light, etc.).
+ * Guarantees that no theme paints an artificial black gradient over the bottom row cards.
+ */
+
+/* Standard widescreen - Universal Across All Themes */
+.hero-carousel-container.immersive:not(.compact) .hero-item,
+.hero-carousel-container.immersive-performance:not(.compact) .hero-item {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black 35%,
+        rgba(0, 0, 0, 0.96) 48%,
+        rgba(0, 0, 0, 0.75) 62%,
+        rgba(0, 0, 0, 0.38) 76%,
+        rgba(0, 0, 0, 0.08) 88%,
+        transparent 96%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        black 35%,
+        rgba(0, 0, 0, 0.96) 48%,
+        rgba(0, 0, 0, 0.75) 62%,
+        rgba(0, 0, 0, 0.38) 76%,
+        rgba(0, 0, 0, 0.08) 88%,
+        transparent 96%
+    );
+}
+
+/* Compact widescreen - Universal Across All Themes */
+.hero-carousel-container.immersive.compact .hero-item,
+.hero-carousel-container.immersive-performance.compact .hero-item {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black 30%,
+        rgba(0, 0, 0, 0.95) 44%,
+        rgba(0, 0, 0, 0.70) 58%,
+        rgba(0, 0, 0, 0.32) 72%,
+        rgba(0, 0, 0, 0.06) 84%,
+        transparent 94%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        black 30%,
+        rgba(0, 0, 0, 0.95) 44%,
+        rgba(0, 0, 0, 0.70) 58%,
+        rgba(0, 0, 0, 0.32) 72%,
+        rgba(0, 0, 0, 0.06) 84%,
+        transparent 94%
+    );
+}
+
+/*
+ * ============================================================================
+ * Semi-Immersive Layout & Mask Architecture
+ * ============================================================================
+ * In semi-immersive mode, text content (.hero-content) is positioned directly
+ * near the bottom of the canvas (padding-bottom: 120px / 80px compact).
+ * If a vertical mask is applied to the parent .hero-item, the alpha gradient
+ * occludes the overview and meta typography, reducing opacity and readability.
+ *
+ * Architecture Resolution:
+ * 1. .hero-item is left completely unmasked so all text details remain 100% opaque.
+ * 2. .hero-backdrop receives its own bottom alpha mask to softly dissolve artwork
+ *    directly into the theme background without leaving a harsh horizontal shelf.
+ * 3. .hero-item::before receives a dedicated vertical mask that shields the text
+ *    with deep contrast while dissolving to 0% at the baseline edge.
+ * ============================================================================
+ */
+
+/* Keep typography parent container completely unmasked for maximum clarity */
+.hero-carousel-container.semi-immersive .hero-item {
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+}
+
+/*
+ * Standard Semi-Immersive Backdrop Fade:
+ * Smooth 7-stop polynomial ease curve dissolving artwork texture into --jf-background.
+ * Ensures the bottom boundary vanishes into the section background above media rows.
+ */
+.hero-carousel-container.semi-immersive:not(.compact) .hero-backdrop {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black 25%,
+        rgba(0, 0, 0, 0.96) 40%,
+        rgba(0, 0, 0, 0.82) 54%,
+        rgba(0, 0, 0, 0.58) 68%,
+        rgba(0, 0, 0, 0.30) 80%,
+        rgba(0, 0, 0, 0.08) 92%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        black 25%,
+        rgba(0, 0, 0, 0.96) 40%,
+        rgba(0, 0, 0, 0.82) 54%,
+        rgba(0, 0, 0, 0.58) 68%,
+        rgba(0, 0, 0, 0.30) 80%,
+        rgba(0, 0, 0, 0.08) 92%,
+        transparent 100%
+    );
+}
+
+/*
+ * Compact Semi-Immersive Backdrop Fade:
+ * Calibrated for lower canvas height (540px) to deliver an identical smooth gradient falloff.
+ */
+.hero-carousel-container.semi-immersive.compact .hero-backdrop {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black 20%,
+        rgba(0, 0, 0, 0.95) 35%,
+        rgba(0, 0, 0, 0.80) 50%,
+        rgba(0, 0, 0, 0.54) 65%,
+        rgba(0, 0, 0, 0.28) 78%,
+        rgba(0, 0, 0, 0.06) 90%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        black 20%,
+        rgba(0, 0, 0, 0.95) 35%,
+        rgba(0, 0, 0, 0.80) 50%,
+        rgba(0, 0, 0, 0.54) 65%,
+        rgba(0, 0, 0, 0.28) 78%,
+        rgba(0, 0, 0, 0.06) 90%,
+        transparent 100%
+    );
+}
+
+/* 
+ * Completely suppress redundant hardcoded black gradient overlay (::after) across ALL themes:
+ * Because hardware alpha masking seamlessly dissolves the backdrop into the theme's true
+ * background canvas, ::after's hardcoded black paint is eliminated on all modes
+ * (Ambient, Tinted, Classic Dark, Classic Light, OLED Black, etc.).
+ */
+.hero-carousel-container.immersive .hero-item::after,
+.hero-carousel-container.immersive-performance .hero-item::after,
+.hero-carousel-container.semi-immersive .hero-item::after,
+.hero-carousel-container.compact .hero-item::after {
+    display: none !important;
+}
+
+/* 
+ * ============================================================================
+ * Text Shadow Overlay (::before)
+ * ============================================================================
+ * Standard horizontal contrast gradient covering typography on the left quadrant.
+ * Bounded to 65% width to reduce GPU overdraw across the right artwork region.
+ * ============================================================================
+ */
+
+.hero-carousel-container.immersive .hero-item::before,
+.hero-carousel-container.semi-immersive .hero-item::before,
+.hero-carousel-container.immersive.compact .hero-item::before,
+.hero-carousel-container.semi-immersive.compact .hero-item::before {
+    width: 65%;
+    background: linear-gradient(
+        to right,
+        var(--hero-vignette-start) 0%,
+        var(--hero-vignette-mid) 45%,
+        var(--hero-vignette-end) 100%
+    );
+}
+
+/* RTL horizontal vignette mirror rule */
+[dir="rtl"] .hero-carousel-container.immersive .hero-item::before,
+[dir="rtl"] .hero-carousel-container.semi-immersive .hero-item::before,
+[dir="rtl"] .hero-carousel-container.immersive.compact .hero-item::before,
+[dir="rtl"] .hero-carousel-container.semi-immersive.compact .hero-item::before {
+    left: auto;
+    right: 0;
+    width: 65%;
+    background: linear-gradient(
+        to left,
+        var(--hero-vignette-start) 0%,
+        var(--hero-vignette-mid) 45%,
+        var(--hero-vignette-end) 100%
+    );
+}
+
+/* 
+ * Immersive modes inherit the vertical bottom fade from .hero-item's mask,
+ * so ::before does not need its own vertical alpha mask in immersive mode.
+ */
+.hero-carousel-container.immersive .hero-item::before,
+.hero-carousel-container.immersive.compact .hero-item::before {
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+}
+
+/*
+ * Semi-Immersive Text Contrast Vignette Falloff:
+ * Dedicated vertical alpha ramp for the left vignette overlay.
+ * Delivers deep, uncompromised contrast behind titles and synopsis details,
+ * then softly fades to 0% below the text baseline so no dark rectangular box
+ * stamps over the active theme canvas.
+ */
+.hero-carousel-container.semi-immersive:not(.compact) .hero-item::before {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black 0%,
+        black 65%,
+        rgba(0, 0, 0, 0.92) 76%,
+        rgba(0, 0, 0, 0.45) 86%,
+        rgba(0, 0, 0, 0.08) 94%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        black 0%,
+        black 65%,
+        rgba(0, 0, 0, 0.92) 76%,
+        rgba(0, 0, 0, 0.45) 86%,
+        rgba(0, 0, 0, 0.08) 94%,
+        transparent 100%
+    );
+}
+
+/* Compact Semi-Immersive Text Contrast Vignette Falloff */
+.hero-carousel-container.semi-immersive.compact .hero-item::before {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black 0%,
+        black 62%,
+        rgba(0, 0, 0, 0.90) 74%,
+        rgba(0, 0, 0, 0.45) 86%,
+        rgba(0, 0, 0, 0.08) 94%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        black 0%,
+        black 62%,
+        rgba(0, 0, 0, 0.90) 74%,
+        rgba(0, 0, 0, 0.45) 86%,
+        rgba(0, 0, 0, 0.08) 94%,
+        transparent 100%
+    );
+}
+
+/* Ensure the main container frames remain transparent */
+.hero-carousel-container.immersive,
+.hero-carousel-container.immersive-performance,
+.hero-carousel-container.semi-immersive,
+.hero-carousel-container.immersive .hero-carousel,
+.hero-carousel-container.immersive-performance .hero-carousel,
+.hero-carousel-container.semi-immersive .hero-carousel {
+    background: transparent !important;
+}
+
+/* Elevate indicator dots to align perfectly with the elevated text */
+.hero-carousel-container.immersive .hero-indicators,
+.hero-carousel-container.immersive-performance .hero-indicators {
+    /* 
+     * Align dot indicators with the baseline of the description paragraph for the -450px overlap.
+     * Elevated to 430px to guarantee zero horizontal collision/overlapping with the side chevrons.
+     */
+    bottom: var(--hero-indicators-bottom-immersive, 430px);
+}
+
+/* Elevate indicator dots for compact immersive mode */
+.hero-carousel-container.immersive.compact .hero-indicators,
+.hero-carousel-container.immersive-performance.compact .hero-indicators {
+    /* 
+     * Align dot indicators perfectly with the elevated text at the 570px boundary.
+     * Elevated to 530px to clear navigation chevrons completely on lower viewport heights.
+     */
+    bottom: var(--hero-indicators-bottom-compact, 530px);
+}
+
+/* 
+ * ============================================================================
+ * Immersive Navigation Arrow Position Overrides
+ * ============================================================================
+ * Pushes the side navigation chevrons upward to visually center them within
+ * the remaining exposed backdrop canvas (above the card overlap zones).
+ * ============================================================================
+ */
+
+/* Elevate navigation arrows in standard immersive mode */
+.hero-carousel-container.immersive .hero-nav-arrows,
+.hero-carousel-container.immersive-performance .hero-nav-arrows {
+    /* 
+     * Shift standard mode arrows up to 30% viewport height.
+     * Aligns perfectly with the visual center of the backdrop above the -450px row overlap.
+     */
+    top: 30%;
+}
+
+/* Elevate navigation arrows for compact immersive mode */
+.hero-carousel-container.immersive.compact .hero-nav-arrows,
+.hero-carousel-container.immersive-performance.compact .hero-nav-arrows {
+    /* 
+     * Shift compact mode arrows further up to 24% viewport height.
+     * Centers arrows relative to the taller -550px bottom overlap.
+     */
+    top: 24%;
+}
+
+/* ============================================================================
+   Expanded Sidebar Overlap for Immersive & Semi-Immersive Modes
+   ============================================================================ */
+
+/* 1. Shift the entire homepage to the left using margin when sidebar is visible */
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .home-page:not(.favorites-page) {
+    position: relative !important;
+    margin-left: calc(-1 * var(--sidebar-width-collapsed, 100px)) !important;
+    width: calc(100% + var(--sidebar-width-collapsed, 100px)) !important;
+}
+
+/* 2. Increase left padding of the scroller to keep rows in place */
+body:not(.no-sidebar):not(.sidebar-mode-hidden) #home-content {
+    padding-left: var(--sidebar-width-collapsed, 100px) !important;
+}
+
+/* 3. Expand the carousel container to the left edge of the screen */
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive,
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive-performance,
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.semi-immersive {
+    margin-left: calc(-1 * var(--sidebar-width-collapsed, 100px)) !important;
+    width: calc(100% + var(--sidebar-width-collapsed, 100px)) !important;
+}
+
+/* 4. Position carousel content back to its original screen position */
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive .hero-content,
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive-performance .hero-content,
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.semi-immersive .hero-content {
+    margin-left: var(--sidebar-width-collapsed, 100px) !important;
+}
+
+/* 5. Center navigation arrows relative to the visible screen width */
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive .hero-nav-arrows,
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive-performance .hero-nav-arrows,
+body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.semi-immersive .hero-nav-arrows {
+    padding-left: calc(8px + var(--sidebar-width-collapsed, 100px)) !important;
+}
+
+/* ============================================================================
+   RTL Layout Support
+   ============================================================================ */
+
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .home-page:not(.favorites-page) {
+    position: relative !important;
+    margin-right: calc(-1 * var(--sidebar-width-collapsed, 100px)) !important;
+    margin-left: 0 !important;
+    width: calc(100% + var(--sidebar-width-collapsed, 100px)) !important;
+}
+
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) #home-content {
+    padding-right: var(--sidebar-width-collapsed, 100px) !important;
+    padding-left: 0 !important;
+}
+
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive,
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive-performance,
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.semi-immersive {
+    margin-right: calc(-1 * var(--sidebar-width-collapsed, 100px)) !important;
+    margin-left: 0 !important;
+    width: calc(100% + var(--sidebar-width-collapsed, 100px)) !important;
+}
+
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive .hero-content,
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive-performance .hero-content,
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.semi-immersive .hero-content {
+    margin-right: var(--sidebar-width-collapsed, 100px) !important;
+    margin-left: 0 !important;
+}
+
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive .hero-nav-arrows,
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.immersive-performance .hero-nav-arrows,
+[dir="rtl"] body:not(.no-sidebar):not(.sidebar-mode-hidden) .hero-carousel-container.semi-immersive .hero-nav-arrows {
+    padding-right: calc(8px + var(--sidebar-width-collapsed, 100px)) !important;
+    padding-left: 8px !important;
+}
+
+/* ============================================================================
+   Viewport Height Responsiveness (Browser Windowed Modes / Compact Layouts)
+   ============================================================================ */
+
+@media (max-height: 850px) {
+    /* Immersive Mode (Native unscaled viewports only) */
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-carousel,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-carousel,
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-carousel,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-carousel {
+        min-height: 520px;
+    }
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive + .home-rows,
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive-performance + .home-rows {
+        margin-top: -340px;
+    }
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive.style-compact + .home-rows,
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive-performance.style-compact + .home-rows {
+        margin-top: -420px;
+    }
+
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-item,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-item {
+        padding-bottom: 360px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-item,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-item {
+        padding-bottom: 440px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-indicators,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-indicators {
+        bottom: 330px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-indicators,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-indicators {
+        bottom: 410px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-nav-arrows,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-nav-arrows {
+        top: 35%;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-nav-arrows,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-nav-arrows {
+        top: 28%;
+    }
+
+    /* Semi-Immersive & Default Modes */
+    html:not([data-display-scale]) .hero-carousel {
+        min-height: 420px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.compact .hero-carousel {
+        min-height: 340px;
+    }
+}
+
+@media (max-height: 700px) {
+    /* Immersive Mode (Native unscaled viewports only) */
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-carousel,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-carousel,
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-carousel,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-carousel {
+        min-height: 420px;
+    }
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive + .home-rows,
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive-performance + .home-rows {
+        margin-top: -240px;
+    }
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive.style-compact + .home-rows,
+    html:not([data-display-scale]) #home-hero-placeholder.style-immersive-performance.style-compact + .home-rows {
+        margin-top: -300px;
+    }
+
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-item,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-item {
+        padding-bottom: 260px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-item,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-item {
+        padding-bottom: 320px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-indicators,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-indicators {
+        bottom: 230px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-indicators,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-indicators {
+        bottom: 290px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive .hero-nav-arrows,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance .hero-nav-arrows {
+        top: 40%;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.immersive.compact .hero-nav-arrows,
+    html:not([data-display-scale]) .hero-carousel-container.immersive-performance.compact .hero-nav-arrows {
+        top: 32%;
+    }
+
+    /* Semi-Immersive & Default Modes */
+    html:not([data-display-scale]) .hero-carousel {
+        min-height: 320px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.compact .hero-carousel {
+        min-height: 260px;
+    }
+    html:not([data-display-scale]) .hero-item {
+        padding-bottom: 80px;
+    }
+    html:not([data-display-scale]) .hero-carousel-container.compact .hero-item {
+        padding-bottom: 60px;
+    }
+    html:not([data-display-scale]) .hero-logo-container {
+        height: 60px !important;
+        margin-bottom: 10px !important;
+    }
+    html:not([data-display-scale]) .hero-item-title {
+        font-size: 2.0rem !important;
+    }
+    html:not([data-display-scale]) .hero-description {
+        -webkit-line-clamp: 2 !important;
+        line-clamp: 2 !important;
+    }
+}
+
+/* ============================================================================
+   Hero Carousel Loading Skeleton
+   ============================================================================
+   Provides premium layout-aligned placeholders while hero metadata/images load.
+   Prevents vertical layout shifts (reflows) on low-end TV chipsets (Tizen/WebOS).
+   ============================================================================ */
+
+/* Disable all user interactions and D-pad clicks during the loading state */
+.hero-carousel-container.skeleton {
+    pointer-events: none;
+}
+
+/* Maintain theme background to mask page background bleed during load */
+.hero-carousel-container.skeleton .hero-carousel {
+    background: var(--jf-background);
+}
+
+/* Base style for the skeleton background shimmer track utilizing theme variables */
+.hero-carousel-container.skeleton .hero-backdrop {
+    background: rgba(var(--jf-primary-btn-color-rgb, 255, 255, 255), 0.04);
+}
+
+/* Forces the content area to remain visible without transition delays on load */
+.hero-carousel-container.skeleton .hero-content {
+    opacity: 1;
+    transform: translateY(0);
+    -webkit-transform: translateY(0);
+}
+
+/* Logo placeholder simulating high-resolution asset geometry */
+.hero-logo-skeleton {
+    width: 320px;
+    height: 60px;
+    border-radius: var(--jf-border-radius, 8px);
+    margin-bottom: 24px;
+}
+
+/* Scales down the logo height when compact mode is preferred */
+.hero-carousel-container.compact .hero-logo-skeleton {
+    height: 48px;
+    margin-bottom: 16px;
+}
+
+/* Metadata pills placeholder row */
+.hero-meta-row-skeleton {
+    width: 220px;
+    height: 24px;
+    border-radius: var(--jf-border-radius, 8px);
+    margin-bottom: 24px;
+}
+
+/* Reduces metadata placeholder vertical weight in compact layouts */
+.hero-carousel-container.compact .hero-meta-row-skeleton {
+    height: 20px;
+    margin-bottom: 16px;
+}
+
+/* Paragraph line 1 - matching standard 3-line clamping synopsis layouts */
+.hero-description-skeleton {
+    width: 600px;
+    height: 20px;
+    border-radius: var(--jf-border-radius, 8px);
+    margin-bottom: 12px;
+}
+
+/* Paragraph line 2 - slightly shorter for natural typographic hierarchy */
+.hero-description-skeleton-2 {
+    width: 450px;
+    height: 20px;
+    border-radius: var(--jf-border-radius, 8px);
+}
+
+/* Responsive handling for windowed viewports and smaller TV setups */
+@media (max-width: 1000px) {
+    .hero-logo-skeleton {
+        width: 240px;
+    }
+    .hero-description-skeleton {
+        width: 100%;
+        max-width: 450px;
+    }
+    .hero-description-skeleton-2 {
+        width: 100%;
+        max-width: 320px;
+    }
+}
+
+/*
+ * ── Chrome 26 Quirks Overrides: Carousel Indicators ────────────────────
+ * Older rendering engines lack support for display: flex. We fall back to 
+ * inline-block spacing for the carousel navigation dots so they sit in a 
+ * horizontal row rather than stacking vertically.
+ */
+html[data-layout-quirks="c26"] .hero-indicators {
+    display: block !important;
+    white-space: nowrap !important;
+}
+
+html[data-layout-quirks="c26"] .hero-dot {
+    display: inline-block !important;
+    vertical-align: middle !important;
+}
+
+/* Position hero details at the bottom of the slide on Chrome 26, matching margins/overlaps */
+html[data-layout-quirks="c26"] .hero-content {
+    padding-top: 80px;
+}
+
+

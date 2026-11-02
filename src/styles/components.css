@@ -1,0 +1,2677 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Components Styles
+ * ============================================================================
+ */
+
+/* Buttons */
+.btn {
+    padding: 20px 40px;
+    font-size: 1.5rem;
+    border: 3px solid transparent;
+
+    border-radius: var(--jf-border-radius);
+    cursor: pointer;
+    margin: 12px;
+    -webkit-transition: -webkit-transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    will-change: transform;
+}
+
+
+.btn-small {
+    padding: 12px 24px;
+    font-size: 1.15rem;
+    min-width: 140px;
+}
+
+
+.btn:focus,
+.btn.focused {
+    border-color: var(--jf-button-border-focus);
+    outline: none;
+    -webkit-transform: scale(1.05);
+    transform: scale(1.05);
+}
+
+.btn-primary {
+    background: var(--jf-btn-primary-bg);
+    color: var(--jf-btn-primary-color);
+    border: 3px solid var(--jf-btn-primary-border) !important;
+    margin: 0px;
+    margin-left: 8px;
+}
+
+.btn-primary:focus,
+.btn-primary.focused {
+    background: var(--jf-btn-primary-focus-bg);
+    color: var(--jf-btn-primary-focus-color);
+    border-color: var(--jf-btn-primary-focus-border) !important;
+}
+
+.btn-primary:hover {
+    border-color: var(--jf-btn-primary-hover-border) !important;
+}
+
+
+.btn-secondary {
+    background: var(--jf-button-bg, rgba(255, 255, 255, 0.12));
+    color: var(--jf-text-primary, #ffffff);
+}
+
+.btn-secondary:focus,
+.btn-secondary.focused,
+.btn-secondary:hover {
+    background: var(--jf-button-hover, rgba(255, 255, 255, 0.22));
+}
+
+.btn-danger {
+    background: var(--jf-error, #f44336);
+    color: white;
+}
+
+.btn-danger:focus,
+.btn-danger.focused {
+    background: #ff5252;
+}
+
+.nav-btn {
+    background: var(--jf-button-bg, rgba(255, 255, 255, 0.12));
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    color: var(--jf-text-primary, #ffffff);
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-radius: var(--jf-border-radius);
+    cursor: pointer;
+}
+
+.nav-btn > *:not(:last-child) {
+    margin-right: 8px;
+}
+
+.nav-btn:focus,
+.nav-btn.focused {
+    background: var(--jf-accent);
+    color: var(--jf-primary-btn-color);
+    outline: none;
+    border-color: var(--jf-button-border-focus);
+}
+
+.nav-btn.icon-only {
+    background: transparent;
+    padding: 8px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--jf-text-primary);
+}
+
+.nav-btn.icon-only:focus,
+.nav-btn.icon-only.focused {
+    background: var(--jf-button-hover);
+    color: var(--jf-accent);
+    outline: none;
+    box-shadow: none;
+}
+
+.back-btn {
+    background: transparent;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    color: var(--jf-text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: var(--jf-border-radius);
+}
+
+
+.back-btn:focus,
+.back-btn.focused {
+    background: var(--jf-accent-light);
+    outline: none;
+    border-color: var(--jf-button-border-focus);
+}
+
+.btn-icon-small {
+    background: transparent;
+    border: 3px solid transparent;
+    color: var(--jf-text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon-small:focus,
+.btn-icon-small.focused,
+.btn-icon-small:hover {
+    background: var(--jf-button-hover);
+    color: var(--jf-accent);
+    border-color: var(--jf-button-border-focus);
+}
+
+/* Inputs */
+.text-input {
+    width: 100%;
+    padding: 20px 28px;
+    font-size: 1.75rem;
+    background: var(--jf-input-bg);
+    border: 3px solid var(--jf-input-border);
+    background-clip: padding-box;
+    border-radius: var(--jf-border-radius);
+    color: var(--jf-text-primary);
+}
+
+
+.text-input:focus,
+.text-input.focused {
+    border-color: var(--jf-button-border-focus);
+    outline: none;
+}
+
+.text-input::placeholder {
+    color: var(--jf-text-tertiary);
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-label {
+    display: block;
+    color: #e0e0e0;
+    font-size: 1.5rem;
+    margin-bottom: 16px;
+    font-weight: 400;
+}
+
+/* Avatars */
+.header-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.header-avatar-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--jf-accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Loaders */
+.loading-spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--jf-text-tertiary);
+    border-top-color: var(--jf-accent);
+    border-radius: 50%;
+    animation: spin-gpu 1s linear infinite;
+    margin-right: 8px;
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+@keyframes spin-gpu {
+    from {
+        transform: translateZ(0) rotate(0deg);
+    }
+    to {
+        transform: translateZ(0) rotate(360deg);
+    }
+}
+
+/* Progress Bar Component (CSP-Safe) */
+.card-progress-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0; /* Use right: 0 instead of width: 100% for safer absolute positioning */
+    height: 6px;
+    background: rgba(0, 0, 0, 0.5); /* Slightly more transparent */
+    z-index: 100;
+    /* IMPORTANT: Remove individual radius.
+       The parent (.card-image) already has overflow: hidden and the border-radius.
+       Letting the parent handle the clipping ensures perfect pixel alignment. */
+    overflow: hidden;
+    /* Clean entrance using global animation */
+    opacity: 0;
+    animation: fadeIn 0.4s ease-out forwards;
+    /* PERFORMANCE: no permanent will-change here. The container's only
+     * animation is a one-shot 0.4s fade-in; a permanent promotion keeps
+     * 9 compositor layers resident on HomePage, costing more VRAM and
+     * raster budget than the short fade is worth on embedded TV GPUs
+     * (on-device probe: 9 extraneous layers at rest). */
+}
+
+progress.card-progress {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: none;
+    background: transparent;
+    border-radius: 0; /* Reset internal radius to allow parent to clip naturally */
+}
+
+progress.card-progress::-webkit-progress-bar {
+    background: transparent;
+    border-radius: 0;
+}
+
+progress.card-progress::-webkit-progress-value {
+    /* Premium gradient */
+    background: linear-gradient(90deg, var(--jf-accent) 0%, var(--jf-accent-hover) 100%);
+    /* Ensure sharp edges for the value bar */
+    border-radius: 0;
+}
+
+/* Skeleton Utility Classes (CSP-Safe) */
+.w-50 { width: 50%; }
+.w-80 { width: 80%; }
+.m-auto { margin-left: auto; margin-right: auto; }
+.mt-8 { margin-top: 8px; }
+
+/* Alerts/Errors */
+.page-error {
+    display: none;
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #ff6b6b;
+    border: 1px solid #ff6b6b;
+    padding: 1rem;
+    margin: 1rem;
+    border-radius: var(--jf-border-radius);
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Media Fallbacks & Gradients */
+.media-fallback {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    background: #1a1a1a;
+    overflow: hidden;
+    z-index: 1;
+}
+
+/* Gradient Variants */
+.grad-1 {
+    background: linear-gradient(135deg, #007aff 0%, #004a99 100%);
+}
+
+.grad-2 {
+    background: linear-gradient(135deg, #af52de 0%, #7a35a1 100%);
+}
+
+.grad-3 {
+    background: linear-gradient(135deg, #ff2d55 0%, #cc1d41 100%);
+}
+
+.grad-4 {
+    background: linear-gradient(135deg, #ff9500 0%, #cc7700 100%);
+}
+
+.grad-5 {
+    background: linear-gradient(135deg, #34c759 0%, #248a3d 100%);
+}
+
+.grad-6 {
+    background: linear-gradient(135deg, #5856d6 0%, #3e3ca3 100%);
+}
+
+.media-fallback-initials {
+    font-size: 4rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 8px;
+    /* Simplified shadow to avoid Tizen rendering artifacts */
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.landscape .media-fallback-initials {
+    font-size: 3rem;
+}
+
+.media-fallback-name {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    max-width: 90%;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    /* Simplified shadow to avoid Tizen rendering artifacts */
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.7);
+}
+
+.landscape .media-fallback-name {
+    font-size: 2.2rem;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+}
+
+/* Skeleton Enhancements */
+.media-card.skeleton {
+    cursor: default;
+    pointer-events: none;
+}
+
+.skeleton-image {
+    background-color: #1a1a1a; /* Fallback */
+    background-color: rgba(var(--jf-primary-btn-color-rgb, 255, 255, 255), 0.08);
+}
+
+.skeleton-line {
+    background-color: #2a2a2a;
+    height: 16px;
+    border-radius: var(--jf-border-radius);
+}
+
+.pulse {
+    /* Keeping pulse as a secondary subtle animation if needed, 
+       but we mainly use skeleton-shimmer now */
+    -webkit-animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+
+@-webkit-keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+
+/* ==========================================================================
+   Consolidated Modal Styles (Shared)
+   ========================================================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--jf-overlay-bg, rgba(0, 0, 0, 0.7));
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    /* Performance: Avoid backdrop-filter on Tizen */
+}
+
+.modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.settings-modal {
+    background: var(--jf-background-alt, #151515);
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+    border-radius: var(--jf-border-radius-lg);
+    -webkit-border-radius: var(--jf-border-radius-lg);
+    overflow: hidden;
+    background-clip: padding-box;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 750px;
+    max-width: 90%;
+    max-height: 80vh;
+    min-height: 180px; /* Lower minimum for short dialogs (e.g. Delete?) */
+    animation: modal-fade-in 0.3s ease-out;
+    -webkit-animation: modal-fade-in 0.3s ease-out;
+}
+
+@keyframes modal-fade-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@-webkit-keyframes modal-fade-in {
+    from { opacity: 0; -webkit-transform: scale(0.95); }
+    to { opacity: 1; -webkit-transform: scale(1); }
+}
+
+.settings-modal .modal-header {
+    padding: 10px 30px; /* Balanced vertical breathing room */
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    flex-shrink: 0; /* Never collapse header */
+}
+
+.settings-modal .modal-header h2 {
+    padding: 16px;
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--jf-text-primary);
+    /* Allow long version/item names to wrap onto a second line instead of being cut off */
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.4;
+}
+
+.settings-modal .modal-options {
+    padding: 10px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    max-height: calc(80vh - 150px);
+    min-height: 0;
+}
+
+.modal-option-btn {
+    position: relative; /* Ensure absolute children (badges) are scoped to the button */
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px 30px;
+    min-height: 80px;
+    height: auto;
+    /* Explicit min-height for vertical centering on TV, while allowing text to wrap naturally */
+    margin-bottom: 12px;
+    border: 3px solid transparent;
+    /* Layout stability */
+    border-radius: var(--jf-border-radius-lg);
+    -webkit-border-radius: var(--jf-border-radius-lg);
+    overflow: hidden;
+    background-clip: padding-box;
+    color: var(--jf-text-primary);
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    position: relative; /* Anchor for absolute positioned badge containers */
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    /* Prevent shrinking/distortion on TV browsers */
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.18s ease, border-color 0.18s ease;
+    will-change: transform;
+}
+
+.modal-option-btn > * {
+    vertical-align: middle;
+}
+
+/* Radio Button Styling (Sort Modal) */
+.radio-icon {
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    margin-right: 20px;
+    position: relative;
+    background-clip: padding-box;
+}
+
+.radio-btn.selected .radio-icon::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 12px;
+    height: 12px;
+    background: var(--jf-accent);
+    border-radius: 50%;
+}
+
+.modal-option-btn.focused .radio-icon {
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+.modal-option-btn.focused.selected .radio-icon::after {
+    background: var(--jf-primary-btn-color);
+}
+
+/* Checkbox Styling (Filter Modal) */
+.checkbox-box {
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    margin-right: 20px;
+    position: relative;
+    text-align: center;
+    background-clip: padding-box;
+}
+
+.checkbox-box .check-mark {
+    display: none;
+    line-height: 20px;
+    font-size: 18px;
+    color: var(--jf-accent);
+}
+
+.check-btn.selected .checkbox-box .check-mark {
+    display: block;
+}
+
+.modal-option-btn.focused .checkbox-box {
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+.modal-option-btn.focused .check-mark {
+    color: var(--jf-primary-btn-color) !important;
+}
+
+/* Modal Option Label Scaling */
+.modal-option-btn .track-label-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    text-overflow: ellipsis;
+    /* Allow up to 2 lines for track selection (like long Version names) */
+}
+
+.modal-option-btn .track-badges,
+.modal-option-btn .subtitle-track-meta,
+.track-option .track-badges {
+    margin-left: auto; /* Push to the right in flex contexts */
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+
+/* Base Badge Styling */
+.track-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 14px; /* Wider padding */
+    min-width: 54px; /* Ensure 0% and 100% have similar weight */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    font-size: 0.85rem; /* Slightly smaller for the wider pill look */
+    font-weight: 700;
+    white-space: nowrap;
+    text-transform: uppercase;
+    color: var(--jf-text-primary);
+    transition: all 0.2s ease;
+    letter-spacing: 0.8px;
+    line-height: 1;
+}
+
+/* Status-specific translucent colors */
+.track-badge.badge-success {
+    background: rgba(46, 204, 113, 0.15);
+    border-color: rgba(46, 204, 113, 0.4);
+    color: #2ecc71;
+}
+
+.track-badge.badge-warning {
+    background: rgba(241, 196, 15, 0.15);
+    border-color: rgba(241, 196, 15, 0.4);
+    color: #f1c40f;
+}
+
+.track-badge.badge-danger {
+    background: rgba(231, 76, 60, 0.15);
+    border-color: rgba(231, 76, 60, 0.4);
+    color: #e74c3c;
+}
+
+/* Focused State: Use dynamic contrast color instead of hardcoded white */
+.modal-option-btn.focused .track-badge {
+    background: rgba(var(--jf-btn-primary-focus-color-rgb), 0.15) !important;
+    border-color: rgba(var(--jf-btn-primary-focus-color-rgb), 0.35) !important;
+    color: var(--jf-btn-primary-focus-color) !important;
+}
+
+.modal-option-btn.focused .track-badge.badge-success,
+.modal-option-btn.focused .track-badge.badge-warning,
+.modal-option-btn.focused .track-badge.badge-danger {
+    background: rgba(var(--jf-btn-primary-focus-color-rgb), 0.2) !important;
+    border-color: rgba(var(--jf-btn-primary-focus-color-rgb), 0.4) !important;
+    color: var(--jf-btn-primary-focus-color) !important;
+}
+
+
+/*
+ * ── SELECTED MODAL OPTION STYLE ──────────────────────────────────────────────
+ * Maps selected modal options (e.g. tracks, audio, subtitles, qualities) to
+ * the dynamic button theme background variables for consistent color flow.
+ */
+.modal-option-btn.selected {
+    background: rgba(var(--jf-accent-rgb), 0.1) !important;
+    border-color: var(--jf-btn-primary-bg) !important;
+    color: var(--jf-text-primary);
+}
+
+/*
+ * ── FOCUSED MODAL OPTION STYLE ───────────────────────────────────────────────
+ * Highlights focused modal option items using customizable button focus states.
+ */
+.modal-option-btn:focus,
+.modal-option-btn.focused {
+    background: var(--jf-btn-primary-focus-bg) !important; /* Force priority over .selected */
+    color: var(--jf-btn-primary-focus-color) !important;
+    outline: none;
+    transform: scale(1.01);
+    border: 2px solid var(--jf-btn-primary-focus-border) !important;
+    will-change: transform;
+}
+
+.modal-option-btn:hover {
+    transform: scale(1.01);
+    border: 2px solid var(--jf-btn-primary-focus-border) !important;
+    will-change: transform;
+}
+
+/*
+ * ── SELECTED MODAL OPTION CHECK ICON ─────────────────────────────────────────
+ * Configures the selection checkmarks/icons inside list modal items to follow
+ * dynamic button colors and focus text color properties.
+ */
+.modal-option-btn .check-icon {
+    display: inline-block;
+    vertical-align: middle;
+    width: 20px;
+    height: 32px;
+    margin-right: 1.2em; /* Spacing from text */
+    flex-shrink: 0;
+    opacity: 0; /* Hidden by default */
+    color: var(--jf-btn-primary-bg) !important;
+}
+
+/*
+ * Force Selection Modals to only display the filled check icon variant.
+ * Since the checkmark is only visible when an option is selected, we hide 
+ * the outlined SVG state entirely and force the filled state to display,
+ * applying the high-contrast primary text color.
+ */
+/*
+ * Switch between outline and filled check icon variant based on selected/focus state.
+ *
+ * Design Guidelines:
+ * - If the option is selected and unfocused: display the outline checkmark icon.
+ * - If the option is selected and focused/hovered: switch to the filled checkmark icon.
+ * - Apply a premium look by styling the filled icon with the primary text color variable.
+ */
+
+/* By default, show outline icon, hide filled icon */
+.modal-option-btn .check-icon .icon-outline {
+    display: inline-block;
+}
+
+.modal-option-btn .check-icon .icon-filled {
+    display: none;
+    color: var(--jf-text-primary) !important;
+}
+
+/* Make selected icons visible */
+.modal-option-btn.selected .check-icon {
+    opacity: 1;
+}
+
+/* Switch outline icon to hidden and filled icon to visible on focus or hover */
+.modal-option-btn.selected.focused .check-icon .icon-outline,
+.modal-option-btn.selected:focus .check-icon .icon-outline,
+.modal-option-btn.selected:hover .check-icon .icon-outline {
+    display: none;
+}
+
+.modal-option-btn.selected.focused .check-icon .icon-filled,
+.modal-option-btn.selected:focus .check-icon .icon-filled,
+.modal-option-btn.selected:hover .check-icon .icon-filled {
+    display: inline-block;
+}
+
+/* A focused selected row is filled with the adaptive focus background, so the filled checkmark
+   must follow the same dynamic contrast variable instead of the fixed primary text color, or it
+   disappears against a light focus fill. Hover is excluded here because the global hover rule
+   changes no background, leaving --jf-text-primary legible. */
+.modal-option-btn.selected.focused .check-icon .icon-filled,
+.modal-option-btn.selected:focus .check-icon .icon-filled {
+    color: var(--jf-btn-primary-focus-color) !important;
+}
+
+/* Filter/Sort column layout: flex for modern/legacy, floats for ultra-legacy (Chrome 32) */
+.filter-split-container {
+    display: flex;
+    width: 100%;
+    height: 450px;
+}
+
+.filter-sidebar {
+    width: 30%;
+    height: 100%;
+    overflow-y: auto;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    box-sizing: border-box;
+}
+
+.filter-category-btn {
+    display: block;
+    width: 100%;
+    padding: 20px 24px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--jf-text-secondary);
+    font-size: 1.1rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-left: 4px solid transparent;
+}
+
+.filter-category-btn.active {
+    color: var(--jf-accent);
+    border-left-color: var(--jf-accent);
+    background: rgba(var(--jf-accent-rgb), 0.1);
+}
+
+.filter-category-btn.focused,
+.filter-category-btn:focus {
+    background: var(--jf-accent);
+    color: white;
+    outline: none;
+}
+
+/* Sort Modal Column Stabilization */
+.sort-columns {
+    display: flex;
+    width: 100%;
+}
+
+.sort-column {
+    width: 50%;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+.modal-actions {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-action-btn {
+    padding: 12px 32px;
+    border-radius: var(--jf-border-radius-lg);
+    /* Use theme-aware background with a fallback */
+    background: var(--jf-action-btn-bg, rgba(255, 255, 255, 0.1));
+    /* FLIP: Use primary text color instead of hardcoded white for theme compliance */
+    color: var(--jf-text-primary);
+    border: 2px solid var(--jf-action-btn-border, transparent);
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.modal-action-btn:focus,
+.modal-action-btn:hover,
+.modal-action-btn.focused {
+    background: var(--jf-btn-primary-bg) !important;
+    /* High contrast text color calculated by ThemeUtils */
+    color: var(--jf-btn-primary-color) !important;
+    outline: none;
+    transform: scale(1.05);
+    border-color: var(--jf-btn-primary-border) !important;
+    z-index: 10;
+}
+
+/* Playlist Editor Modal styles */
+.pe-selector-label {
+    font-size: 1.1rem;
+    opacity: 0.7;
+    min-width: 80px;
+    margin-right: 16px;
+}
+
+.pe-selector-value {
+    flex: 1;
+    text-align: right;
+    margin-right: 8px;
+    font-weight: 600;
+}
+
+.pe-chevron {
+    font-size: 1.8rem;
+    opacity: 0.5;
+    transition: transform 0.2s ease;
+}
+
+.modal-option-btn:focus .pe-chevron,
+.modal-option-btn.focused .pe-chevron {
+    transform: translateX(4px);
+}
+
+.modal-field-group {
+    padding: 4px 4px 16px;
+}
+
+.modal-field-label {
+    display: block;
+    color: var(--jf-text-secondary, #b0b0b0);
+    font-size: 1.1rem;
+    font-weight: 400;
+    margin-bottom: 8px;
+}
+
+.playlist-name-input {
+    width: 100%;
+    padding: 16px 20px;
+    font-size: 1.3rem;
+    background: var(--jf-input-bg, rgba(255, 255, 255, 0.06));
+    border: 2px solid var(--jf-input-border, rgba(255, 255, 255, 0.15));
+    border-radius: var(--jf-border-radius, 8px);
+    color: var(--jf-text-primary);
+    box-sizing: border-box;
+}
+
+.playlist-name-input:focus,
+.playlist-name-input.focused {
+    border-color: var(--jf-button-border-focus, var(--jf-accent));
+    outline: none;
+}
+
+.btn-add:focus,
+.btn-add.focused {
+    background: var(--jf-btn-primary-bg) !important;
+    color: var(--jf-btn-primary-color) !important;
+}
+
+/* Secondary/Cancel styling: Lower prominence but perfect readability */
+#btn-modal-cancel,
+#exit-dialog-no,
+#btn-subtitle-cancel,
+#btn-lang-modal-cancel,
+#btn-results-cancel,
+#btn-results-back {
+    opacity: 0.85;
+}
+
+#btn-modal-cancel:focus,
+#btn-modal-cancel.focused,
+#exit-dialog-no:focus,
+#exit-dialog-no.focused,
+#btn-subtitle-cancel:focus,
+#btn-subtitle-cancel.focused,
+#btn-lang-modal-cancel:focus,
+#btn-lang-modal-cancel.focused,
+#btn-results-cancel:focus,
+#btn-results-cancel.focused,
+#btn-results-back:focus,
+#btn-results-back.focused {
+    /* Keep secondary buttons visually distinct even when focused */
+    background: rgba(var(--jf-text-primary-rgb, 255, 255, 255), 0.15);
+    color: var(--jf-text-primary);
+    border: 3px solid var(--jf-btn-primary-bg) !important;
+}
+
+/* Redesigned Danger Button for Destructive Modal Actions (e.g. Exit, Delete) */
+.modal-action-btn.danger-btn {
+    background: rgba(255, 59, 48, 0.15); /* Translucent Red */
+    color: #ff3b30;
+    border: 2px solid rgba(255, 59, 48, 0.3);
+}
+
+.modal-action-btn.danger-btn:focus,
+.modal-action-btn.danger-btn.focused {
+    background: #ff3b30 !important;
+    color: white !important;
+    border-color: #ff453a !important;
+}
+
+/* Modal Close Button Focus (Individualized) */
+.modal-close-btn:focus,
+.modal-close-btn.focused {
+    background: var(--jf-btn-primary-bg) !important;
+    color: var(--jf-btn-primary-color) !important;
+    border-color: var(--jf-btn-primary-border) !important;
+    transform: scale(1.01) !important;
+    outline: none !important;
+}
+
+/* Track Option Badges (Subtitle Metadata) */
+.track-option-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    flex: 1;
+}
+
+/* Remote Subtitle Results Styling */
+.subtitle-result-btn {
+    height: auto !important;
+    padding-top: 15px !important;
+    padding-bottom: 15px !important;
+}
+
+/* ============================================================================ */
+/* Subtitle Downloader Result Item (Stacked Layout) */
+/* ============================================================================ */
+
+.subtitle-result-btn.modal-option-btn {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    height: auto !important; /* Allow results to expand */
+    padding: 1.4rem !important;
+}
+
+.subtitle-result-info {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100%;
+    min-width: 0;
+}
+
+.subtitle-result-info .track-label-text {
+    white-space: normal !important; /* Allow wrapping for search results */
+    text-align: left;
+    line-height: 1.4;
+    word-break: break-all !important;
+    font-size: 1.25rem;
+    color: var(--jf-text-primary);
+    width: 100% !important;
+    margin-bottom: 12px;
+}
+
+/* Ensure high contrast when the parent modal button is focused */
+.modal-option-btn.focused .subtitle-result-info .track-label-text {
+    color: var(--jf-primary-btn-color) !important;
+}
+
+.subtitle-result-meta {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px;
+    width: 100%;
+}
+
+.subtitle-result-meta .track-badge {
+    margin-left: 0 !important;
+    margin-right: 10px;
+}
+
+.track-badge.match-badge {
+    background: var(--jf-accent);
+    color: var(--jf-primary-btn-color, #ffffff);
+    border-color: var(--jf-accent);
+}
+
+.track-badge.badge-sdh {
+    background: rgba(255, 193, 7, 0.18);
+    color: #ffc107;
+    border-color: rgba(255, 193, 7, 0.4);
+}
+
+.track-badge.badge-forced {
+    background: rgba(235, 87, 87, 0.18);
+    color: #eb5757;
+    border-color: rgba(235, 87, 87, 0.4);
+}
+
+.track-badge.badge-ai,
+.track-badge.badge-mt {
+    background: rgba(168, 85, 247, 0.18);
+    color: #c084fc;
+    border-color: rgba(168, 85, 247, 0.4);
+}
+
+.track-badge.provider-badge {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--jf-text-primary, #ffffff);
+    border-color: rgba(255, 255, 255, 0.25);
+    text-transform: none;
+}
+
+.track-badge.uploader-badge {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--jf-text-secondary, #bbbbbb);
+    border-color: rgba(255, 255, 255, 0.18);
+    text-transform: none;
+    font-weight: 500;
+}
+
+.modal-option-btn.focused .track-badge.badge-sdh,
+.modal-option-btn.focused .track-badge.badge-forced,
+.modal-option-btn.focused .track-badge.badge-ai,
+.modal-option-btn.focused .track-badge.badge-mt,
+.modal-option-btn.focused .track-badge.provider-badge,
+.modal-option-btn.focused .track-badge.uploader-badge,
+.modal-option-btn.focused .track-badge.match-badge {
+    background: var(--jf-bg-dark, #000000) !important;
+    color: var(--jf-accent, #ffffff) !important;
+    border-color: var(--jf-accent, #ffffff) !important;
+}
+
+.subtitle-placeholder-card {
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: var(--jf-border-radius);
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.subtitle-placeholder-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--jf-text-primary);
+}
+
+.subtitle-placeholder-desc {
+    font-size: 0.9rem;
+    color: var(--jf-text-secondary);
+    line-height: 1.4;
+}
+
+.track-badge {
+    display: inline-block;
+    vertical-align: middle;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--jf-border-radius);
+    padding: 4px 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-left: 10px;
+    color: var(--jf-text-primary);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    line-height: normal;
+}
+
+.track-option-label .track-badge {
+    text-align: center;
+}
+
+/* Language Completeness Badge */
+.lang-badge {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    width: 50px;
+    text-align: center;
+}
+
+.lang-badge.badge-warning {
+    background: rgba(255, 159, 10, 0.15);
+    color: #ff9f0a;
+    border-color: rgba(255, 159, 10, 0.3);
+}
+
+.lang-badge.badge-danger {
+    background: rgba(255, 59, 48, 0.15);
+    color: #ff3b30;
+    border-color: rgba(255, 59, 48, 0.3);
+}
+
+.lang-badge.badge-success {
+    background: rgba(52, 199, 89, 0.15);
+    color: #34c759;
+    border-color: rgba(52, 199, 89, 0.3);
+}
+
+
+/* Response to focused parents with accent backgrounds */
+.modal-option-btn.focused .track-badge,
+.modal-option-btn:focus .track-badge,
+.subtitle-result-btn.focused .track-badge,
+.subtitle-result-btn:focus .track-badge,
+.track-option.focused .track-badge,
+.track-option:focus .track-badge {
+    background-color: rgba(var(--jf-btn-primary-focus-color-rgb), 0.15) !important;
+    color: var(--jf-btn-primary-focus-color) !important;
+    border-color: rgba(var(--jf-btn-primary-focus-color-rgb), 0.35) !important;
+}
+
+.track-label-text {
+    flex: 1;
+    white-space: normal;
+    word-break: break-all;
+}
+
+/* Modal variant compatibility */
+.modal-option-btn span {
+    display: flex;
+}
+
+/* ==========================================================================
+   Subtitle Editor Modal Specifics
+   ========================================================================== */
+
+.modal-section-title {
+    padding: 10px 20px 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--jf-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.subtitle-tracks-list {
+    max-height: 40vh;
+    padding: 0 20px 20px;
+}
+
+.subtitle-empty-notice {
+    padding: 20px;
+    text-align: center;
+    color: var(--jf-text-tertiary);
+    font-size: 1.2rem;
+    font-style: italic;
+}
+
+.subtitle-track-row {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: var(--jf-border-radius);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+}
+
+.subtitle-track-label {
+    flex: 1;
+    font-size: 1.1rem;
+    font-weight: 500;
+    white-space: normal;
+    line-height: 1.4;
+    padding-right: 4px;
+    color: var(--jf-text-primary);
+}
+
+.subtitle-track-meta {
+    display: flex;
+    align-items: center;
+    margin: 0 8px;
+}
+
+.subtitle-track-meta .track-badge {
+    margin-left: 8px;
+    text-align: center;
+}
+
+.subtitle-delete-btn {
+    height: 33px;
+    padding: 0 24px;
+    margin: 0;
+    background: rgba(255, 59, 48, 0.15) !important;
+    color: #ff3b30 !important;
+    border: 1px solid rgba(255, 59, 48, 0.3) !important;
+    border-radius: var(--jf-border-radius);
+    font-size: 1.1rem !important; /* Force priority over legacy font-size:0 hacks */
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 110px;
+    width: auto !important; /* Prevent modal-option-btn style from stretching to 100% */
+}
+
+.subtitle-delete-btn:focus,
+.subtitle-delete-btn.focused {
+    background: #ff3b30 !important;
+    color: white !important;
+    border-color: white !important;
+    transform: scale(1.05);
+}
+
+.subtitle-delete-btn:focus,
+.subtitle-delete-btn.focused,
+.subtitle-delete-btn:hover {
+    background: #dc3545 !important;
+    border-color: #ffb3b3 !important;
+}
+
+.subtitle-track-locked {
+    font-size: 1.5rem;
+    opacity: 0.6;
+    padding: 0;
+    width: 100px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.subtitle-search-row {
+    display: flex;
+    padding: 0 26px 20px;
+}
+
+.subtitle-search-row > * {
+    margin-right: 12px;
+}
+
+.subtitle-search-row > *:last-child {
+    margin-right: 0;
+}
+
+.modal-select {
+    flex: 1;
+    min-width: 0;
+    width: 0; /* Force flexbox to handle the width even if content is wide */
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--jf-text-primary);
+    border: 3px solid transparent;
+    border-radius: var(--jf-border-radius);
+    padding: 16px 20px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.modal-select:focus,
+.modal-select.focused {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--jf-accent);
+    transform: scale(1.02);
+}
+
+.modal-select option {
+    background: #1a1a1a;
+    color: white;
+}
+
+#btn-subtitle-search,
+#player-sub-search-btn {
+    margin: 0;
+    height: auto;
+    border-radius: var(--jf-border-radius);
+}
+
+#btn-subtitle-search:focus,
+#btn-subtitle-search.focused,
+#player-sub-search-btn:focus,
+#player-sub-search-btn.focused {
+    background: var(--jf-accent) !important;
+    /* High contrast text color calculated by ThemeUtils */
+    color: var(--jf-primary-btn-color) !important;
+    transform: scale(1.02);
+}
+
+/* Panel B Results Specifics */
+.subtitle-result-btn {
+    height: auto;
+    min-height: 80px;
+    padding: 16px 20px;
+    display: flex;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.subtitle-result-btn .track-option-label {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.subtitle-result-btn .track-option-label > * {
+    margin-bottom: 6px;
+}
+
+.subtitle-result-btn .track-option-label > *:last-child {
+    margin-bottom: 0;
+}
+
+.subtitle-result-meta {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.subtitle-result-meta .track-badge {
+    margin-right: 3px;
+    margin-bottom: 4px;
+}
+
+.subtitle-result-meta .track-badge {
+    margin-left: 0;
+}
+
+.subtitle-result-btn .check-icon {
+    display: block; /* Always show the download icon */
+    background-image: none; /* override the checkmark */
+    font-size: 1.5rem;
+    line-height: 1;
+    width: auto;
+    height: auto;
+}
+/* ==========================================================================
+   Media Info Modal Specifics
+   ========================================================================== */
+
+.media-info-modal {
+    width: 800px;
+}
+
+.media-info-scrollable {
+    max-height: 60vh;
+    padding: 20px 40px !important; /* Added 20px top/bottom to prevent scale clipping */
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch; 
+}
+
+.media-info-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+    color: var(--jf-text-secondary);
+}
+
+.media-info-loading .loading-spinner-small {
+    margin-right: 16px;
+}
+
+.media-info-source-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--jf-accent);
+    margin: 30px 0 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+.media-info-section {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--jf-border-radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.media-info-stream {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: var(--jf-border-radius-lg);
+    margin-bottom: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+
+.media-info-stream-header {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.media-info-stream-header .stream-type-badge {
+    margin-right: 16px;
+}
+
+.stream-type-badge {
+    padding: 4px 10px;
+    border-radius: var(--jf-border-radius);
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.stream-type-badge.video { background: #007aff; color: white; }
+.stream-type-badge.audio { background: #34c759; color: white; }
+.stream-type-badge.subtitle { background: #ff9500; color: white; }
+
+.stream-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--jf-text-primary);
+}
+
+.media-info-grid {
+    padding: 16px 24px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.media-info-grid .media-info-row:nth-child(even) {
+    margin-left: 12px;
+}
+
+.media-info-grid .media-info-row:nth-child(odd) {
+    margin-right: 12px;
+}
+
+.media-info-grid .media-info-row {
+    margin-bottom: 12px;
+}
+.media-info-full-rows {
+    padding: 16px 24px;
+}
+
+.media-info-full-rows .media-info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.media-info-full-rows .media-info-row .info-label {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+    color: var(--jf-accent);
+}
+
+.media-info-full-rows .media-info-row .info-value {
+    text-align: left;
+    font-size: 1rem;
+    line-height: 1.4;
+    word-break: break-all;
+    width: 100%;
+}
+
+/* Fallback for Tizen 3/4 (Legacy browser) and ultra-legacy */
+html[data-layout-tier="legacy"] .media-info-grid,
+html[data-layout-tier="ultra-legacy"] .media-info-grid {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+html[data-layout-tier="legacy"] .media-info-row,
+html[data-layout-tier="ultra-legacy"] .media-info-row {
+    width: 45%;
+    margin-right: 5%;
+}
+
+/* ==========================================================================
+   Player Media Info Modal (In-Player OSD)
+   ========================================================================== */
+
+.player-media-info-overlay {
+    z-index: 10001;
+}
+
+.player-media-info-modal {
+    width: 820px;
+    max-width: 90vw;
+}
+
+/* ============================================================================
+ * MOBILE & TOUCH MODAL DIALOG OVERRIDES
+ * ============================================================================ */
+html[data-litefin-scaled] .settings-modal,
+html[data-litefin-touch] .settings-modal,
+html[data-litefin-scaled] .player-media-info-modal,
+html[data-litefin-touch] .player-media-info-modal,
+html[data-litefin-scaled] .media-info-modal,
+html[data-litefin-touch] .media-info-modal,
+html[data-litefin-scaled] .fav-languages-modal,
+html[data-litefin-touch] .fav-languages-modal {
+    /*
+     * Proportional modal dialog with balanced max-width:
+     * Restricts width to 620px to prevent awkward edge-to-edge stretching in landscape/tablet viewports,
+     * while utilizing calc(100% - 32px) for comfortable 16px edge margins on narrow portrait screens.
+     */
+    width: calc(100% - 32px) !important;
+    max-width: 620px !important;
+    min-width: 0 !important;
+    max-height: 90vh !important;
+    max-height: calc(100% - 32px) !important;
+    border-radius: 24px !important;
+    box-sizing: border-box !important;
+}
+
+html[data-litefin-scaled] .media-info-scrollable,
+html[data-litefin-touch] .media-info-scrollable {
+    padding: 14px 20px !important;
+    max-height: calc(90vh - 80px) !important;
+    max-height: calc(100% - 80px) !important;
+    box-sizing: border-box !important;
+}
+
+html[data-litefin-scaled] .settings-modal .modal-header,
+html[data-litefin-touch] .settings-modal .modal-header {
+    padding: 18px 22px 10px 22px !important;
+}
+
+html[data-litefin-scaled] .settings-modal .modal-header h2,
+html[data-litefin-touch] .settings-modal .modal-header h2 {
+    font-size: 1.45rem !important;
+    font-weight: 700 !important;
+    padding: 4px 0 !important;
+}
+
+html[data-litefin-scaled] .settings-modal .modal-options,
+html[data-litefin-touch] .settings-modal .modal-options {
+    padding: 10px 18px !important;
+    max-height: calc(88vh - 140px) !important;
+    box-sizing: border-box !important;
+}
+
+html[data-litefin-scaled] .settings-modal .modal-option-btn,
+html[data-litefin-touch] .settings-modal .modal-option-btn {
+    min-height: 60px !important;
+    padding: 14px 20px !important;
+    margin-bottom: 8px !important;
+    font-size: 1.25rem !important;
+    border-radius: 14px !important;
+}
+
+.player-media-info-modal .media-info-scrollable:focus {
+    outline: none;
+}
+
+.media-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.media-info-row:last-child:nth-child(odd) {
+    border-bottom: none;
+}
+
+.info-label {
+    font-size: 1rem;
+    color: var(--jf-text-secondary);
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 1.05rem;
+    color: var(--jf-text-primary);
+    font-weight: 600;
+    text-align: right;
+}
+
+.media-info-content-track {
+    outline: none;
+    padding-bottom: 40px; /* Buffer for scrolling */
+}
+
+/* Card Focus Styles */
+.media-info-focusable {
+    outline: none;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.media-info-focusable:focus,
+.media-info-focusable.focused {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: var(--jf-accent) !important;
+    transform: scale(1.02);
+    z-index: 10;
+}
+
+.media-info-focusable:focus .media-info-source-title,
+.media-info-focusable.focused .media-info-source-title {
+    color: white;
+}
+
+/* ==========================================================================
+   Trailer Dialog Specifics
+   Overrides the base .settings-modal / .modal-option-btn for the trailer
+   choice dialog, which uses richer option cards (icon + label + sublabel).
+   ========================================================================== */
+
+/* Slightly narrower than the wide MediaInfo modal, but taller per option */
+.trailer-dialog-modal {
+    width: 520px;
+}
+
+/* Trim padding on the options column — only 2 options, no scrolling needed */
+.trailer-dialog-options {
+    padding: 12px 20px !important;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Fallback for flex gap on older Tizen */
+.trailer-dialog-options > * {
+    margin-bottom: 10px;
+}
+
+.trailer-dialog-options > *:last-child {
+    margin-bottom: 0;
+}
+
+/*
+ * Individual trailer option card: icon on the left, two-line text on the right.
+ * Overrides the fixed 80px height so the sublabel has room to breathe.
+ */
+.trailer-option {
+    height: auto !important;
+    min-height: 90px;
+    padding: 20px 24px !important;
+}
+
+/* Icon wrapper — fixed square, accent-tinted background to match brand */
+.trailer-option-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--jf-border-radius);
+    background: rgba(var(--jf-accent-rgb), 0.12);
+    color: var(--jf-accent);
+    flex-shrink: 0;
+    transition: background 0.18s ease, color 0.18s ease;
+    margin-right: 20px; /* Fallback for gap */
+}
+
+/* On focus/hover the icon surface follows the accent button color */
+.trailer-option:focus .trailer-option-icon,
+.trailer-option.focused .trailer-option-icon,
+.trailer-option:hover .trailer-option-icon {
+    background: rgba(var(--jf-primary-btn-color-rgb), 0.2);
+    color: var(--jf-primary-btn-color, #fff);
+}
+
+/* Text column — primary label over dimmed sublabel */
+.trailer-option-text {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+}
+
+.trailer-option-label {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--jf-text-primary);
+    line-height: 1.2;
+    margin-bottom: 4px; /* Fallback for gap */
+}
+
+.trailer-option-sublabel {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--jf-text-secondary);
+    line-height: 1.2;
+}
+
+/* Sublabel follows the primary button contrast color when active */
+.trailer-option:focus .trailer-option-sublabel,
+.trailer-option.focused .trailer-option-sublabel,
+.trailer-option:hover .trailer-option-sublabel {
+    color: rgba(var(--jf-primary-btn-color-rgb), 0.7) !important;
+}
+
+/* Ensure labels also switch to contrast color when parent is focused */
+.trailer-option.focused .trailer-option-label,
+.trailer-option:focus .trailer-option-label {
+    color: var(--jf-primary-btn-color) !important;
+}
+
+/* ============================================================================
+   Phase 2: Remote Trailer Fullscreen OSD
+   ============================================================================ */
+.trailer-player-overlay {
+    /* Fixed viewport overlay stretching edge to edge across all scaling tiers */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Use 100% instead of 100vw/100vh so that CSS zoom respects layout coordinates */
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 99999;
+}
+
+/* Container for the trailer embed providing boundary clipping */
+.trailer-iframe-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Keep embed positioned underneath our custom native player OSD */
+    z-index: 1;
+    /* Hard overflow clipping to trim away overscanned external player title bars */
+    overflow: hidden;
+}
+
+/*
+ * ============================================================================
+ * Remote Trailer Iframe & Host Container Sizing and Isolation
+ * ============================================================================
+ * YouTube's embed player displays a title header bar and watermark links by
+ * default and whenever pointer activity is detected.
+ *
+ * 1. pointer-events: none completely isolates the iframe from mouse and magic
+ *    remote hover, ensuring YouTube never activates its internal hover chrome.
+ * 2. transform: scale(1.15) applies a slight hardware-accelerated overscan
+ *    that pushes YouTube's top title bar and bottom watermark completely outside
+ *    the visible viewport boundary without impacting playback performance.
+ * ============================================================================
+ */
+.trailer-iframe-container #yt-player-host,
+.trailer-iframe-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: none;
+    margin: 0;
+    padding: 0;
+    /* Disallow direct pointer interaction to prevent YouTube hover UI triggers */
+    pointer-events: none;
+    /* Hardware accelerated GPU scale to crop top title bar and bottom logo */
+    transform: scale(1.15);
+    transform-origin: center center;
+}
+
+/*
+ * Fallback mode override:
+ * When the iframe API handshake cannot be established, fallback mode relies
+ * on native controls. Restore default pointer events and 1:1 scaling.
+ */
+.trailer-iframe-container.trailer-fallback-mode #yt-player-host,
+.trailer-iframe-container.trailer-fallback-mode iframe {
+    pointer-events: auto;
+    transform: none;
+}
+
+/* Make sure the custom OSD overlays the iframe correctly */
+.trailer-osd {
+    z-index: 10;
+}
+
+/* ============================================================================
+   Ultra-Legacy Overrides (Chrome <47 / Tizen 2.x / WebOS 1.x)
+   ============================================================================
+   Chrome 32 has deeply broken flexbox support for many alignment scenarios,
+   and does not support display: flex with align-items on fixed-height elements.
+   These rules override the modern flex defaults above with the ghost-centering
+   technique (font-size:0 + ::before ghost + inline-block children) and the
+   float-based column layout for the filter/sort modals.
+   ============================================================================ */
+
+/* Nav Button: restore block + ghost centering */
+html[data-layout-tier="ultra-legacy"] .nav-btn {
+    display: inline-block;
+    vertical-align: middle;
+    height: 48px;
+    padding: 0 20px;
+    line-height: normal;
+    font-size: 0; /* Collapse whitespace between icon and text */
+    white-space: nowrap;
+}
+
+html[data-layout-tier="ultra-legacy"] .nav-btn::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .nav-btn > * {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 1rem; /* Restore font size for children */
+    margin-right: 8px;
+}
+
+html[data-layout-tier="ultra-legacy"] .nav-btn > *:last-child {
+    margin-right: 0;
+}
+
+/* Nav Icon-Only: center SVG via ghost */
+html[data-layout-tier="ultra-legacy"] .nav-btn.icon-only {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: center;
+    padding: 0;
+    font-size: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .nav-btn.icon-only::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .nav-btn.icon-only svg {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Small Icon Button: center SVG via ghost */
+html[data-layout-tier="ultra-legacy"] .btn-icon-small {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: center;
+    padding: 0;
+    font-size: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .btn-icon-small::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .btn-icon-small svg {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Header Avatar Placeholder: center initials via ghost */
+html[data-layout-tier="ultra-legacy"] .header-avatar-placeholder {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: center;
+    font-size: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-avatar-placeholder::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+/* Modal Options Scroll Container */
+html[data-layout-tier="ultra-legacy"] .settings-modal .modal-options {
+    display: block;
+}
+
+/* Modal Option Button: block + ghost centering */
+html[data-layout-tier="ultra-legacy"] .modal-option-btn {
+    display: block;
+    font-size: 0; /* Collapse whitespace */
+    line-height: normal;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+html[data-layout-tier="ultra-legacy"] .modal-option-btn::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .modal-option-btn > * {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 1.25rem; /* Restore after parent collapse */
+    white-space: normal;
+}
+
+html[data-layout-tier="ultra-legacy"] .modal-option-btn span,
+html[data-layout-tier="ultra-legacy"] .modal-option-btn div {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .modal-option-btn span:first-of-type,
+html[data-layout-tier="ultra-legacy"] .modal-option-btn div:first-of-type {
+    white-space: nowrap;
+}
+
+/* Filter/Sort Columns: float-based layout */
+html[data-layout-tier="ultra-legacy"] .filter-split-container {
+    display: block;
+}
+
+html[data-layout-tier="ultra-legacy"] .filter-sidebar {
+    float: left;
+}
+
+html[data-layout-tier="ultra-legacy"] .filter-main {
+    display: block;
+    float: left;
+    width: 70%;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 20px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+html[data-layout-tier="ultra-legacy"] .filter-split-container::after {
+    content: '';
+    display: block;
+    clear: both;
+}
+
+html[data-layout-tier="ultra-legacy"] .sort-columns {
+    display: block;
+}
+
+html[data-layout-tier="ultra-legacy"] .sort-column {
+    display: block;
+    float: left;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+html[data-layout-tier="ultra-legacy"] .sort-columns::after {
+    content: '';
+    display: block;
+    clear: both;
+}
+
+/* Modal Actions Footer */
+html[data-layout-tier="ultra-legacy"] .modal-actions {
+    display: block;
+    text-align: right;
+}
+
+/* Track Option Labels */
+html[data-layout-tier="ultra-legacy"] .track-option-label {
+    display: block;
+    width: 100%;
+}
+
+html[data-layout-tier="ultra-legacy"] .subtitle-result-info {
+    display: block;
+}
+
+html[data-layout-tier="ultra-legacy"] .subtitle-result-meta {
+    display: block;
+}
+
+/* ==========================================================================
+   Card Text Marquee Scrolling (Loop Overflowing Titles/Subtitles)
+   ========================================================================== */
+.card-title,
+.card-subtitle {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.card-title span,
+.card-subtitle span {
+    display: inline-block;
+    white-space: nowrap;
+    /* PERFORMANCE: Avoid unconditional will-change: transform on static card spans.
+     * Promoting every title and subtitle span across 50-100+ cards to a separate GPU layer
+     * exhausts texture memory and causes severe compositor hitching during navigation.
+     * Layers are only promoted when marquee animation is actively engaged on focus. */
+    will-change: auto;
+    /* Use dynamic spring-like transitions for reset focus animations */
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* When the card is focused, disable truncation and apply alternate animation */
+.media-card.focused .card-title.marquee-active,
+.media-card.focused .card-subtitle.marquee-active {
+    text-overflow: clip;
+}
+
+.media-card.focused .card-title.marquee-active span,
+.media-card.focused .card-subtitle.marquee-active span {
+    /* Promote to GPU compositing layer strictly while active marquee animation is running */
+    will-change: transform;
+    animation: card-text-marquee var(--marquee-duration, 4s) linear infinite alternate;
+}
+
+/* Alternate keyframes for smooth scrolling back-and-forth */
+@keyframes card-text-marquee {
+    0%, 20% {
+        transform: translate3d(0, 0, 0);
+    }
+    80%, 100% {
+        transform: translate3d(var(--scroll-dist, 0px), 0, 0);
+    }
+}
+
+/* ==========================================================================
+   Description Dialog Modal Styling
+   ========================================================================== */
+.description-dialog-modal {
+    width: 1350px;
+    max-width: 96%;
+    max-height: 88vh;
+}
+
+.description-dialog-modal .modal-header h2 {
+    font-size: 2rem;
+    padding: 20px 24px;
+}
+
+.description-dialog-content {
+    padding: 36px 48px;
+    font-size: 1.65rem;
+    line-height: 1.8;
+    color: var(--jf-text-primary);
+    outline: none;
+    border-radius: var(--jf-border-radius);
+    max-height: calc(88vh - 110px);
+}
+
+.description-dialog-content:focus,
+.description-dialog-content.focused {
+    box-shadow: inset 0 0 0 3px var(--jf-accent);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.description-dialog-text {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--jf-text-primary);
+    font-size: 1.65rem;
+}
+
+/*
+ * ── Chrome 26 Quirks Overrides: Modals & Media Fallbacks ────────────────────
+ * Older browser engines lacking flexbox display defaults will stick modals to the 
+ * top-left. We force the overlay block to relative and align settings-modals 
+ * using an absolute offset centering strategy.
+ */
+html[data-layout-quirks="c26"] .modal-overlay {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+html[data-layout-quirks="c26"] .settings-modal {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    -webkit-transform: translate(-50%, -50%) !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+}
+
+/* Vertical and horizontal centering for fallback text inside media cards */
+html[data-layout-quirks="c26"] .media-fallback {
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-box-align: center !important;
+    -webkit-box-pack: center !important;
+}
+
+/* ============================================================================
+   Favorite Languages & Modal Filter Pills (Flat, crisp, zero shadows/blurs)
+   ============================================================================ */
+
+/* Segmented Filter Pills at Top of Modals */
+.modal-filter-pills {
+    display: flex;
+    gap: 10px;
+    padding: 12px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-filter-pills.has-slot-subrow {
+    border-bottom: none;
+    padding-bottom: 6px;
+}
+
+/* Audio Language Multi-Slot Sub-Tabs (Preferred, Fallback 1, 2, 3) */
+.modal-slot-pills {
+    display: flex;
+    gap: 8px;
+    padding: 6px 24px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-slot-pill {
+    padding: 8px 10px;
+    font-size: 0.92rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+}
+
+.modal-slot-pill .slot-pill-title {
+    font-weight: 700;
+    opacity: 0.9;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.modal-slot-pill .slot-pill-val {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* Individual Filter Pill Button */
+.modal-filter-pill {
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--jf-text-secondary, #aaa);
+    background: #242424;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+    outline: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Focused Filter Pill: High contrast inverted feedback */
+.modal-filter-pill:hover,
+.modal-filter-pill:focus,
+.modal-filter-pill.focused {
+    background: #ffffff !important;
+    color: #111111 !important;
+    border-color: #ffffff !important;
+    transform: scale(1.04);
+    outline: none !important;
+    z-index: 3;
+}
+
+/* Active Filter Pill — the label uses the dynamic on-accent contrast color so a light/white
+   custom accent does not render white-on-white text. */
+.modal-filter-pill.active {
+    background: var(--jf-accent, #00a4dc);
+    color: var(--jf-accent-content-color, #ffffff);
+    border-color: var(--jf-accent, #00a4dc);
+}
+
+/* Focused Active Filter Pill — the focus background is a hardcoded #ffffff for all pills, so the
+   accent-colored label would vanish against it with light accents; use the same fixed dark text
+   as the non-active pills' inverted focus feedback. */
+.modal-filter-pill.active:focus,
+.modal-filter-pill.active.focused {
+    background: #ffffff !important;
+    color: #111111 !important;
+    border-color: #ffffff !important;
+    transform: scale(1.04);
+}
+
+/* Modal Option Label Flex Layout */
+.modal-option-label {
+    flex: 1;
+    min-width: 0;
+    text-align: start;
+    white-space: normal;
+    text-overflow: ellipsis;
+}
+
+/* Modal Star Button */
+.modal-star-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    font-size: 1.35rem;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-left: 12px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s ease, transform 0.15s ease;
+    user-select: none;
+}
+
+/* Star Active Gold Tone */
+.modal-star-btn.active {
+    color: #f1c40f;
+}
+
+/* Star Hover Expansion */
+.modal-star-btn:hover {
+    color: #f39c12;
+    transform: scale(1.15);
+}
+
+/* Star in Focused Row Highlight — follows the dynamic focus text color (the exact pairing of
+   --jf-btn-primary-focus-bg) instead of a hardcoded white tone that vanishes on light fills. */
+.modal-option-btn:focus .modal-star-btn.active,
+.modal-option-btn.focused .modal-star-btn.active {
+    color: var(--jf-btn-primary-focus-color);
+}
+
+/* Inactive Star in Focused Row */
+.modal-option-btn:focus .modal-star-btn:not(.active),
+.modal-option-btn.focused .modal-star-btn:not(.active) {
+    color: var(--jf-btn-primary-focus-color);
+}
+
+/* Favorite Languages Management Modal Container */
+.fav-languages-modal {
+    max-width: 720px;
+    width: calc(100% - 40px);
+    background: #1a1a1a;
+    border: 1px solid #333333;
+}
+
+/* Search Header Box */
+.fav-lang-search-box {
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Real-Time Language Search Input */
+.fav-lang-search-input {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 1.15rem;
+    color: #ffffff;
+    background: #222222;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    outline: none;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Search Input Focused State */
+.fav-lang-search-input:focus,
+.fav-lang-search-input.focused {
+    background: #2a2a2a;
+    border-color: #ffffff;
+    outline: 2px solid var(--jf-accent, #00a4dc);
+    outline-offset: 2px;
+}
+
+/* Scrollable Full Language List */
+.fav-lang-list {
+    max-height: 560px;
+    max-height: calc(88vh - 200px);
+    overflow-y: auto;
+}
+
+/* Language Row Item */
+.fav-lang-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+/* Language Row Info Group */
+.fav-lang-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Inline Favorite Star Indicator */
+.fav-lang-star {
+    font-size: 1.3rem;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Star Active State */
+.fav-lang-star.active {
+    color: #f1c40f;
+}
+
+/* Selected Row Star */
+.fav-lang-row.selected .fav-lang-star {
+    color: #f1c40f;
+}
+
+/* Focused Row Active Star */
+.fav-lang-row.focused .fav-lang-star.active {
+    color: #ffffff;
+}
+
+/* Track Menu Toggle All Buttons */
+.track-toggle-all-btn,
+.details-track-toggle-btn {
+    margin-top: 8px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.2) !important;
+    color: var(--jf-accent, #00a4dc) !important;
+    font-weight: 600;
+}
+
+/* ============================================================================
+   Custom HTTP Headers Dialog (Lightweight / Low-Spec TV Optimized)
+   Zero backdrop-filter blur and zero box-shadows to conserve GPU memory
+   and prevent compositor frame drops on low-end Tizen and WebOS hardware.
+   ============================================================================ */
+
+.custom-headers-modal {
+    width: 860px;
+    max-width: 95vw;
+    background: #151518;
+    border: 2px solid #28282e;
+    border-radius: var(--jf-border-radius-lg, 12px);
+    box-shadow: none !important;
+}
+
+.custom-headers-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.custom-headers-dialog-header h2 {
+    margin: 0;
+    padding: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--jf-text-primary, #ffffff);
+}
+
+
+.custom-headers-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    gap: 12px;
+}
+
+.custom-headers-presets-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.custom-headers-presets-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.45);
+    margin-right: 4px;
+}
+
+.preset-pill-btn {
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: #e4e4e7;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.preset-pill-btn:focus,
+.preset-pill-btn.focused {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: var(--jf-accent, #00a4dc);
+    color: #ffffff;
+    outline: none;
+    transform: scale(1.04);
+}
+
+.add-header-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--jf-accent, #00a4dc);
+    border-radius: 6px;
+    color: var(--jf-accent, #00a4dc);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.add-header-action-btn .add-header-plus {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.add-header-action-btn:focus,
+.add-header-action-btn.focused {
+    background: var(--jf-accent, #00a4dc);
+    color: var(--jf-primary-btn-color, #ffffff);
+    outline: none;
+    transform: scale(1.04);
+}
+
+.custom-headers-col-headers {
+    display: flex;
+    gap: 10px;
+    padding: 12px 24px 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.custom-headers-col-headers .col-head-key {
+    flex: 2;
+}
+
+.custom-headers-col-headers .col-head-val {
+    flex: 3;
+}
+
+.custom-headers-col-headers .col-head-toggle {
+    width: 110px;
+    text-align: center;
+}
+
+.custom-headers-col-headers .col-head-delete {
+    width: 44px;
+    text-align: center;
+}
+
+.custom-headers-content {
+    max-height: 48vh;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.custom-headers-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: #888892;
+    font-size: 1.05rem;
+}
+
+.custom-header-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 0 24px;
+    margin-bottom: 10px;
+}
+
+.custom-header-row input,
+.custom-header-row .custom-header-input {
+    height: 44px;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    color: #ffffff;
+    padding: 0 14px;
+    font-size: 0.95rem;
+    line-height: normal;
+    box-shadow: none !important;
+    outline: none;
+    transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.custom-header-row .custom-header-key {
+    flex: 2;
+}
+
+.custom-header-row .custom-header-val {
+    flex: 3;
+}
+
+.custom-header-row input::placeholder,
+.custom-header-row .custom-header-input::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.custom-header-row input:focus,
+.custom-header-row input.focused,
+.custom-header-row .custom-header-input:focus,
+.custom-header-row .custom-header-input.focused {
+    border-color: var(--jf-accent, #00a4dc) !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    transform: scale(1.015);
+}
+
+.custom-header-toggle {
+    width: 110px;
+    height: 44px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.custom-header-toggle .toggle-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.custom-header-toggle.btn-toggle-active {
+    background: rgba(34, 197, 94, 0.12) !important;
+    color: #4ade80 !important;
+    border: 1px solid rgba(34, 197, 94, 0.4) !important;
+}
+
+.custom-header-toggle.btn-toggle-inactive {
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: rgba(255, 255, 255, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.custom-header-toggle:focus,
+.custom-header-toggle.focused {
+    border-color: var(--jf-accent, #00a4dc) !important;
+    outline: none;
+    transform: scale(1.04);
+}
+
+.custom-header-delete {
+    width: 44px;
+    height: 44px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #f87171 !important;
+    border: 1px solid rgba(239, 68, 68, 0.28) !important;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.custom-header-delete:focus,
+.custom-header-delete.focused {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #ef4444 !important;
+    outline: none;
+    transform: scale(1.06);
+}
+
+
+
+

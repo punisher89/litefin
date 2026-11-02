@@ -1,0 +1,290 @@
+/* ============================================================================
+   Font Definitions - Bundled Google Fonts
+   ============================================================================
+   These fonts are bundled locally in src/assets/fonts/ to bypass Tizen's
+   cross-origin restrictions on remote font loading.
+   ============================================================================ */
+
+/* Courier Prime - Typewriter style */
+@font-face {
+    font-family: 'Courier Prime';
+    src: url('../assets/fonts/CourierPrime.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+
+/* Merriweather - Print/Serif style */
+@font-face {
+    font-family: 'Merriweather';
+    src: url('../assets/fonts/Merriweather.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+
+/* Inconsolata - Console/Monospace style */
+@font-face {
+    font-family: 'Inconsolata';
+    src: url('../assets/fonts/Inconsolata.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+
+/* Dancing Script - Cursive style */
+@font-face {
+    font-family: 'Dancing Script';
+    src: url('../assets/fonts/DancingScript.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+
+/* Patrick Hand - Casual style */
+@font-face {
+    font-family: 'Patrick Hand';
+    src: url('../assets/fonts/PatrickHand.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+
+/* Cinzel - Small Caps style */
+@font-face {
+    font-family: 'Cinzel';
+    src: url('../assets/fonts/Cinzel.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Poppins - Modern style */
+@font-face {
+    font-family: 'Poppins';
+    src: url('../assets/fonts/Poppins.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Noto Sans Arabic - Arabic style */
+@font-face {
+    font-family: 'Noto Sans Arabic';
+    src: url('../assets/fonts/NotoSansArabic.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Roboto - Google's standard sans-serif */
+@font-face {
+    font-family: Roboto;
+    src: url('../assets/fonts/Roboto.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Google Sans - Premium Google brand font */
+@font-face {
+    font-family: 'Google Sans';
+    src: url('../assets/fonts/Google.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Silkscreen - Pixel art style */
+@font-face {
+    font-family: 'Silkscreen';
+    src: url('../assets/fonts/Silkscreen.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Space Grotesk - Geometric sans */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('../assets/fonts/SpaceGrotesk.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* RETROTECH - Retro style */
+@font-face {
+    font-family: 'RETROTECH';
+    src: url('../assets/fonts/RETROTECH.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Poiret One - Art Deco display */
+@font-face {
+    font-family: 'Poiret One';
+    src: url('../assets/fonts/PoiretOne.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Kitty - Playful style */
+@font-face {
+    font-family: 'Kitty';
+    src: url('../assets/fonts/Kitty.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Inter - Modern geometric sans-serif */
+@font-face {
+    font-family: 'Inter';
+    src: url('../assets/fonts/Inter.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Proxima Nova - Modern geometric sans-serif */
+@font-face {
+    font-family: 'Proxima Nova';
+    src: url('../assets/fonts/ProximaNova.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Baloo Bhaijaan 2 - Playful, bold Arabic/Latin sans-serif */
+@font-face {
+    font-family: 'Baloo Bhaijaan 2';
+    src: url('../assets/fonts/BalooBhaijaan2.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Zen Kaku Gothic New - Japanese Gothic */
+@font-face {
+    font-family: 'Zen Kaku Gothic New';
+    src: url('../assets/fonts/ZenKakuGothicNew.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* OpenDyslexic - Designed for dyslexia */
+@font-face {
+    font-family: 'OpenDyslexic';
+    src: url('../assets/fonts/OpenDyslexic.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Atkinson Hyperlegible - Highly legible print/sans-serif */
+@font-face {
+    font-family: 'Atkinson Hyperlegible';
+    src: url('../assets/fonts/Atkinson-Hyperlegible.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Manrope - Geometric sans-serif */
+@font-face {
+    font-family: 'Manrope';
+    src: url('../assets/fonts/Manrope.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* ============================================================================
+   Font Classes - Applied to subtitle elements via SubtitleStyles.js
+   ============================================================================ */
+
+.font-typewriter { font-family: 'Courier Prime', monospace, 'Courier New', Courier; }
+
+.font-merriweather {
+    font-family: 'Merriweather', serif;
+}
+
+.font-poppins {
+    font-family: 'Poppins', sans-serif;
+}
+
+.font-noto-arabic {
+    font-family: 'Noto Sans Arabic', sans-serif;
+}
+
+.font-roboto {
+    font-family: Roboto, sans-serif;
+}
+
+.font-google {
+    font-family: 'Google Sans', sans-serif;
+}
+
+.font-console { font-family: 'Inconsolata', monospace, Consolas, 'Lucida Console', Monaco; }
+.font-cursive { font-family: 'Dancing Script', cursive; }
+.font-casual { font-family: 'Patrick Hand', cursive, 'Comic Sans MS', 'Segoe Print'; }
+.font-smallcaps { font-family: 'Cinzel', 'Copperplate', serif; font-variant: small-caps; }
+.font-silkscreen { font-family: 'Silkscreen', 'Courier New', monospace; }
+.font-space-grotesk { font-family: 'Space Grotesk', sans-serif; }
+.font-retrotech { font-family: 'RETROTECH', sans-serif; }
+.font-kitty { font-family: 'Kitty', cursive; }
+.font-inter { font-family: 'Inter', sans-serif; }
+.font-proxima { font-family: 'Proxima Nova', sans-serif; }
+.font-baloo { font-family: 'Baloo Bhaijaan 2', sans-serif; }
+.font-poiret-one { font-family: 'Poiret One', sans-serif; }
+.font-zen-kaku-gothic-new { font-family: 'Zen Kaku Gothic New', sans-serif; }
+.font-opendyslexic { font-family: 'OpenDyslexic', sans-serif; }
+.font-atkinson { font-family: 'Atkinson Hyperlegible', sans-serif; }
+.font-manrope { font-family: 'Manrope', sans-serif; }
+.font-fallback-font { font-family: 'Jellyfin Fallback Font', sans-serif; }
+
+.font-default { font-family: TizenSans, 'Tizen Sans', 'SamsungOne', 'LG Smart UI', Roboto, Helvetica, Arial, sans-serif; }
+
+/* 
+   Nuclear font override: 
+   Force all libjass rendered elements (spans, SVG text) to inherit the 
+   font-family from our wrapper's class, overriding libjass's inline styles.
+*/
+.libjass-wrapper[class*="font-"] span,
+.libjass-wrapper[class*="font-"] text {
+    font-family: inherit !important;
+}
+
+/* 
+   Dynamic spacing overrides for ASS tracks.
+   - Vertical Spacing: Pixel-based margin offset between lines/characters.
+   - Horizontal Spacing: Pixel-based character offset.
+   - Vertical Position: Pixel-based bottom offset for alignment.
+*/
+
+.libjass-wrapper.override-bottom-offset .libjass-subs .an1,
+.libjass-wrapper.override-bottom-offset .libjass-subs .an2,
+.libjass-wrapper.override-bottom-offset .libjass-subs .an3 {
+    bottom: var(--ass-bottom-offset, 0px) !important;
+}
+
+/* 
+   User Discovery: 
+   Applying margin-bottom to the direct span child of the dialogue 
+   is the most reliable way to collapse gaps without layout shifts.
+*/
+.libjass-subs div[data-dialogue-id] > span {
+    display: inline-block !important;
+    margin-bottom: var(--ass-vertical-spacing, 0px) !important;
+    line-height: normal !important;
+    vertical-align: top !important;
+}
+
+.libjass-wrapper.override-letter-spacing span {
+    /* Horizontal character alignment (Letter Spacing) */
+    letter-spacing: var(--ass-letter-spacing) !important;
+}

@@ -1,0 +1,4205 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - API Client
+ * ============================================================================
+ * HTTP client wrapper for Jellyfin server API communication.
+ * Handles authentication headers, error handling, and request management.
+ *
+ * Based on jellyfin-web patterns for compatibility.
+ * ============================================================================
+ */
+
+import { eventBus } from '../core/EventBus.js';
+import { state } from '../core/StateManager.js';
+import { tizenAdapter } from '../tizen/TizenAdapter.js';
+import { logger } from '../utils/Logger.js';
+import { storage } from '../utils/StorageService.js';
+import { i18n } from '../utils/i18n.js';
+import { customHeaders } from '../utils/CustomHeaders.js';
+// Centralized platform info utility
+import { platformInfo } from '../utils/PlatformInfo.js';
+
+const log = logger.create('ApiClient');
+
+/**
+ * Custom error for when the server is physically unreachable
+ */
+export class ServerUnreachableError extends Error {
+    constructor(message = 'Server unreachable') {
+        super(message);
+        this.name = 'ServerUnreachableError';
+        this.isNetworkError = true;
+    }
+}
+
+// API request timeout (ms)
+const REQUEST_TIMEOUT = 30000; // Increased from 10s to 30s for weaker hardware (Tizen/WebOS)
+
+/**
+ * Determine whether the host JavaScript environment provides native fetch cancellation.
+ * Modern Chromium engines (66+) support AbortSignal directly on window.fetch.
+ * Legacy TV platforms (Tizen 4.0 running Chromium 56, WebOS 4 running Chromium 53)
+ * lack signal support on fetch(); polyfilled AbortControllers dispatch events,
+ * but native fetch never cancels the network socket. This leaves stalled requests
+ * holding sockets open until the OS TCP timeout (~106s), exhausting Chromium's
+ * 6-connection pool and creating cascading navigation timeouts across the app.
+ */
+function isNativeFetchAbortSupported() {
+    try {
+        // In environments without XMLHttpRequest (e.g. Node.js unit tests), use fetch
+        if (typeof XMLHttpRequest === 'undefined') {
+            return true;
+        }
+        // Check if the Request prototype supports the signal property (Chrome 66+)
+        if (typeof Request === 'undefined' || !('signal' in Request.prototype)) {
+            return false;
+        }
+        // Verify global AbortController exists
+        if (typeof AbortController === 'undefined') {
+            return false;
+        }
+        // Verify AbortController is a native C++ constructor rather than a polyfill
+        return /\[native code\]/.test(Function.prototype.toString.call(AbortController));
+    } catch (_) {
+        return false;
+    }
+}
+
+// Cached evaluation of abort capabilities for the current runtime session
+const HAS_NATIVE_FETCH_ABORT = isNativeFetchAbortSupported();
+
+/**
+ * Execute an HTTP request via XMLHttpRequest for legacy browser runtimes.
+ * Unlike native fetch on Chromium < 66, XMLHttpRequest fully supports xhr.abort()
+ * and xhr.timeout, immediately terminating the underlying TCP socket at the
+ * browser engine level and releasing the connection slot back to the host pool.
+ *
+ * @param {string} url - Target endpoint URL
+ * @param {Object} fetchOptions - Standard fetch configuration (method, headers, body)
+ * @param {number} timeout - Request timeout threshold in milliseconds
+ * @param {AbortController} [controller] - Optional cancellation controller
+ * @returns {Promise<Object>} Response-compatible duck-typed object
+ */
+function executeXhrRequest(url, fetchOptions, timeout, controller) {
+    return new Promise((resolve, reject) => {
+        // Instantiate native XMLHttp request
+        const xhr = new XMLHttpRequest();
+        let settled = false;
+        let timeoutTimer = null;
+
+        // Clean-up and rejection helper for timeouts and manual cancellation
+        const handleAbort = () => {
+            if (settled) return;
+            settled = true;
+
+            // Clear secondary timeout timer
+            if (timeoutTimer) {
+                clearTimeout(timeoutTimer);
+                timeoutTimer = null;
+            }
+
+            // Immediately abort the hardware socket to release pool connection
+            try {
+                xhr.abort();
+            } catch (_) {}
+
+            // Build standard AbortError matching fetch timeout behavior
+            const timeoutErr = new Error(`Connection timed out after ${(timeout || REQUEST_TIMEOUT) / 1000}s`);
+            timeoutErr.name = 'AbortError';
+            reject(timeoutErr);
+        };
+
+        // Attach listener to external cancellation controller if present
+        if (controller && controller.signal) {
+            controller.signal.addEventListener('abort', handleAbort, { once: true });
+        }
+
+        // Open asynchronous HTTP connection
+        xhr.open(fetchOptions.method || 'GET', url, true);
+
+        // Populate request headers
+        if (fetchOptions.headers) {
+            for (const [key, val] of Object.entries(fetchOptions.headers)) {
+                if (val !== undefined && val !== null) {
+                    try {
+                        xhr.setRequestHeader(key, String(val));
+                    } catch (_) {}
+                }
+            }
+        }
+
+        // Configure socket timeout at native layer
+        if (timeout) {
+            try {
+                xhr.timeout = timeout;
+                xhr.ontimeout = handleAbort;
+            } catch (_) {}
+
+            // Fallback JavaScript timer in case xhr.timeout is unsupported or erratic
+            timeoutTimer = setTimeout(handleAbort, timeout);
+        }
+
+        // Handle successful HTTP response arrival
+        xhr.onload = () => {
+            if (settled) return;
+            settled = true;
+
+            // Clear timeout timer
+            if (timeoutTimer) {
+                clearTimeout(timeoutTimer);
+                timeoutTimer = null;
+            }
+
+            // Unbind abort listener
+            if (controller && controller.signal) {
+                controller.signal.removeEventListener('abort', handleAbort);
+            }
+
+            // Status 0 indicates connection abort or network rejection
+            if (xhr.status === 0) {
+                reject(new TypeError('Failed to fetch'));
+                return;
+            }
+
+            // Parse response headers into normalized case-insensitive map
+            const rawHeaders = xhr.getAllResponseHeaders() || '';
+            const headersMap = {};
+            const lines = rawHeaders.split(/\r?\n/);
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const colonIndex = line.indexOf(':');
+                if (colonIndex > 0) {
+                    const key = line.slice(0, colonIndex).trim().toLowerCase();
+                    const val = line.slice(colonIndex + 1).trim();
+                    headersMap[key] = val;
+                }
+            }
+
+            const status = xhr.status;
+            const responseText = xhr.responseText || '';
+
+            // Return duck-typed object matching native fetch Response contract
+            const responseObj = {
+                status,
+                ok: status >= 200 && status < 300,
+                statusText: xhr.statusText || '',
+                headers: {
+                    get: (name) => headersMap[(name || '').toLowerCase()] || null
+                },
+                text: async () => responseText,
+                json: async () => JSON.parse(responseText)
+            };
+
+            resolve(responseObj);
+        };
+
+        // Handle physical network errors (DNS failures, connection refusals)
+        xhr.onerror = () => {
+            if (settled) return;
+            settled = true;
+
+            // Clear timeout timer
+            if (timeoutTimer) {
+                clearTimeout(timeoutTimer);
+                timeoutTimer = null;
+            }
+
+            // Unbind abort listener
+            if (controller && controller.signal) {
+                controller.signal.removeEventListener('abort', handleAbort);
+            }
+
+            reject(new TypeError('Failed to fetch'));
+        };
+
+        // Transmit request payload
+        xhr.send(fetchOptions.body || null);
+    });
+}
+
+// ============================================================================
+// ApiClient Class
+// ============================================================================
+export class ApiClient {
+    constructor() {
+        // Server configuration
+        this._serverUrl = null;
+        this._accessToken = null;
+        this._userId = null;
+
+        // Device identification - NO SPACES in any of these values
+        this._deviceId = null;
+        this._deviceName = 'Litefin'; // Default, will be updated by AuthManager.init()
+        this._clientName = 'Litefin';
+        this._clientVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0';
+
+        // Track retries to prevent infinite loops on 401
+        this._retryingRequests = new Set();
+
+        // ── Litefin Companion Server Plugin Detection Cache ───────────────
+        // Cached availability state for the Litefin server-side companion plugin.
+        // null = unprobed / unknown, true = installed & active, false = missing
+        this._hasLitefinServerPlugin = null;
+        this._litefinPluginProbePromise = null;
+
+        // ── ETag Response Cache ───────────────────────────────────────────
+        // In-memory cache of { etag, body } keyed by full request URL.
+        // Used to send If-None-Match on GET requests and short-circuit to 304
+        // cached data when the server reports no change.
+        this._etagCache = new Map();
+        this._etagCacheMaxSize = 20;
+
+        // ── In-Flight Request Deduplication Promises ───────────────────────
+        // Prevents burst duplicate network requests during boot and navigation
+        this._userViewsPromise = null;
+        this._reportCapabilitiesPromise = null;
+    }
+
+    // ========================================================================
+    // Properties
+    // ========================================================================
+    get clientName() {
+        return this._clientName;
+    }
+    get deviceName() {
+        return this._deviceName;
+    }
+    get deviceId() {
+        return this._deviceId;
+    }
+    get clientVersion() {
+        return this._clientVersion;
+    }
+    get serverUrl() {
+        return this._serverUrl;
+    }
+    get accessToken() {
+        return this._accessToken;
+    }
+    get userId() {
+        return this._userId;
+    }
+
+    /**
+     * Check if the currently connected server is an Emby instance.
+     * We determine this by checking the public product name returned
+     * during the initial server discovery/handshake.
+     *
+     * @returns {boolean} True if the server identifies as Emby.
+     */
+    isEmby() {
+        /*
+         * Retrieve the server information stored in global application state.
+         * Emby does not return a 'ProductName' in its public (unauthenticated)
+         * System Info response, whereas Jellyfin does. We detect Emby by checking
+         * if the server returns a ServerName but omits ProductName, or if the
+         * ProductName explicitly contains 'emby'.
+         */
+        const info = state.get('server:info') || {};
+        return !!(info.ServerName && (!info.ProductName || info.ProductName.toLowerCase().includes('emby')));
+    }
+
+    /**
+     * Check if the connected server is Jellyfin 12.0 or newer.
+     *
+     * JF 12.0 canonicalized many user-scoped routes: the old
+     * /Users/{userId}/Items/{itemId}/... prefix was deprecated in favour of
+     * /Items/{itemId}?userId=...  (and similar non-user-scoped paths for
+     * PlayedItems, FavoriteItems, Configuration, etc.).
+     *
+     * Old routes still exist as silent legacy fallbacks on JF12, but this flag
+     * lets us proactively use the new paths on modern servers while keeping
+     * full backward compatibility with 10.10 / 10.11 installs.
+     *
+     * @returns {boolean} True when the major server version is >= 12.
+     */
+    isJF12Plus() {
+        /*
+         * The Version field comes from /System/Info/Public and is stored in
+         * global state during the initial server handshake.
+         * Shape: "12.0.0.4" — we only care about the major component.
+         */
+        const info = state.get('server:info') || {};
+        const major = parseInt((info.Version || '').split('.')[0], 10);
+        return !isNaN(major) && major >= 12;
+    }
+
+    // ========================================================================
+    // Configuration Methods
+    // ========================================================================
+
+    /**
+     * Set the server URL
+     * @param {string} serverUrl - Jellyfin server URL
+     */
+    setServer(serverUrl) {
+        // Normalize URL (remove trailing slash)
+        this._serverUrl = serverUrl.replace(/\/+$/, '');
+        state.set('server:url', this._serverUrl);
+
+        // Invalidate server-scoped plugin presence cache on server change
+        this._hasLitefinServerPlugin = null;
+        this._litefinPluginProbePromise = null;
+
+        // Synchronize active server URL with the custom headers manager
+        customHeaders.setActiveServer(this._serverUrl);
+
+        log.info(`Server set to ${this._serverUrl}`);
+    }
+
+    /**
+     * Set authentication credentials
+     * @param {string} accessToken - Access token from login
+     * @param {string} userId - User ID
+     */
+    setAuth(accessToken, userId) {
+        this._accessToken = accessToken;
+        this._userId = userId;
+
+        // Reset user-scoped request promises
+        this._userViewsPromise = null;
+        this._reportCapabilitiesPromise = null;
+
+        state.set('user:authenticated', !!accessToken);
+        log.info(`Authenticated as user ${userId}`);
+    }
+
+    /**
+     * Set device identification
+     * Device name is sanitized to remove spaces and special characters
+     * @param {string} deviceId - Unique device ID
+     * @param {string} [deviceName] - Device name (will be sanitized)
+     */
+    setDevice(deviceId, deviceName = null) {
+        this._deviceId = deviceId;
+        if (deviceName) {
+            // Allow alphanumeric, spaces, hyphens, underscores, dots, and percent encoding
+            this._deviceName = deviceName.replace(/[^a-zA-Z0-9 \-_.%]/g, '');
+        }
+    }
+
+    /**
+     * Clear authentication credentials
+     */
+    clearAuth() {
+        this._accessToken = null;
+        this._userId = null;
+
+        // Reset user-scoped request promises
+        this._userViewsPromise = null;
+        this._reportCapabilitiesPromise = null;
+
+        state.set('user:authenticated', false);
+        state.set('user:data', null);
+
+        // Reset server-side plugin detection cache
+        this._hasLitefinServerPlugin = null;
+        this._litefinPluginProbePromise = null;
+
+        // Wipe ETag cache — cached responses are bound to the previous auth session
+        this._etagCache.clear();
+
+        // Wipe page caches — stale data bound to the previous auth session
+        state.clearByPrefix('details:');
+        state.clearByPrefix('home:');
+        state.clearByPrefix('discover:');
+
+        log.info('Authentication cleared');
+    }
+
+    /**
+     * Clear the ETag response cache. Call after playback or server data mutations
+     * to ensure the next request fetches fresh data instead of a 304-stale body.
+     */
+    clearEtagCache() {
+        this._etagCache.clear();
+        log.debug('ETag cache cleared');
+    }
+
+    // ========================================================================
+    // Header Management
+    // ========================================================================
+
+    /**
+     * Build the Authorization header value using the Jellyfin MediaBrowser scheme.
+     * This is the current, non-deprecated way to authorize all authenticated requests.
+     * Format: MediaBrowser Client="...", Device="...", DeviceId="...", Version="...[, Token="..."]
+     * @returns {string} Authorization header value
+     */
+    getAuthHeader(tokenOverride = null) {
+        /*
+         * Check if we are connected to an Emby server instance.
+         * Emby handles the Authorization header differently than Jellyfin.
+         */
+        if (this.isEmby()) {
+            /*
+             * Emby auth header format uses the 'Emby' scheme.
+             * It requires 'UserId' (if authenticated) but does NOT carry the
+             * 'Token' inside the Authorization header itself. Instead, the token
+             * is transmitted in the separate 'X-Emby-Token' request header.
+             */
+            const parts = [
+                `Client="${this._clientName}"`,
+                `Device="${this._deviceName}"`,
+                `DeviceId="${this._deviceId}"`,
+                `Version="${this._clientVersion}"`
+            ];
+
+            // Append UserId only if the session is fully authenticated
+            if (this._userId) {
+                parts.unshift(`UserId="${this._userId}"`);
+            }
+
+            return `Emby ${parts.join(', ')}`;
+        }
+
+        /*
+         * Standard Jellyfin MediaBrowser authorization header.
+         * Formatted with the MediaBrowser scheme containing Client, Device,
+         * DeviceId, Version, and optionally the Token parameter.
+         */
+        const parts = [
+            `Client="${this._clientName}"`,
+            `Device="${this._deviceName}"`,
+            `DeviceId="${this._deviceId}"`,
+            `Version="${this._clientVersion}"`
+        ];
+
+        /*
+         * Retrieve the active authentication token from memory
+         * or fallback to the provided token override.
+         */
+        const token = tokenOverride || this._accessToken;
+        if (token) {
+            parts.push(`Token="${token}"`);
+        }
+
+        return `MediaBrowser ${parts.join(', ')}`;
+    }
+
+    /**
+     * Build full URL for an endpoint
+     * @param {string} endpoint - API endpoint path
+     * @returns {string} Full URL
+     */
+    buildUrl(endpoint) {
+        const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        return `${this._serverUrl}${path}`;
+    }
+
+    // ========================================================================
+    // Request Methods
+    // ========================================================================
+
+    /**
+     * Make an API request
+     * @param {string} endpoint - API endpoint
+     * @param {Object} [options] - Fetch options
+     * @returns {Promise<any>} Response data
+     */
+    async request(endpoint, options = {}, isRetry = false) {
+        if (!this._serverUrl) {
+            throw new Error('Server URL not configured');
+        }
+
+        // Conditionally request quality/resolution metadata if enabled.
+        // We skip injection on single-item fetches (endpoint ends with a GUID segment like
+        // /Items/{id} or /Users/{id}/Items/{id}) — Persons, Detail headers, etc. don't
+        // have media sources and requesting MediaSourceCount on them forces Jellyfin to
+        // do an expensive full-library count join, adding 2–4 seconds of latency.
+        if (options.params) {
+            const fieldsKey = Object.keys(options.params).find((k) => k.toLowerCase() === 'fields');
+
+            // Match a 32-character hex GUID at the very end of the endpoint path
+            const endsWithSingleItemId = /\/[0-9a-f]{32}$/i.test(endpoint.replace(/\?.*$/, ''));
+
+            const isItemsEndpoint =
+                !endsWithSingleItemId &&
+                ((endpoint.includes('/Items') && !endpoint.includes('/Items/Thumbnails')) ||
+                    endpoint.includes('/Latest') ||
+                    endpoint.includes('/Resume') ||
+                    endpoint.includes('/NextUp') ||
+                    endpoint.includes('/Upcoming') ||
+                    endpoint.includes('/Similar') ||
+                    endpoint.includes('/Episodes') ||
+                    endpoint.includes('/Search/Hints') ||
+                    endpoint.includes('/Persons') ||
+                    endpoint.includes('/MergedRows'));
+
+            if (isItemsEndpoint) {
+                const targetKey = fieldsKey || 'Fields';
+                const fieldsList = (options.params[targetKey] || '').split(',').filter(Boolean);
+
+                if (storage.getItem('pref:showQualityBadges') === 'true') {
+                    ['Width', 'Height', 'VideoRange', 'VideoRangeType', 'MediaSources'].forEach((f) => {
+                        if (!fieldsList.includes(f)) {
+                            fieldsList.push(f);
+                        }
+                    });
+                }
+
+                if (storage.getItem('pref:showMediaSourceCounts') !== 'false') {
+                    if (!fieldsList.includes('MediaSourceCount')) {
+                        fieldsList.push('MediaSourceCount');
+                    }
+                }
+
+                options.params[targetKey] = fieldsList.join(',');
+            }
+        }
+
+        let url = this.buildUrl(endpoint);
+
+        // Append query parameters if provided
+        if (options.params) {
+            const searchParams = new URLSearchParams();
+            for (const [key, value] of Object.entries(options.params)) {
+                if (value !== undefined && value !== null) {
+                    searchParams.append(key, value);
+                }
+            }
+            const queryString = searchParams.toString();
+            if (queryString) {
+                url += (url.includes('?') ? '&' : '?') + queryString;
+            }
+        }
+
+        const method = options.method || 'GET';
+
+        // DEBUG: Store last requested URL
+        this.lastUrl = url;
+
+        // ── ETag cache lookup ──────────────────────────────────────────────
+        // For GET requests, check if we have a cached ETag and send
+        // If-None-Match so the server can respond with 304 if unchanged.
+        let etagEntry = null;
+        if (method === 'GET') {
+            etagEntry = this._etagCache.get(url) || null;
+        }
+
+        // Build headers
+        const headers = {
+            Accept: 'application/json', // Explicitly request JSON response
+            ...options.headers
+        };
+
+        // ------------------------------------------------------------------
+        // Custom HTTP Headers (Reverse Proxy / Gateway Authentication)
+        // If the user has configured custom headers (e.g. Cloudflare Zero
+        // Trust, Pangolin, Authelia) for this server, attach them to all
+        // outbound requests that match the server's origin and base path.
+        // ------------------------------------------------------------------
+        const proxyHeaders = customHeaders.getHeadersForUrl(url, this._serverUrl);
+        if (proxyHeaders && typeof proxyHeaders === 'object') {
+            Object.assign(headers, proxyHeaders);
+        }
+
+        // ------------------------------------------------------------------
+        // Accept-Language Header (Jellyfin 12+ Localization Middleware)
+        // Passes the client's current UI language so that server messages,
+        // localized metadata, genre descriptions, and scheduled task notifications
+        // are returned in the client's active language rather than server host default.
+        // ------------------------------------------------------------------
+        if (!headers['Accept-Language']) {
+            const activeLang = i18n?.currentLang || (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
+            headers['Accept-Language'] = `${activeLang},en;q=0.8`;
+        }
+
+        // Add If-None-Match header if we have a cached ETag for this URL
+        if (etagEntry && etagEntry.etag) {
+            headers['If-None-Match'] = etagEntry.etag;
+        }
+
+        if (!options.skipAuth) {
+            /*
+             * Fetch the formatted authorization header.
+             * For Jellyfin, this contains client/device info plus the auth token.
+             * For Emby, it contains client/device/user info, but NO token.
+             */
+            const authHeader = this.getAuthHeader();
+            headers['Authorization'] = authHeader;
+
+            /*
+             * Emby servers require the token to be explicitly supplied via
+             * the dedicated 'X-Emby-Token' request header on authenticated endpoints.
+             */
+            if (this.isEmby() && this._accessToken) {
+                headers['X-Emby-Token'] = this._accessToken;
+            }
+        }
+
+        // Build fetch options
+        const fetchOptions = {
+            method,
+            headers,
+            keepalive: options.keepalive
+        };
+
+        // Forward cache mode if explicitly requested (e.g. 'no-cache')
+        if (options.cache) {
+            fetchOptions.cache = options.cache;
+        }
+
+        // Add body for POST/PUT requests
+        if (options.body !== undefined && options.body !== null) {
+            if (options.body instanceof FormData) {
+                fetchOptions.body = options.body;
+                // Let browser set Content-Type for FormData
+                delete headers['Content-Type'];
+            } else if (typeof options.body === 'object') {
+                headers['Content-Type'] = 'application/json';
+                fetchOptions.body = JSON.stringify(options.body);
+            } else {
+                fetchOptions.body = options.body;
+            }
+        }
+
+        log.debug(`${method} ${endpoint}`);
+
+        try {
+            // Create abort controller for timeout
+            // Support per-request timeout override via options.timeout
+            // Note: keepalive requests must not attach an AbortSignal in older
+            // environments where the Fetch specification disallowed signals on keepalive.
+            const timeout = options.timeout || (options.keepalive ? 0 : REQUEST_TIMEOUT);
+            const controller = new AbortController();
+            let timeoutId = null;
+            if (timeout) {
+                fetchOptions.signal = controller.signal;
+            }
+
+            log.debug(`Fetching ${url} (timeout: ${timeout || 'none'}ms)...`);
+            let response;
+            try {
+                if (HAS_NATIVE_FETCH_ABORT) {
+                    // Modern browser engine (Chrome 66+) with native fetch AbortSignal support
+                    const executeFetch = async () => {
+                        try {
+                            return await fetch(url, fetchOptions);
+                        } catch (fetchErr) {
+                            /*
+                             * On Smart TVs and legacy web runtimes (such as Tizen 5.5 running Chromium 69),
+                             * cross-origin fetch calls with keepalive:true and non-simple headers (like Authorization
+                             * or Content-Type: application/json) trigger an immediate 'TypeError: Failed to fetch'
+                             * due to lack of CORS preflight support for keepalive in older browser engines.
+                             * If keepalive was active and threw a TypeError, fall back to a standard fetch without keepalive.
+                             */
+                            if (fetchOptions.keepalive && fetchErr instanceof TypeError) {
+                                log.warn(`Fetch with keepalive failed (${fetchErr.message}); retrying without keepalive...`);
+                                delete fetchOptions.keepalive;
+                                return await fetch(url, fetchOptions);
+                            }
+                            throw fetchErr;
+                        }
+                    };
+
+                    // On modern platforms, wrap fetch in Promise.race with an explicit timeout promise
+                    if (timeout) {
+                        const timeoutPromise = new Promise((_, reject) => {
+                            timeoutId = setTimeout(() => {
+                                try {
+                                    controller.abort();
+                                } catch (_) {}
+                                const timeoutErr = new Error(`Connection timed out after ${timeout / 1000}s`);
+                                timeoutErr.name = 'AbortError';
+                                reject(timeoutErr);
+                            }, timeout);
+                        });
+                        response = await Promise.race([executeFetch(), timeoutPromise]);
+                    } else {
+                        response = await executeFetch();
+                    }
+                } else {
+                    // Legacy smart TV platform (Tizen 4.0 / WebOS 4) — execute via XMLHttpRequest
+                    // so xhr.abort() physically closes the underlying socket and frees Chromium's connection pool
+                    response = await executeXhrRequest(url, fetchOptions, timeout, controller);
+                }
+            } finally {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            }
+
+            // Handle 304 Not Modified — return cached response body
+            if (response.status === 304 && etagEntry) {
+                log.debug(`304 ${endpoint} — returning cached response`);
+                return etagEntry.body;
+            }
+
+            // Handle error responses
+            if (!response.ok) {
+                // If 401 Unauthorized and not already a retry, try one more time
+                // This handles transient session blips on some servers after sleep
+                if (response.status === 401 && !isRetry && this._accessToken) {
+                    log.warn(`Unauthorized (401) for ${endpoint}. Attempting one-time silent retry...`);
+                    return this.request(endpoint, options, true);
+                }
+
+                if (options.warnOnError && response) {
+                    response._suppressErrorLog = true;
+                }
+                const error = await this._handleError(response, endpoint, options);
+                throw error;
+            }
+
+            // Handle 204 No Content (common for session reporting endpoints)
+            if (response.status === 204) {
+                return null;
+            }
+
+            // -----------------------------------------------------------------
+            // Dynamic Response Body Parsing
+            // -----------------------------------------------------------------
+            // Inspect the response Content-Type header to decide the parsing strategy.
+            // Jellyfin and Emby endpoints primarily return JSON payloads, but certain
+            // reverse proxies (Nginx, Traefik, Caddy, Cloudflare) or specialized setups
+            // may omit the header or advertise 'text/plain' or 'text/json' instead of
+            // 'application/json'. We handle both standard JSON headers and fallback to
+            // parsing raw text if it looks like a valid JSON object or array.
+            // -----------------------------------------------------------------
+            const contentType = response.headers.get('content-type');
+            let body;
+            if (contentType && (contentType.includes('application/json') || contentType.includes('text/json'))) {
+                body = await response.json();
+            } else {
+                body = await response.text();
+                // If the response body was read as raw text, check if it contains
+                // a serialized JSON array or object and parse it accordingly.
+                if (typeof body === 'string' && body.length > 0) {
+                    const trimmed = body.trim();
+                    if (
+                        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+                        (trimmed.startsWith('[') && trimmed.endsWith(']'))
+                    ) {
+                        try {
+                            body = JSON.parse(trimmed);
+                        } catch {
+                            // If parsing fails, preserve raw string text without throwing
+                        }
+                    }
+                }
+            }
+
+            // Cache ETag for GET requests so subsequent calls can use
+            // If-None-Match / 304 short-circuit when data hasn't changed.
+            if (method === 'GET') {
+                const etag = response.headers.get('ETag');
+                if (etag && body !== undefined && body !== null) {
+                    if (this._etagCache.size >= this._etagCacheMaxSize) {
+                        const firstKey = this._etagCache.keys().next().value;
+                        this._etagCache.delete(firstKey);
+                    }
+                    this._etagCache.set(url, { etag, body });
+                }
+            }
+
+            return body;
+        } catch (error) {
+            // Handle Network Errors (DNS, Connection Refused, Offline) or Timeout
+            const isTimeout = error.name === 'AbortError';
+            const isNetworkError = error instanceof TypeError;
+
+            // =========================================================================
+            // IDEMPOTENT GET STALE SOCKET AUTO-RECOVERY
+            // =========================================================================
+            // If an idempotent GET request timed out or failed on a stale socket (e.g.
+            // after long video playback or router conntrack idle timeouts), perform a
+            // single immediate retry on a fresh connection. Aborting the previous request
+            // closed the dead socket, allowing the retry to succeed instantly.
+            // =========================================================================
+            if ((isTimeout || isNetworkError) && !isRetry && method === 'GET' && !options._isWolTimeoutRetry) {
+                log.info(`GET ${endpoint} timed out or stalled on socket; retrying on fresh connection...`);
+                return this.request(endpoint, options, true);
+            }
+
+            if (isTimeout || isNetworkError) {
+                const timeout = options.timeout || REQUEST_TIMEOUT;
+                let msg = isTimeout
+                    ? `Connection timed out after ${timeout / 1000}s`
+                    : `Server unreachable at ${this._serverUrl}`;
+
+                const activeProxyHeaders = customHeaders.getActiveHeaders();
+                const hasProxyHeaders = activeProxyHeaders && Object.keys(activeProxyHeaders).length > 0;
+
+                if (isNetworkError && hasProxyHeaders) {
+                    msg += ' (CORS or reverse proxy error)';
+                }
+
+                log.error(`${msg}:`, error.message);
+
+                // =============================================================
+                // WAKE-ON-LAN ON REQUEST TIMEOUT / UNREACHABLE RETRY
+                // =============================================================
+                // If the user has enabled Wake-on-LAN on timeout and provided
+                // a valid MAC address, send a magic packet and retry the probe.
+                // =============================================================
+                const wolTimeoutEnabled = storage.getItem('pref:enableWolOnTimeout') === 'true';
+                const wolMac = storage.getItem('pref:wolMacAddress');
+
+                if (wolTimeoutEnabled && wolMac && !options._isWolTimeoutRetry) {
+                    log.info(
+                        `Request failed/timed out. Wake-on-LAN on timeout active. Broadcasting packet to ${wolMac}...`
+                    );
+
+                    try {
+                        // Send Wake-on-LAN Magic Packet
+                        sendWakeOnLan(wolMac).catch((wolErr) =>
+                            log.warn('Failed to send WOL packet on timeout:', wolErr)
+                        );
+
+                        // Retry loop: probe server status every 3s (up to 25 attempts / ~90s if Extended Wait is active)
+                        const extendedWait = storage.getItem('pref:enableWolExtendedWait') === 'true';
+                        const maxAttempts = extendedWait ? 25 : 5;
+                        const retryDelayMs = 3000;
+
+                        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                            log.info(`Probing server status post-WOL (attempt ${attempt}/${maxAttempts})...`);
+                            await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+
+                            try {
+                                const testUrl = `${this._serverUrl}/System/Info/Public`;
+                                const testRes = await fetch(testUrl, {
+                                    method: 'GET',
+                                    headers: { Accept: 'application/json' }
+                                });
+
+                                if (testRes.ok) {
+                                    log.info('Server responded to status probe! Re-executing failed API request...');
+                                    // Re-run original request with _isWolTimeoutRetry flag set to prevent recursion loops
+                                    return await this.request(
+                                        endpoint,
+                                        { ...options, _isWolTimeoutRetry: true },
+                                        isRetry
+                                    );
+                                }
+                            } catch (probeErr) {
+                                log.debug(
+                                    `Server status probe ${attempt}/${maxAttempts} failed — server still booting...`
+                                );
+                            }
+                        }
+                    } catch (wolCycleErr) {
+                        log.warn('Error during WOL timeout recovery cycle:', wolCycleErr);
+                    }
+                }
+
+                const extraHint =
+                    isNetworkError && hasProxyHeaders
+                        ? ' If using Cloudflare Access, verify that CORS is enabled in your Zero Trust Application settings and that the custom headers are allowed.'
+                        : ' Please check your network and server status.';
+                const networkError = new ServerUnreachableError(`${msg}.${extraHint}`);
+                eventBus.emit('api:offline', { url: this._serverUrl, isTimeout });
+                throw networkError;
+            }
+
+            if (options.silent) {
+                // Completely silent suppression (e.g., for background capability probes)
+                log.debug(`Request to ${endpoint} failed (silent probe):`, error.message || error);
+            } else if (options.warnOnError) {
+                log.warn(`Request to ${endpoint} failed (suppressed):`, error.message || error);
+            } else {
+                log.error(`Request to ${endpoint} failed:`, error.message || error);
+                eventBus.emit('api:error', { endpoint, error });
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Handle error responses
+     * @private
+     * @param {Response} response - The fetch Response object
+     * @param {string} [endpoint=''] - Target API route
+     * @param {Object} [options={}] - Request options passed to request()
+     */
+    async _handleError(response, endpoint = '', options = {}) {
+        let message = `HTTP ${response.status}`;
+
+        // Try to parse the server's error description from the response body.
+        // Jellyfin returns JSON on most errors, but schema-validation 400s can
+        // return plain text. We try JSON first and fall back to raw text so the
+        // actual server reason (e.g. "MaxAudioChannels must be an integer") is
+        // visible in the debug overlay instead of being silently discarded.
+        try {
+            const bodyText = await response.text();
+            if (bodyText) {
+                try {
+                    const data = JSON.parse(bodyText);
+                    message = data.message || data.Message || message;
+                } catch {
+                    // Not JSON — check if HTML response and extract readable text
+                    let cleaned = (bodyText || '').trim();
+                    if (cleaned.startsWith('<')) {
+                        // Strip HTML markup and collapse whitespace
+                        cleaned = cleaned
+                            .replace(/<[^>]*>/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                    }
+                    if (cleaned) {
+                        message = cleaned.length > 200 ? cleaned.slice(0, 200) + '…' : cleaned;
+                    }
+                }
+            }
+        } catch {
+            // Could not read body at all — keep the "HTTP N" default
+        }
+
+        // Log 400s at error level only if not suppressed via warnOnError
+        if (response.status === 400 && !response._suppressErrorLog) {
+            log.error(`Server rejected request (400 Bad Request): ${message}`);
+        }
+
+        // Handle specific status codes if no specific server message was provided
+        const isGenericMessage = message === `HTTP ${response.status}`;
+        switch (response.status) {
+            case 401: {
+                // =============================================================
+                // UNAUTHORIZED / SESSION EXPIRY RESOLUTION
+                // =============================================================
+                // Determine whether this 401 indicates that an active authenticated
+                // session has expired or been revoked, as opposed to an authentication
+                // credential attempt (e.g. login or silent probe) that failed.
+                //
+                // An authentication failure on /Users/AuthenticateByName or
+                // /Users/AuthenticateWithQuickConnect indicates incorrect/missing
+                // credentials for the account being tested, NOT that the current
+                // active session expired. Emitting 'api:unauthorized' during a login
+                // attempt would mistakenly evict the previously signed-in user.
+                // =============================================================
+                const isAuthEndpoint =
+                    endpoint.includes('/Users/AuthenticateByName') ||
+                    endpoint.includes('/Users/AuthenticateWithQuickConnect');
+
+                // Inspect parameters and endpoints for container, playlist, or library targets.
+                // In Jellyfin, querying a container that the authenticated user lacks access to
+                // returns a 401 or 403 status code for that specific resource. This indicates a
+                // resource permission denial, NOT that the user's active session token has expired.
+                const isResourceAccessDenied =
+                    Boolean(options.params?.ParentId) ||
+                    Boolean(options.params?.parentId) ||
+                    endpoint.includes('ParentId=') ||
+                    endpoint.includes('parentId=') ||
+                    endpoint.startsWith('/Playlists/');
+
+                // Session expiration should only fire if:
+                // 1. Not explicitly suppressed by the caller (e.g. probe or login attempt)
+                // 2. Not marked as a silent operation
+                // 3. Not an authentication credential endpoint
+                // 4. Not a resource-level container or playlist access denial
+                // 5. An active session token was actually transmitted with the request
+                const shouldEmitUnauthorized =
+                    !options.suppressUnauthorized &&
+                    !options.silent &&
+                    !isAuthEndpoint &&
+                    !isResourceAccessDenied &&
+                    Boolean(this._accessToken);
+
+                // Broadcast session invalidation only when an active token was rejected
+                if (shouldEmitUnauthorized) {
+                    eventBus.emit('api:unauthorized');
+                }
+
+                if (isGenericMessage) message = 'Authentication required';
+                break;
+            }
+            case 403:
+                if (isGenericMessage) message = 'Access denied';
+                break;
+            case 404:
+                if (isGenericMessage) message = 'Not found';
+                break;
+            case 500:
+                if (isGenericMessage) message = 'Server error';
+                break;
+        }
+
+        const error = new Error(message);
+        error.status = response.status;
+        return error;
+    }
+
+    /**
+     * GET request helper
+     */
+    async get(endpoint, params = null, options = {}) {
+        return this.request(endpoint, { method: 'GET', params, ...options });
+    }
+
+    /**
+     * POST request helper
+     */
+    async post(endpoint, body = null, options = {}) {
+        return this.request(endpoint, { method: 'POST', body, ...options });
+    }
+
+    /**
+     * DELETE request helper
+     */
+    async delete(endpoint, options = {}) {
+        return this.request(endpoint, { method: 'DELETE', ...options });
+    }
+
+    // ========================================================================
+    // Server Endpoints (Public - No auth required)
+    // ========================================================================
+
+    /**
+     * Get server public info
+     */
+    async getPublicInfo(options = {}) {
+        return this.get('/System/Info/Public', null, { skipAuth: true, ...options });
+    }
+
+    /**
+     * Get server branding configuration
+     */
+    async getBranding() {
+        return this.get('/Branding/Configuration');
+    }
+
+    // ========================================================================
+    // Localization Endpoints
+    // ========================================================================
+
+    /**
+     * Get list of cultures (languages) supported by the server
+     * @returns {Promise<Array>} List of culture objects
+     */
+    async getCultures() {
+        return this.get('/Localization/Cultures');
+    }
+
+    // ========================================================================
+    // User Endpoints
+    // ========================================================================
+
+    /**
+     * Get list of public users (for login screen)
+     * Returns users with HasPassword field.
+     * Ensures an Array is always returned even if the response is wrapped
+     * inside a query container (e.g. Items / Users) or returned as serialized text.
+     *
+     * @returns {Promise<Array>} Public users array
+     */
+    async getPublicUsers() {
+        // =====================================================================
+        // Fetch Public Users Endpoint
+        // =====================================================================
+        // Query the Jellyfin/Emby public users route which lists accounts
+        // configured to display on visual login selection screens.
+        // =====================================================================
+        const result = await this.get('Users/Public');
+
+        // Direct array response (standard Jellyfin & Emby behavior)
+        if (Array.isArray(result)) {
+            return result;
+        }
+
+        // Response wrapped inside standard container objects (e.g. Items or Users)
+        if (result && Array.isArray(result.Items)) {
+            return result.Items;
+        }
+        if (result && Array.isArray(result.Users)) {
+            return result.Users;
+        }
+
+        // Safety fallback: if the body was returned as a JSON string, attempt to parse
+        if (typeof result === 'string') {
+            try {
+                const parsed = JSON.parse(result);
+                if (Array.isArray(parsed)) return parsed;
+                if (parsed && Array.isArray(parsed.Items)) return parsed.Items;
+                if (parsed && Array.isArray(parsed.Users)) return parsed.Users;
+            } catch {
+                // Ignore parsing errors for non-JSON strings (e.g. HTML error pages)
+            }
+        }
+
+        // Always return an array to prevent downstream .map() or .length errors
+        return [];
+    }
+
+    // ========================================================================
+    // Quick Connect Endpoints
+    // ========================================================================
+
+    /**
+     * Check if Quick Connect is enabled on the server.
+     * Returns true/false — no auth required.
+     * Call this before initiating to avoid showing QC option on servers that have it off.
+     */
+    async isQuickConnectEnabled() {
+        return this.get('/QuickConnect/Enabled');
+    }
+
+    /**
+     * Initiate a new Quick Connect session.
+     * Returns { Secret, Code, Authenticated: false }.
+     * Display `Code` (6 digits) to the user on screen.
+     * Hold onto `Secret` for polling.
+     *
+     * No user credentials needed — only the device authorization header.
+     */
+    async initiateQuickConnect() {
+        return this.post('/QuickConnect/Initiate');
+    }
+
+    /**
+     * Poll for Quick Connect authorization status.
+     * Returns the updated QuickConnectResult: { Secret, Code, Authenticated }.
+     * When Authenticated === true, use the Secret to authenticate.
+     *
+     * @param {string} secret - The Secret returned from initiateQuickConnect
+     */
+    async checkQuickConnectStatus(secret) {
+        return this.get('/QuickConnect/Connect', { secret });
+    }
+
+    /**
+     * Exchange an authorized Quick Connect secret for a full auth token.
+     * This is called after checkQuickConnectStatus returns Authenticated: true.
+     * Returns the same shape as /Users/AuthenticateByName (AccessToken, User, etc.)
+     *
+     * @param {string} secret - The authorized Secret from the Quick Connect flow
+     * @param {Object} [options={}] - Additional request options
+     */
+    async authenticateWithQuickConnect(secret, options = {}) {
+        return this.post(
+            '/Users/AuthenticateWithQuickConnect',
+            {
+                Secret: secret,
+                App: this.clientName,
+                Device: this.deviceName,
+                DeviceId: this.deviceId,
+                Version: this.clientVersion
+            },
+            {
+                suppressUnauthorized: true,
+                ...options
+            }
+        );
+    }
+
+    /**
+     * Get current user info
+     */
+    async getCurrentUser(options = {}) {
+        return this.get(`/Users/${this._userId}`, null, options);
+    }
+
+    /**
+     * -------------------------------------------------------------------------
+     * SERVER SYSTEM CONFIGURATION
+     * -------------------------------------------------------------------------
+     * Retrieves global server configuration parameters from the Jellyfin host.
+     * Contains playback completion properties including MaxResumePct (default 90)
+     * and MinResumePct (default 5).
+     *
+     * Automatically caches MaxResumePct into persistent storage so the player
+     * can reliably resolve completion thresholds without hitting network stalls.
+     * -------------------------------------------------------------------------
+     *
+     * @param {Object} [options={}] - Optional request options
+     * @returns {Promise<Object>}
+     */
+    async getServerConfiguration(options = {}) {
+        // Fetch server system configuration payload
+        const config = await this.get('/System/Configuration', null, options);
+
+        // Cache MaxResumePct if returned by the server
+        if (config && typeof config.MaxResumePct === 'number') {
+            storage.setItem('server:maxResumePct', config.MaxResumePct);
+            storage.flush();
+        }
+
+        return config;
+    }
+
+    /**
+     * Update user configuration.
+     *
+     * JF12+ canonical: POST /Users/Configuration?userId=...
+     * Legacy (pre-12):  POST /Users/{userId}/Configuration
+     *
+     * Both routes are supported in JF12 (old one kept as silent fallback),
+     * but we prefer the new form on modern servers.
+     *
+     * @param {Object} configuration - The UserConfiguration object to save
+     */
+    async updateUserConfiguration(configuration) {
+        if (this.isJF12Plus()) {
+            // New JF12 canonical route — userId goes in the query string
+            return this.post(`/Users/Configuration?userId=${encodeURIComponent(this._userId)}`, configuration);
+        }
+        // Legacy path used by JF 10.10 / 10.11
+        return this.post(`/Users/${this._userId}/Configuration`, configuration);
+    }
+
+    /**
+     * Get user's library views with in-flight request deduplication.
+     * Prevents multiple components (Sidebar, HomePage, MobileNav) from firing
+     * duplicate concurrent HTTP GET requests for the same user library data.
+     *
+     * @returns {Promise<any>} User views list
+     */
+    async getUserViews() {
+        /*
+         * If an identical request for the active user's views is already in-flight
+         * or resolved within the last few seconds, return the shared active promise.
+         */
+        if (this._userViewsPromise) {
+            return this._userViewsPromise;
+        }
+
+        // Dispatch GET request and store promise
+        this._userViewsPromise = this.get(`/Users/${this._userId}/Views`).finally(() => {
+            // Keep active for 2.5 seconds so rapid concurrent mounting components share payload
+            setTimeout(() => {
+                this._userViewsPromise = null;
+            }, 2500);
+        });
+
+        return this._userViewsPromise;
+    }
+
+    // ========================================================================
+    // Library Endpoints
+    // ========================================================================
+
+    /**
+     * Trigger a scan / refresh of all media libraries on the server.
+     * Accessible by server administrators.
+     * POST /Library/Refresh
+     * @returns {Promise<any>}
+     */
+    async refreshAllLibraries() {
+        // Send POST request directly to server library refresh endpoint
+        return this.post('/Library/Refresh');
+    }
+
+    /**
+     * Get items from library
+     * @param {Object} [params={}] - Jellyfin /Items query parameters
+     * @param {Object} [options={}] - Network and error handling options
+     */
+    async getItems(params = {}, options = {}) {
+        // Standard baseline parameters for item queries
+        const defaults = {
+            UserId: this._userId,
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            IncludeItemTypes: '',
+            Recursive: true,
+            Fields: 'BackdropImageTags,ParentBackdropImageTags,MediaSourceCount',
+            ImageTypeLimit: 1,
+            EnableImageTypes: 'Primary,Backdrop,Thumb',
+            Limit: 100
+        };
+
+        // When querying with a specific ParentId (e.g. collection, boxset, playlist, folder),
+        // permission denials (401/403) from the server should not invalidate the user's active session.
+        const requestOptions = {
+            ...(params && (params.ParentId || params.parentId)
+                ? { suppressUnauthorized: true, warnOnError: true }
+                : {}),
+            ...options
+        };
+
+        return this.get('/Items', { ...defaults, ...params }, requestOptions);
+    }
+
+    /**
+     * Get a single random item (Movie or Series) from the user's library.
+     * @returns {Promise<Object|null>} A random item object or null if none found.
+     */
+    async getRandomItem() {
+        const result = await this.getItems({
+            IncludeItemTypes: 'Movie,Series',
+            SortBy: 'Random',
+            Limit: 1,
+            Recursive: true
+        });
+        return result && result.Items && result.Items.length > 0 ? result.Items[0] : null;
+    }
+
+    /**
+     * Get latest items in a library
+     * Uses configurable user limit preference (defaults to 12 items)
+     * @param {string} parentId - Library or collection folder ID
+     * @param {Object} [params={}] - Additional query options
+     * @param {Object} [options={}] - Network and error handling options
+     */
+    async getLatestItems(parentId, params = {}, options = {}) {
+        // Read user's custom homepage row limit from storage, defaulting to 12 items
+        const defaultLimit = parseInt(storage.getItem('pref:homeRowsLimit') || 12, 10);
+
+        // Core fields and parameters for row presentation
+        const defaults = {
+            // Default item count per library row configured via user settings
+            Limit: defaultLimit,
+            // Request tags, backdrop, and series metadata needed for home card representation
+            Fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag',
+            ImageTypeLimit: 1,
+            EnableImageTypes: 'Primary,Backdrop,Thumb',
+            ParentId: parentId
+        };
+
+        // Suppress unauthorized logout if parent library is restricted
+        const requestOptions = {
+            suppressUnauthorized: true,
+            warnOnError: true,
+            ...options
+        };
+
+        /*
+         * JF12+ canonical: GET /Items/Latest?userId=...
+         * Legacy (pre-12):  GET /Users/{userId}/Items/Latest
+         */
+        if (this.isJF12Plus()) {
+            return this.get('/Items/Latest', { UserId: this._userId, ...defaults, ...params }, requestOptions);
+        }
+        return this.get(`/Users/${this._userId}/Items/Latest`, { ...defaults, ...params }, requestOptions);
+    }
+
+    /**
+     * Get resume items (continue watching)
+     * Uses configurable user limit preference (defaults to 12 items)
+     */
+    async getResumeItems(params = {}) {
+        // Read user's custom homepage row limit from storage, defaulting to 12 items
+        const defaultLimit = parseInt(storage.getItem('pref:homeRowsLimit') || 12, 10);
+
+        const defaults = {
+            // Fetch items up to the user-selected row item limit
+            Limit: defaultLimit,
+            Recursive: true,
+            // Include Tags so game ROM items can be identified with platform badges and progress bar suppression
+            Fields: 'SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,Tags',
+            ImageTypeLimit: 1,
+            EnableImageTypes: 'Primary,Backdrop,Thumb',
+            EnableTotalRecordCount: false,
+            MediaTypes: 'Video',
+            // Restrict to playable video items to prevent container folders (e.g. Seasons/Series)
+            // from being returned on Jellyfin 12+ where folder rollup marks them as resumable.
+            IncludeItemTypes: 'Movie,Episode,Video'
+        };
+
+        /*
+         * JF12+ canonical: GET /UserItems/Resume?userId=...
+         * Legacy (pre-12):  GET /Users/{userId}/Items/Resume
+         */
+        if (this.isJF12Plus()) {
+            return this.get('/UserItems/Resume', { UserId: this._userId, ...defaults, ...params });
+        }
+        return this.get(`/Users/${this._userId}/Items/Resume`, { ...defaults, ...params });
+    }
+
+    /**
+     * Get recently played audio items.
+     *
+     * JF12+ canonical: GET /Items?userId=...
+     * Legacy (pre-12):  GET /Users/{userId}/Items
+     */
+    async getRecentlyPlayedAudio(parentId, limit = 15) {
+        const params = {
+            ParentId: parentId,
+            IncludeItemTypes: 'Audio',
+            Recursive: true,
+            Filters: 'IsPlayed',
+            SortBy: 'DatePlayed',
+            SortOrder: 'Descending',
+            Limit: limit
+        };
+        if (this.isJF12Plus()) {
+            return this.get('/Items', { UserId: this._userId, ...params });
+        }
+        return this.get(`/Users/${this._userId}/Items`, params);
+    }
+
+    /**
+     * Get frequently played audio items.
+     *
+     * JF12+ canonical: GET /Items?userId=...
+     * Legacy (pre-12):  GET /Users/{userId}/Items
+     */
+    async getFrequentlyPlayedAudio(parentId, limit = 15) {
+        const params = {
+            ParentId: parentId,
+            IncludeItemTypes: 'Audio',
+            Recursive: true,
+            Filters: 'IsPlayed',
+            SortBy: 'PlayCount',
+            SortOrder: 'Descending',
+            Limit: limit
+        };
+        if (this.isJF12Plus()) {
+            return this.get('/Items', { UserId: this._userId, ...params });
+        }
+        return this.get(`/Users/${this._userId}/Items`, params);
+    }
+
+    /**
+     * Centralized capability check for the Litefin server companion plugin.
+     * Evaluates availability once per session (using the admin plugin registry
+     * or a silent probe endpoint) and caches the boolean result.
+     *
+     * When the Litefin server plugin is not installed, downstream callers
+    /**
+     * Checks if the Litefin companion server plugin is installed, enabled, and active on the Jellyfin server.
+     * Caches the result after the initial check so downstream calls can
+     * immediately bypass all /Litefin/* endpoints and seamlessly fall back to
+     * native Jellyfin routes without logging 404 warnings or errors.
+     *
+     * @param {boolean} [force=false] - Force re-probing the server rather than using cached state
+     * @returns {Promise<boolean>} True if Litefin server companion plugin is active and enabled
+     */
+    async isLitefinPluginAvailable(force = false) {
+        if (force) {
+            this._hasLitefinServerPlugin = null;
+        }
+
+        // 1. Return cached evaluation immediately if already resolved
+        if (this._hasLitefinServerPlugin !== null) {
+            return this._hasLitefinServerPlugin;
+        }
+
+        // 2. Return active probe promise to prevent duplicate concurrent probes
+        if (this._litefinPluginProbePromise) {
+            return this._litefinPluginProbePromise;
+        }
+
+        this._litefinPluginProbePromise = (async () => {
+            try {
+                // Strategy A: Check admin installed plugins list if already initialized
+                try {
+                    const { serverPluginClient } = await import('../plugins/ServerPluginClient.js');
+                    if (
+                        serverPluginClient &&
+                        typeof serverPluginClient.isInitialized === 'function' &&
+                        serverPluginClient.isInitialized()
+                    ) {
+                        if (force) {
+                            serverPluginClient.reset();
+                        }
+                        const adminList = await serverPluginClient.getInstalledPlugins();
+                        if (Array.isArray(adminList)) {
+                            const match = adminList.some((p) => {
+                                const name = (p.Name || p.name || '').toLowerCase();
+                                const id = (p.Id || p.id || '').toLowerCase();
+                                const matchesName = name.includes('litefin') || id.includes('litefin');
+                                const status = (p.Status || p.status || '').toString().toLowerCase();
+                                const isExplicitlyDisabled =
+                                    status === 'disabled' ||
+                                    status === 'deleted' ||
+                                    status === 'malfunctioned' ||
+                                    status === 'notsupported' ||
+                                    status === 'superseded';
+                                const isActive =
+                                    !isExplicitlyDisabled && (!status || status === 'active' || status === 'restart');
+                                return matchesName && isActive;
+                            });
+                            this._hasLitefinServerPlugin = match;
+                            log.info(
+                                `Litefin server companion plugin ${match ? 'detected & active' : 'not present or disabled'} via admin registry`
+                            );
+                            return match;
+                        }
+                    }
+                } catch (_) {
+                    // Ignore and proceed to probe fallback
+                }
+
+                // Strategy B: Lightweight silent probe to /Litefin/Hero
+                log.debug('Probing Litefin server companion plugin presence...');
+                const probeResult = await this.get('/Litefin/Hero', { limit: 1 }, { silent: true, warnOnError: true });
+                this._hasLitefinServerPlugin = !!probeResult;
+                log.info('Litefin server companion plugin is installed and accessible');
+                return true;
+            } catch (err) {
+                // 404 indicates the plugin is not installed or disabled on this server
+                if (err.status === 404 || err.message?.includes('Not found') || err.message?.includes('404')) {
+                    log.info(
+                        'Litefin server companion plugin is not installed or disabled — using native Jellyfin routes'
+                    );
+                    this._hasLitefinServerPlugin = false;
+                    return false;
+                }
+                // 403 / 401 indicates endpoint exists on server but user is not authorized
+                if (err.status === 403 || err.status === 401) {
+                    this._hasLitefinServerPlugin = true;
+                    return true;
+                }
+                // Network or unexpected error — return false without permanently caching
+                log.debug('Litefin server plugin probe query unsettled:', err.message || err);
+                return false;
+            } finally {
+                this._litefinPluginProbePromise = null;
+            }
+        })();
+
+        return this._litefinPluginProbePromise;
+    }
+
+    /**
+     * Batch fetch latest items for multiple parent library IDs in a single request.
+     * @param {string[]} parentIds - Array of library parent GUIDs
+     * @param {Object} [params] - Optional parameters (Limit, isPlayed, fields)
+     * @returns {Promise<Object>} Object mapping parentId -> BaseItemDto[]
+     */
+    async getBatchLatest(parentIds = [], params = {}) {
+        if (!parentIds || parentIds.length === 0) return {};
+
+        // Fast-path: Check centralized Litefin server plugin presence
+        const isAvailable = await this.isLitefinPluginAvailable();
+        if (!isAvailable) return null;
+
+        try {
+            return await this.get(
+                '/Litefin/Items/Latest',
+                {
+                    parentIds: parentIds.join(','),
+                    ...params
+                },
+                { warnOnError: true, timeout: 6000 }
+            );
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Batch fetch candidate thumbnail items for multiple parent library IDs in 1 request.
+     * @param {string[]} parentIds - Array of library parent GUIDs
+     * @returns {Promise<Object|null>} Object mapping parentId -> BaseItemDto[]
+     */
+    async getLibraryThumbnails(parentIds = []) {
+        if (!parentIds || parentIds.length === 0) return {};
+
+        // Fast-path: Check centralized Litefin server plugin presence
+        const isAvailable = await this.isLitefinPluginAvailable();
+        if (!isAvailable) return null;
+
+        try {
+            return await this.get(
+                '/Litefin/Items/Thumbnails',
+                {
+                    parentIds: parentIds.join(',')
+                },
+                { warnOnError: true, timeout: 6000 }
+            );
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Fetch curated Hero Carousel items (Movies & Series with backdrops) in a single optimized request.
+     * @param {Object} [params] - Optional query parameters (limit, ignoreWatched)
+     * @returns {Promise<Object|null>} QueryResult object with Items array or null on fallback
+     */
+    async getHomeHero(params = {}) {
+        // Fast-path: Check centralized Litefin server plugin presence
+        const isAvailable = await this.isLitefinPluginAvailable();
+        if (!isAvailable) return null;
+
+        try {
+            return await this.get('/Litefin/Hero', params, { warnOnError: true });
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get next up episodes
+     */
+    async getNextUp(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            Limit: 24,
+            Fields: 'Overview,RunTimeTicks,CommunityRating,PremiereDate,IndexNumber,ParentIndexNumber,SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,MediaSources,MediaStreams,Width,Height,UserData',
+            ImageTypeLimit: 1,
+            EnableImageTypes: 'Primary,Backdrop,Thumb'
+        };
+
+        return this.get('/Shows/NextUp', { ...defaults, ...params });
+    }
+
+    /**
+     * Get merged continue watching and next up items from the Litefin plugin on the server.
+     * This calls the custom Litefin plugin controller to return a pre-merged deduplicated list.
+     *
+     * @param {Object} [params] - Query parameters such as limit
+     * @returns {Promise<Object>} Object containing the merged items list
+     */
+    async getMergedRows(params = {}) {
+        // Fast-path: Check centralized Litefin server plugin presence
+        const isAvailable = await this.isLitefinPluginAvailable();
+        if (!isAvailable) return null;
+
+        // Query the custom plugin controller route directly on the server
+        return this.get('/Litefin/MergedRows/ContinueAndNextUp', params);
+    }
+
+    /**
+     * Get upcoming episodes for a library
+     */
+    async getUpcoming(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            Limit: 48,
+            Fields: 'AirTime',
+            ImageTypeLimit: 1,
+            EnableImageTypes: 'Primary,Backdrop,Banner,Thumb',
+            EnableTotalRecordCount: false
+        };
+
+        return this.get('/Shows/Upcoming', { ...defaults, ...params });
+    }
+
+    /**
+     * Get studios/networks for a library
+     */
+    async getStudios(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            IncludeItemTypes: 'Series',
+            Recursive: true,
+            Fields: 'DateCreated'
+        };
+
+        return this.get(`/Studios`, { ...defaults, ...params });
+    }
+
+    // ========================================================================
+    // Item Endpoints
+    // ========================================================================
+
+    /**
+     * Get a single item by ID with user-specific data (playback state, etc.).
+     *
+     * JF12+ canonical: GET /Items/{itemId}?userId=...
+     * Legacy (pre-12):  GET /Users/{userId}/Items/{itemId}
+     *
+     * @param {string} itemId - The Jellyfin item GUID
+     * @param {Object} [params] - Additional query parameters
+     * @param {Object} [options] - Network request options
+     */
+    async getItem(itemId, params = {}, options = {}) {
+        if (this.isJF12Plus()) {
+            // New JF12 form — userId is a query param on the non-user route
+            return this.get(`/Items/${itemId}`, { userId: this._userId, ...params }, options);
+        }
+        // Legacy path for JF 10.10 / 10.11
+        return this.get(`/Users/${this._userId}/Items/${itemId}`, params, options);
+    }
+
+    /**
+     * Update item metadata
+     * @param {Object} item - Item object containing the Id and fields to update
+     * @returns {Promise<any>} Result of the update
+     */
+    async updateItem(item) {
+        // Jellyfin metadata update endpoint is POST /Items/{Id}
+        return this.post(`/Items/${item.Id}`, item);
+    }
+
+    /**
+     * Get pre-roll intro items for a given media item.
+     *
+     * JF12+ canonical: GET /Items/{itemId}/Intros?userId=...
+     * Legacy (pre-12):  GET /Users/{userId}/Items/{itemId}/Intros
+     *
+     * @param {string} itemId - The target media item ID
+     * @returns {Promise<Object>} Object containing Items array and TotalRecordCount
+     */
+    async getIntros(itemId) {
+        if (this.isJF12Plus()) {
+            return this.get(`/Items/${itemId}/Intros`, { userId: this._userId });
+        }
+        return this.get(`/Users/${this._userId}/Items/${itemId}/Intros`);
+    }
+
+    /**
+     * Get local trailers for an item.
+     *
+     * Jellyfin stores locally-managed trailers as full BaseItemDto objects,
+     * each with their own Id — so they can be played directly through the
+     * normal JellyfinPlayer.play({ itemId }) pipeline without any special casing.
+     *
+     * JF12+ canonical: GET /Items/{itemId}/LocalTrailers?userId=...
+     * Legacy (pre-12):  GET /Users/{userId}/Items/{itemId}/LocalTrailers
+     *
+     * @param {string} itemId - The parent item's ID
+     * @returns {Promise<BaseItemDto[]>} Array of trailer items (may be empty)
+     */
+    async getLocalTrailers(itemId) {
+        if (this.isJF12Plus()) {
+            return this.get(`/Items/${itemId}/LocalTrailers`, { userId: this._userId });
+        }
+        return this.get(`/Users/${this._userId}/Items/${itemId}/LocalTrailers`);
+    }
+
+    /**
+     * Get special features (extras) for an item.
+     * Includes trailers, featurettes, behind the scenes, etc.
+     *
+     * JF12+ canonical: GET /Items/{itemId}/SpecialFeatures?userId=...
+     * Legacy (pre-12):  GET /Users/{userId}/Items/{itemId}/SpecialFeatures
+     *
+     * @param {string} itemId - The parent item's ID
+     * @returns {Promise<BaseItemDto[]>} Array of special feature items
+     */
+    async getSpecialFeatures(itemId) {
+        if (this.isJF12Plus()) {
+            return this.get(`/Items/${itemId}/SpecialFeatures`, { userId: this._userId });
+        }
+        return this.get(`/Users/${this._userId}/Items/${itemId}/SpecialFeatures`);
+    }
+
+    /**
+     * Fetch additional video parts for multi-part video items (e.g. Part 2, Part 3 of a multi-disc movie).
+     * Jellyfin server endpoint: GET /Videos/{itemId}/AdditionalParts
+     *
+     * @param {string} itemId - The primary video item ID
+     * @returns {Promise<Object>} Paginated query result containing additional part items
+     */
+    async getAdditionalParts(itemId) {
+        /*
+         * Multi-part items in Jellyfin allow split video files (e.g., Lord of the Rings Disc 1 & Disc 2)
+         * to be grouped under a single library entry while preserving individual stream files.
+         */
+        return this.get(`/Videos/${itemId}/AdditionalParts`, {
+            UserId: this._userId
+        });
+    }
+
+    /**
+     * Get items inside a server-managed Playlist.
+     *
+     * We use the dedicated /Playlists/{id}/Items endpoint rather than the
+     * generic /Items endpoint because:
+     *   - It preserves the user-defined server ordering of playlist items.
+     *   - It returns a PlaylistItemId on each entry, required by SyncPlay's
+     *     stamping mechanism to identify queue slots across sessions.
+     *
+     * @param {string} playlistId - Playlist container item ID
+     * @param {Object} [params]   - Extra query params (e.g. Limit, Fields)
+     * @param {Object} [options]  - Request options
+     * @returns {Promise<Object>} Standard paginated Items response { Items, TotalRecordCount }
+     */
+    async getPlaylistItems(playlistId, params = {}, options = {}) {
+        // Protect callers against playlist-level permission denials causing global session eviction
+        const requestOptions = {
+            suppressUnauthorized: true,
+            warnOnError: true,
+            ...options
+        };
+
+        return this.get(
+            `/Playlists/${playlistId}/Items`,
+            {
+                UserId: this._userId,
+                Fields: 'UserData,RunTimeTicks',
+                EnableImageTypes: 'Primary,Backdrop,Thumb',
+                ...params
+            },
+            requestOptions
+        );
+    }
+
+    /**
+     * Create a new playlist and optionally add items to it.
+     * POST /Playlists
+     * @param {string} name     - Playlist name
+     * @param {boolean} isPublic - Whether the playlist is publicly visible
+     * @param {string[]} itemIds - Item IDs to add to the new playlist
+     * @returns {Promise<Object>} Created playlist object with Id
+     */
+    async createPlaylist(name, isPublic, itemIds) {
+        return this.post('/Playlists', {
+            Name: name,
+            IsPublic: isPublic,
+            Ids: itemIds,
+            UserId: this._userId
+        });
+    }
+
+    /**
+     * Add one or more items to an existing playlist.
+     * POST /Playlists/{playlistId}/Items?ids=...
+     * @param {string} playlistId - Target playlist ID
+     * @param {string[]} itemIds  - Item IDs to add
+     * @returns {Promise<void>}
+     */
+    async addToPlaylist(playlistId, itemIds) {
+        const qs = itemIds.map((id) => `Ids=${encodeURIComponent(id)}`).join('&');
+        return this.post(`/Playlists/${playlistId}/Items?${qs}&UserId=${encodeURIComponent(this._userId)}`);
+    }
+
+    /**
+     * Create a new collection (BoxSet) and optionally add items to it.
+     * POST /Collections?userId=...&name=...&ids=...
+     * @param {string} name     - Collection name
+     * @param {string[]} itemIds - Item IDs to add to the new collection
+     * @returns {Promise<Object>} Created collection object with Id
+     */
+    async createCollection(name, itemIds) {
+        const qs = itemIds.map((id) => `Ids=${encodeURIComponent(id)}`).join('&');
+        return this.post(
+            `/Collections?UserId=${encodeURIComponent(this._userId)}&Name=${encodeURIComponent(name)}&${qs}`
+        );
+    }
+
+    /**
+     * Add one or more items to an existing collection (BoxSet).
+     * POST /Collections/{collectionId}/Items?ids=...
+     * @param {string} collectionId - Target collection ID
+     * @param {string[]} itemIds    - Item IDs to add
+     * @returns {Promise<void>}
+     */
+    async addToCollection(collectionId, itemIds) {
+        const qs = itemIds.map((id) => `Ids=${encodeURIComponent(id)}`).join('&');
+        return this.post(`/Collections/${collectionId}/Items?${qs}&UserId=${encodeURIComponent(this._userId)}`);
+    }
+
+    /**
+     * Gets the collections that include the specified item.
+     * Tries the native Jellyfin endpoint (/Items/{itemId}/Collections) first.
+     * If the server returns a 404 (meaning it's an older server like 10.11),
+     * it falls back to the custom Litefin plugin endpoint (/Litefin/Items/{itemId}/Collections).
+     *
+     * @param {string} itemId - The target item ID
+     * @param {Object} [params] - Query parameters such as Fields, StartIndex, Limit
+     * @returns {Promise<Object>} collections query result
+     */
+    async getItemCollections(itemId, params = {}) {
+        const defaults = {
+            userId: this._userId
+        };
+
+        try {
+            // Attempt to fetch from native Jellyfin endpoint (available in newer servers)
+            return await this.get(`/Items/${itemId}/Collections`, { ...defaults, ...params }, { warnOnError: true });
+        } catch (err) {
+            // Fall back to the Litefin plugin endpoint if the native route is not found and plugin is verified present
+            if (err.status === 404 || err.message?.includes('Not found')) {
+                const isAvailable = await this.isLitefinPluginAvailable();
+                if (isAvailable) {
+                    log.debug(`Native Collections endpoint not found for item ${itemId}, attempting Litefin fallback`);
+                    try {
+                        return await this.get(
+                            `/Litefin/Items/${itemId}/Collections`,
+                            { ...defaults, ...params },
+                            { warnOnError: true }
+                        );
+                    } catch (fallbackErr) {
+                        return { Items: [] };
+                    }
+                }
+            }
+            // A 400 Bad Request simply means the item is not part of any collection on this server version
+            return { Items: [] };
+        }
+    }
+
+    async getSimilar(itemId, params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            Limit: 12
+        };
+
+        return this.get(`/Items/${itemId}/Similar`, { ...defaults, ...params });
+    }
+
+    async getSeasons(seriesId) {
+        return this.get(`/Shows/${seriesId}/Seasons`, {
+            UserId: this._userId
+        });
+    }
+
+    async getEpisodes(seriesId, params = {}) {
+        // Flexible params — pass SeasonId, StartItemId, Limit, etc.
+        // Omit SeasonId to get episodes across all seasons (cross-season navigation)
+        return this.get(`/Shows/${seriesId}/Episodes`, {
+            UserId: this._userId,
+            Fields: 'Overview,RunTimeTicks,Chapters,MediaSources,MediaStreams,Width,Height,UserData',
+            IsVirtualUnaired: false,
+            IsMissing: false,
+            Limit: 100,
+            ...params
+        });
+    }
+
+    async getPeople(itemId) {
+        return this.get(`/Items/${itemId}/People`, {
+            UserId: this._userId,
+            Limit: 24
+        });
+    }
+
+    async getPerson(personId) {
+        return this.getItem(personId);
+    }
+
+    async getPersonItems(personId) {
+        // Check centralized Litefin server companion plugin presence before attempting optimized endpoint
+        const isAvailable = await this.isLitefinPluginAvailable();
+        if (isAvailable) {
+            try {
+                return await this.get(`/Litefin/Persons/${personId}/Items`, { limit: 100 }, { warnOnError: true });
+            } catch (err) {
+                // Fallback to standard Jellyfin endpoint if plugin request fails
+            }
+        }
+
+        // Fallback to standard Jellyfin items endpoint.
+        // JF12+ canonical: GET /Items?UserId=...&PersonIds=...
+        // Legacy (pre-12):  GET /Users/{userId}/Items?PersonIds=...
+        const fallbackParams = {
+            PersonIds: personId,
+            IncludeItemTypes: 'Movie,Series,Episode',
+            Recursive: true,
+            Limit: 500,
+            Fields: 'ProductionYear,ParentIndexNumber,IndexNumber,SeriesName',
+            SortBy: 'PremiereDate',
+            SortOrder: 'Descending'
+        };
+        if (this.isJF12Plus()) {
+            return this.get('/Items', { UserId: this._userId, ...fallbackParams });
+        }
+        return this.get(`/Users/${this._userId}/Items`, fallbackParams);
+    }
+
+    // Separate call to get items with People field (for character roles).
+    // JF12+ canonical: GET /Items?UserId=...&PersonIds=...
+    // Legacy (pre-12):  GET /Users/{userId}/Items?PersonIds=...
+    async getPersonItemsWithRoles(personId) {
+        const params = {
+            PersonIds: personId,
+            IncludeItemTypes: 'Movie,Series',
+            Recursive: true,
+            Limit: 200,
+            Fields: 'People'
+        };
+        if (this.isJF12Plus()) {
+            return this.get('/Items', { UserId: this._userId, ...params });
+        }
+        return this.get(`/Users/${this._userId}/Items`, params);
+    }
+
+    // ========================================================================
+    // Music Endpoints
+    // ========================================================================
+
+    /**
+     * Get lyrics for an audio item.
+     * @param {string} itemId - The audio item ID
+     * @returns {Promise<any>} Lyrics data
+     */
+    async getLyrics(itemId) {
+        return this.get(`/Audio/${itemId}/Lyrics`);
+    }
+
+    /**
+     * Get all album artists in the library.
+     *
+     * In Jellyfin 10.x, 11.x, and 12.x+, the dedicated endpoint for album artists is:
+     * GET /Artists/AlbumArtists
+     *
+     * In ArtistsController.cs on Jellyfin 12, GetAlbumArtists remains fully active,
+     * delegating directly to LibraryManager.GetAlbumArtists() on the music repository.
+     * The /Persons endpoint only queries the video Peoples table and does not return
+     * music library artists.
+     *
+     * @param {Object} [params] - Additional query params (Limit, ParentId, etc.)
+     * @returns {Promise<any>}
+     */
+    async getAlbumArtists(params = {}) {
+        // Configure standard query defaults for album artists
+        const defaults = {
+            UserId: this._userId,
+            Recursive: true,
+            Fields: 'ItemCounts',
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            EnableTotalRecordCount: true
+        };
+
+        // Execute request to the dedicated /Artists/AlbumArtists endpoint
+        return this.get('/Artists/AlbumArtists', { ...defaults, ...params });
+    }
+
+    /**
+     * Get all music artists in the library.
+     *
+     * In Jellyfin 10.x, 11.x, and 12.x+, the dedicated endpoint for music artists is:
+     * GET /Artists
+     *
+     * In ArtistsController.cs on Jellyfin 12, GetArtists remains fully active,
+     * querying LibraryManager.GetArtists() to return MusicArtist items with counts.
+     * Official clients (including jellyfin-web) query this endpoint for music artists.
+     *
+     * @param {Object} [params] - Additional query params
+     * @returns {Promise<any>}
+     */
+    async getMusicArtists(params = {}) {
+        // Configure standard query defaults for music artists
+        const defaults = {
+            UserId: this._userId,
+            Recursive: true,
+            Fields: 'ItemCounts',
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            EnableTotalRecordCount: true
+        };
+
+        // Execute request to the dedicated /Artists endpoint
+        return this.get('/Artists', { ...defaults, ...params });
+    }
+
+    async getResumeAudio(params = {}) {
+        const defaults = {
+            Limit: 20,
+            Recursive: true,
+            Fields: 'ParentThumbImageTag',
+            ImageTypeLimit: 1,
+            EnableImageTypes: 'Primary,Backdrop,Thumb',
+            EnableTotalRecordCount: false,
+            MediaTypes: 'Audio' // Only fetch Audio items
+        };
+
+        /*
+         * JF12+ canonical: GET /UserItems/Resume?userId=...
+         * Legacy (pre-12):  GET /Users/{userId}/Items/Resume
+         */
+        if (this.isJF12Plus()) {
+            return this.get('/UserItems/Resume', { UserId: this._userId, ...defaults, ...params });
+        }
+        return this.get(`/Users/${this._userId}/Items/Resume`, { ...defaults, ...params });
+    }
+
+    // ========================================================================
+    // Genre Endpoints
+    // ========================================================================
+
+    async getGenres(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            Recursive: true,
+            Fields: 'ItemCounts',
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            EnableTotalRecordCount: false
+        };
+
+        return this.get('/Genres', { ...defaults, ...params });
+    }
+
+    async getMusicGenres(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            Recursive: true,
+            Fields: 'ItemCounts',
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            EnableTotalRecordCount: false
+        };
+
+        return this.get('/MusicGenres', { ...defaults, ...params });
+    }
+
+    /**
+     * Get query filters from the modern Jellyfin 12+ Filters2 endpoint.
+     * Returns AudioLanguages, SubtitleLanguages, Tags, and Genres with IDs.
+     *
+     * @param {Object} [params] - Query parameters (e.g. ParentId, IncludeItemTypes, Recursive)
+     * @returns {Promise<Object>} Object with Genres, Tags, AudioLanguages, SubtitleLanguages
+     */
+    async getItemFilters2(params = {}) {
+        // Build base query parameters
+        const defaults = {
+            UserId: this._userId,
+            Recursive: true
+        };
+
+        // Forward request directly to the JF12 Filters2 endpoint
+        return this.get('/Items/Filters2', { ...defaults, ...params });
+    }
+
+    /**
+     * Get query filters for library browsing.
+     *
+     * On Jellyfin 12+, this method combines results from both the legacy
+     * /Items/Filters endpoint (which still provides OfficialRatings and Years)
+     * and the modern /Items/Filters2 endpoint (which provides AudioLanguages,
+     * SubtitleLanguages, and Genres with IDs).
+     *
+     * On older servers (<12), it seamlessly falls back to /Items/Filters only.
+     *
+     * @param {Object} [params] - Query parameters (ParentId, IncludeItemTypes, etc.)
+     * @returns {Promise<Object>} Combined filters object
+     */
+    async getItemFilters(params = {}) {
+        // Base defaults required by both filter endpoints
+        const defaults = {
+            UserId: this._userId,
+            Recursive: true
+        };
+
+        // ------------------------------------------------------------------
+        // Jellyfin 12+ Combined Filter Fetching:
+        // /Items/Filters provides: OfficialRatings, Years, Genres, Tags
+        // /Items/Filters2 provides: AudioLanguages, SubtitleLanguages, Genres (with IDs), Tags
+        // Running both queries concurrently provides a rich filter set without any breaking changes.
+        // ------------------------------------------------------------------
+        if (this.isJF12Plus()) {
+            try {
+                // Execute both requests in parallel using allSettled to ensure resilience
+                const [legacyRes, v2Res] = await Promise.allSettled([
+                    this.get('/Items/Filters', { ...defaults, ...params }),
+                    this.getItemFilters2(params)
+                ]);
+
+                // Safely unpack responses from both filter queries
+                const legacy = legacyRes.status === 'fulfilled' && legacyRes.value ? legacyRes.value : {};
+                const v2 = v2Res.status === 'fulfilled' && v2Res.value ? v2Res.value : {};
+
+                // ------------------------------------------------------------------
+                // Extract clean genre name strings from both v2 (NameGuidPair) and legacy (string)
+                // Using clean names ensures uniform filtering across Jellyfin 10.x through 12.0+
+                // ------------------------------------------------------------------
+                const v2GenreNames = Array.isArray(v2.Genres)
+                    ? v2.Genres.map((g) => (typeof g === 'object' && g ? g.Name || g.name || '' : g)).filter(Boolean)
+                    : [];
+                const legacyGenreNames = Array.isArray(legacy.Genres)
+                    ? legacy.Genres.map((g) => (typeof g === 'object' && g ? g.Name || g.name || '' : g)).filter(
+                          Boolean
+                      )
+                    : [];
+
+                // Deduplicate genres while preserving encounter order
+                const combinedGenres = Array.from(new Set([...legacyGenreNames, ...v2GenreNames]));
+
+                // Deduplicate tag names from both legacy and modern sources
+                const v2Tags = Array.isArray(v2.Tags) ? v2.Tags : [];
+                const legacyTags = Array.isArray(legacy.Tags) ? legacy.Tags : [];
+                const combinedTags = Array.from(new Set([...legacyTags, ...v2Tags]));
+
+                // Return combined, normalized filter structure
+                return {
+                    // List of genre names ready for UI display and pipe-delimited item queries
+                    Genres: combinedGenres.length > 0 ? combinedGenres : legacy.Genres || [],
+                    // Deduplicated tags available across items in the library
+                    Tags: combinedTags.length > 0 ? combinedTags : legacy.Tags || [],
+                    // Ratings and Years only exist on the legacy endpoint
+                    OfficialRatings: legacy.OfficialRatings || [],
+                    Years: legacy.Years || [],
+                    // Audio and Subtitle language arrays from JF12 Filters2
+                    AudioLanguages: v2.AudioLanguages || [],
+                    SubtitleLanguages: v2.SubtitleLanguages || []
+                };
+            } catch (err) {
+                // Log and gracefully fall through to legacy if anything unexpected occurs
+                log.warn('Failed to load combined filters on JF12+, falling back to legacy endpoint:', err);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Pre-JF12 Legacy Route Fallback:
+        // Query the standard /Items/Filters endpoint
+        // ------------------------------------------------------------------
+        return this.get('/Items/Filters', { ...defaults, ...params });
+    }
+
+    // ========================================================================
+    // Search Endpoints
+    // ========================================================================
+
+    async search(query, params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            SearchTerm: query,
+            IncludeItemTypes: 'Movie,Series,Episode,BoxSet',
+            Limit: 24,
+            Recursive: true,
+            EnableTotalRecordCount: false,
+            MediaTypes: null
+        };
+
+        return this.get('/Items', { ...defaults, ...params });
+    }
+
+    /**
+     * Global search using the specialized Search Hints endpoint.
+     * This matches Jellyfin-web behavior and finds Artists more accurately.
+     * @param {string} query
+     * @param {Object} [params]
+     * @returns {Promise<any>}
+     */
+    async searchHints(query, params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            searchTerm: query,
+            IncludeItemTypes: 'Movie,Series,Episode,BoxSet,MusicArtist,Artist,MusicAlbum,Audio',
+            Limit: 50,
+            Recursive: true
+        };
+
+        return this.get('/Search/Hints', { ...defaults, ...params });
+    }
+
+    /**
+     * Get favorite artists using the dedicated /Artists endpoint.
+     * The /Items endpoint with IncludeItemTypes=MusicArtist doesn't properly
+     * support the IsFavorite filter. /Artists does.
+     * @param {Object} [params] - Additional query params
+     * @returns {Promise<any>}
+     */
+    async getFavoriteArtists(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            Filters: 'IsFavorite',
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            Limit: 50,
+            Fields: 'ProductionYear'
+        };
+
+        return this.get('/Artists', { ...defaults, ...params });
+    }
+
+    /**
+     * Get all albums for an artist by their ID.
+     * @param {string} artistId - The artist item ID
+     * @param {Object} [params] - Additional query params
+     * @returns {Promise<any>}
+     */
+    async getArtistAlbums(artistId, params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            ArtistIds: artistId,
+            IncludeItemTypes: 'MusicAlbum',
+            SortBy: 'ProductionYear,SortName',
+            SortOrder: 'Descending',
+            Recursive: true,
+            Limit: 12,
+            Fields: 'ProductionYear,AlbumArtist,Artists'
+        };
+
+        return this.get('/Items', { ...defaults, ...params });
+    }
+
+    /**
+     * Get all songs for an artist by their ID.
+     * @param {string} artistId - The artist item ID
+     * @param {Object} [params] - Additional query params
+     * @returns {Promise<any>}
+     */
+    async getArtistSongs(artistId, params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            ArtistIds: artistId,
+            IncludeItemTypes: 'Audio',
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            Recursive: true,
+            Limit: 12,
+            Fields: 'ProductionYear,AlbumArtist,Artists,RunTimeTicks'
+        };
+
+        return this.get('/Items', { ...defaults, ...params });
+    }
+
+    async searchPeople(query, params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            SearchTerm: query,
+            Limit: 24,
+            Recursive: true,
+            EnableTotalRecordCount: false
+        };
+
+        return this.get('/Persons', { ...defaults, ...params });
+    }
+
+    /**
+     * Refresh metadata for an item
+     * @param {string} itemId - Item ID
+     * @param {Object} [options] - Refresh options
+     * @returns {Promise<any>} Response
+     */
+    async refreshItem(itemId, options = {}) {
+        const defaults = {
+            Recursive: true,
+            MetadataRefreshMode: 'Default',
+            ImageRefreshMode: 'Default',
+            ReplaceAllMetadata: false,
+            ReplaceAllImages: false
+        };
+
+        return this.post(`/Items/${itemId}/Refresh`, null, {
+            params: { ...defaults, ...options }
+        });
+    }
+
+    // ========================================================================
+    // Subtitle Endpoints
+    // ========================================================================
+
+    /**
+     * Search for remote subtitles on the server's installed provider plugins.
+     * The server aggregates results from all installed subtitle plugins (e.g. OpenSubtitles)
+     * and returns them — the client needs no awareness of which providers are installed.
+     *
+     * GET /Items/{itemId}/RemoteSearch/Subtitles/{language}
+     *
+     * @param {string} itemId   - The Jellyfin item ID
+     * @param {string} language - Three-letter ISO 639-2 language code (e.g. "eng", "fre")
+     * @returns {Promise<Array>} Array of remote subtitle result objects
+     */
+    async searchSubtitles(itemId, language) {
+        return this.get(`/Items/${itemId}/RemoteSearch/Subtitles/${language}`);
+    }
+
+    /**
+     * Trigger a server-side download of a remote subtitle result.
+     * The server downloads the file from the provider and attaches it to the item.
+     *
+     * POST /Items/{itemId}/RemoteSearch/Subtitles/{subtitleId}
+     *
+     * @param {string} itemId      - The Jellyfin item ID
+     * @param {string} subtitleId  - The provider result ID (from searchSubtitles response)
+     * @returns {Promise<null>}
+     */
+    async downloadSubtitle(itemId, subtitleId) {
+        return this.post(`/Items/${itemId}/RemoteSearch/Subtitles/${subtitleId}`);
+    }
+
+    /**
+     * Delete a local subtitle track (external .srt/.ass/etc. files only —
+     * embedded internal subtitle streams cannot be deleted via this endpoint).
+     *
+     * DELETE /Videos/{itemId}/Subtitles/{index}
+     *
+     * @param {string} itemId - The Jellyfin item ID
+     * @param {number} index  - The MediaStream index of the subtitle track
+     * @returns {Promise<null>}
+     */
+    async deleteSubtitle(itemId, index) {
+        return this.delete(`/Videos/${itemId}/Subtitles/${index}`);
+    }
+
+    // ========================================================================
+    // Image URLs
+    // ========================================================================
+
+    getImageUrl(itemId, imageType = 'Primary', options = {}) {
+        // Create parameter builder for Jellyfin image query string
+        const params = new URLSearchParams();
+
+        // Map max constraints
+        if (options.maxWidth) params.append('maxWidth', options.maxWidth);
+        if (options.maxHeight) params.append('maxHeight', options.maxHeight);
+
+        // Map fill constraints (contain style aspect preservation)
+        if (options.fillWidth) params.append('fillWidth', options.fillWidth);
+        if (options.fillHeight) params.append('fillHeight', options.fillHeight);
+
+        // Map quality and unique content tags
+        if (options.quality) params.append('quality', options.quality);
+        if (options.tag) params.append('tag', options.tag);
+
+        /*
+         * Include session token in image queries when authenticated.
+         * Browsers and native web views cannot inject custom authorization headers
+         * (such as 'Authorization: MediaBrowser ...') into standard HTML <img> element
+         * requests. Supplying the session token as a query parameter guarantees that
+         * servers enforcing strict media authorization can authenticate the image request.
+         */
+        if (this._accessToken) {
+            const authKey = this.isEmby() ? 'api_key' : 'ApiKey';
+            params.append(authKey, this._accessToken);
+        }
+
+        // Compile query string and final endpoint URL reference
+        const queryString = params.toString();
+        const path = `/Items/${itemId}/Images/${imageType}`;
+
+        return this.buildUrl(queryString ? `${path}?${queryString}` : path);
+    }
+
+    getUserImageUrl(userId, options = {}) {
+        // Create parameter builder for user profile image
+        const params = new URLSearchParams();
+
+        // Map max constraints
+        if (options.maxWidth) params.append('maxWidth', options.maxWidth);
+        if (options.maxHeight) params.append('maxHeight', options.maxHeight);
+
+        // Map fill constraints (contain style aspect preservation)
+        if (options.fillWidth) params.append('fillWidth', options.fillWidth);
+        if (options.fillHeight) params.append('fillHeight', options.fillHeight);
+
+        // Map quality settings
+        if (options.quality) params.append('quality', options.quality);
+
+        /*
+         * Include session token for user avatar requests when available,
+         * ensuring user profile avatars load under cross-origin environments.
+         */
+        if (this._accessToken) {
+            const authKey = this.isEmby() ? 'api_key' : 'ApiKey';
+            params.append(authKey, this._accessToken);
+        }
+
+        // Compile query string and final user endpoint URL reference
+        const queryString = params.toString();
+        const path = `/Users/${userId}/Images/Primary`;
+
+        return this.buildUrl(queryString ? `${path}?${queryString}` : path);
+    }
+
+    /**
+     * ========================================================================
+     * Theme Media Queries
+     * ========================================================================
+     * Fetches background theme songs or theme videos configured for a given show,
+     * season, or episode. Under the hood, this queries the Jellyfin server's
+     * library controller endpoint.
+     *
+     * @param {string} itemId - The Jellyfin item ID (Movie, Series, Season, etc.)
+     * @param {Object} [params] - Optional custom query parameters to override defaults
+     * @returns {Promise<Object>} The AllThemeMediaResult object containing items
+     */
+    async getThemeMedia(itemId, params = {}) {
+        // Build robust defaults matching standard web client configurations.
+        // InheritFromParent=true guarantees that if we visit a Season or Episode
+        // page, it falls back to the parent Show's theme song if defined.
+        const defaults = {
+            UserId: this._userId,
+            InheritFromParent: true
+        };
+
+        // Dispatch the standard GET request to retrieve theme media lists
+        return this.get(`/Items/${itemId}/ThemeMedia`, { ...defaults, ...params });
+    }
+
+    /**
+     * ========================================================================
+     * Authorized Audio Stream URL Generator
+     * ========================================================================
+     * Compiles a direct streaming URL for a specific audio item on the server.
+     * Appends the active session token to the query parameters since the native
+     * HTML5 Audio element cannot pass custom request authorization headers.
+     *
+     * @param {string} itemId - The target audio/song item ID
+     * @returns {string} The fully compiled direct stream URL
+     */
+    getAudioStreamUrl(itemId) {
+        // Capture active auth token from memory
+        const token = this._accessToken;
+
+        // Define direct media path on the server, asking for static playback
+        // to bypass redundant transcoding whenever possible on the TV client.
+        const path = `/Audio/${itemId}/stream?static=true`;
+
+        /*
+         * Select the query param authentication key dynamically based on server.
+         * Emby does not recognize 'ApiKey' and requires the lowercase 'api_key'.
+         * Jellyfin prefers the camelCase 'ApiKey' parameter name.
+         */
+        const authKey = this.isEmby() ? 'api_key' : 'ApiKey';
+
+        // Use the selected parameter key to authorize native browser fetch
+        return this.buildUrl(token ? `${path}&${authKey}=${token}` : path);
+    }
+
+    // ========================================================================
+    // Playback Endpoints
+    // ========================================================================
+
+    async getPlaybackInfo(itemId, deviceProfile, options = {}) {
+        const defaults = {
+            UserId: this._userId,
+            DeviceProfile: deviceProfile,
+            AutoOpenLiveStream: true
+        };
+        return this.post(`/Items/${itemId}/PlaybackInfo`, { ...defaults, ...options });
+    }
+
+    // ========================================================================
+    // Live TV Endpoints
+    // ========================================================================
+
+    async getLiveTvChannels(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            EnableUserData: true,
+            Fields: 'CanSelfRecord',
+            EnableTotalRecordCount: false
+        };
+        return this.get('/LiveTv/Channels', { ...defaults, ...params });
+    }
+
+    async getLiveTvPrograms(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            EnableUserData: true,
+            Fields: 'CanSelfRecord',
+            EnableTotalRecordCount: false
+        };
+        return this.get('/LiveTv/Programs', { ...defaults, ...params });
+    }
+
+    async getLiveTvRecommendedPrograms(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            IsAiring: true,
+            EnableUserData: true,
+            Fields: 'CanSelfRecord',
+            EnableTotalRecordCount: false,
+            Limit: 24
+        };
+        return this.get('/LiveTv/Programs/Recommended', { ...defaults, ...params });
+    }
+
+    async getLiveTvRecordings(params = {}) {
+        const defaults = {
+            UserId: this._userId,
+            Fields: 'CanSelfRecord,Status',
+            EnableTotalRecordCount: false
+        };
+        return this.get('/LiveTv/Recordings', { ...defaults, ...params });
+    }
+
+    async getLiveTvRecording(recordingId) {
+        return this.get(`/LiveTv/Recordings/${recordingId}`, { UserId: this._userId });
+    }
+
+    async getNewTimerDefaults(params = {}) {
+        return this.get('/LiveTv/Timers/Defaults', params);
+    }
+
+    async createTimer(timer) {
+        return this.post('/LiveTv/Timers', timer);
+    }
+
+    async cancelTimer(timerId) {
+        return this.delete(`/LiveTv/Timers/${timerId}`);
+    }
+
+    async getSeriesTimers(params = {}) {
+        return this.get('/LiveTv/SeriesTimers', params);
+    }
+
+    async getSeriesTimer(timerId) {
+        return this.get(`/LiveTv/SeriesTimers/${timerId}`);
+    }
+
+    async createSeriesTimer(timer) {
+        return this.post('/LiveTv/SeriesTimers', timer);
+    }
+
+    async cancelSeriesTimer(timerId) {
+        return this.delete(`/LiveTv/SeriesTimers/${timerId}`);
+    }
+
+    /**
+     * Open a live stream for a channel.
+     * This is required before playback of any Live TV channel.
+     * @param {Object} options - Playback options
+     * @returns {Promise<Object>} Live stream result with MediaSource
+     */
+    async openLiveStream(options) {
+        const body = {
+            DeviceProfile: options.DeviceProfile,
+            UserId: this._userId,
+            OpenToken: options.OpenToken,
+            PlaySessionId: options.PlaySessionId || Math.random().toString(36).substring(2, 15),
+            MaxStreamingBitrate: options.MaxStreamingBitrate,
+            StartTimeTicks: options.StartTimeTicks,
+            AudioStreamIndex: options.AudioStreamIndex,
+            SubtitleStreamIndex: options.SubtitleStreamIndex,
+            DirectPlayProtocols: options.DirectPlayProtocols,
+            EnableDirectPlay: options.EnableDirectPlay,
+            EnableDirectStream: options.EnableDirectStream,
+            ItemId: options.ItemId
+        };
+
+        const url = options.ItemId ? `/LiveStreams/Open?ItemId=${options.ItemId}` : '/LiveStreams/Open';
+
+        return this.post(url, body);
+    }
+
+    /**
+     * Close an active live stream.
+     * @param {string} liveStreamId - The ID returned by openLiveStream
+     */
+    async closeLiveStream(liveStreamId) {
+        return this.post('/LiveStreams/Close', null, { params: { liveStreamId } });
+    }
+
+    /**
+     * Report device capabilities to the server
+     * CRITICAL: Must be called after login to establish session
+     * Without this, the server won't track playback status.
+     * Includes in-flight deduplication to avoid firing duplicate 15KB payloads
+     * when platform adapters and auth initialization handshake concurrently.
+     *
+     * @param {Object} capabilities - Device/app capabilities
+     * @returns {Promise<any>}
+     */
+    async reportCapabilities(capabilities) {
+        /*
+         * Deduplicate rapid back-to-back capability reporting. On TV platforms,
+         * hardware detection and session restoration run in parallel and both
+         * attempt to report capabilities within ~500ms of each other.
+         */
+        if (this._reportCapabilitiesPromise) {
+            return this._reportCapabilitiesPromise;
+        }
+
+        this._reportCapabilitiesPromise = this.post('/Sessions/Capabilities/Full', capabilities).finally(() => {
+            // Keep guard active for 4 seconds to absorb initial boot bursts
+            setTimeout(() => {
+                this._reportCapabilitiesPromise = null;
+            }, 4000);
+        });
+
+        return this._reportCapabilitiesPromise;
+    }
+
+    /**
+     * Upload client logs to server
+     * Endpoint: POST /ClientLog/Document
+     */
+    async uploadClientLog(name, data) {
+        // Send raw text body, filename in query string
+        // Provide extended 60-second timeout budget to accommodate large telemetry bundles over TV WiFi
+        const url = `/ClientLog/Document?name=${encodeURIComponent(name)}`;
+        return this.post(url, data, {
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            timeout: 60000
+        });
+    }
+
+    async reportPlaybackStart(info) {
+        return this.post('/Sessions/Playing', info);
+    }
+
+    async reportPlaybackProgress(info) {
+        return this.post('/Sessions/Playing/Progress', info);
+    }
+
+    /**
+     * Report to the server that playback has stopped for an active session.
+     *
+     * Note: In previous revisions, keepalive:true was passed here under the assumption
+     * that it would help when an app unloads. However, on Smart TVs running older
+     * Chromium engines (e.g. Tizen 5.5 running Chromium 69), cross-origin fetch
+     * requests with custom headers like Authorization reject keepalive requests
+     * with 'TypeError: Failed to fetch'. Unload events already use synchronous XHR
+     * in PlayerPage._reportPlaybackStopped, so keepalive is neither needed nor
+     * safe to mandate here.
+     *
+     * @param {Object} info - Playback stop payload
+     * @param {Object} [options={}] - Additional request options
+     * @returns {Promise<any>}
+     */
+    async reportPlaybackStopped(info, options = {}) {
+        return this.post('/Sessions/Playing/Stopped', info, options);
+    }
+
+    // ========================================================================
+    // SyncPlay Endpoints
+    // ========================================================================
+    //
+    // SyncPlay allows multiple clients to synchronize playback in a group.
+    // The server acts as the clock authority — clients ping it for time offsets
+    // and receive commands over WebSocket (SyncPlayCommand / SyncPlayGroupUpdate).
+    //
+    // Endpoint reference: /SyncPlay/* (Jellyfin API v10.8+)
+    // ========================================================================
+
+    /**
+     * Fetch the server's current UTC time for SyncPlay clock synchronisation.
+     *
+     * Endpoint: GET /GetUTCTime
+     * Returns a UtcTimeResponse body with:
+     *   - RequestReceptionTime  : ISO8601 timestamp of when the server received our request
+     *   - ResponseTransmissionTime : ISO8601 timestamp of when the server sent its response
+     *
+     * Confirmed from the official jellyfin-apiclient-python source:
+     *   SyncPlayAPIMixin.utc_time() calls send_request(server_address, "GetUTCTime")
+     * and reads response_obj["RequestReceptionTime"] / response_obj["ResponseTransmissionTime"].
+     *
+     * @returns {Promise<{RequestReceptionTime: string, ResponseTransmissionTime: string}>}
+     */
+    async getServerTime() {
+        return this.get('/GetUTCTime');
+    }
+
+    /**
+     * Create a new SyncPlay group.
+     * POST /SyncPlay/New
+     * @param {Object} [body] - Optional group creation parameters
+     */
+    async syncPlayNew(body = {}) {
+        return this.post('/SyncPlay/New', body);
+    }
+
+    /**
+     * Join an existing SyncPlay group.
+     * POST /SyncPlay/Join
+     * @param {Object} body - Must include { GroupId: string }
+     */
+    async syncPlayJoin(body) {
+        return this.post('/SyncPlay/Join', body);
+    }
+
+    /**
+     * Leave the current SyncPlay group.
+     * POST /SyncPlay/Leave
+     */
+    async syncPlayLeave() {
+        return this.post('/SyncPlay/Leave', {});
+    }
+
+    /**
+     * Get a list of all available SyncPlay groups on the server.
+     * GET /SyncPlay/List
+     * @returns {Promise<Array>} Array of group info objects
+     */
+    async syncPlayList() {
+        return this.get('/SyncPlay/List');
+    }
+
+    /**
+     * Send a time-sync ping to the server.
+     * The server echoes back with RequestReceptionTime and ResponseTransmissionTime
+     * so the client can compute its clock offset.
+     *
+     * POST /SyncPlay/Ping
+     * @param {string} pingTime - ISO8601 timestamp of when the ping was sent
+     */
+    async syncPlayPing(pingTime) {
+        return this.post('/SyncPlay/Ping', { When: pingTime });
+    }
+
+    /**
+     * Notify the server that this client is buffering (not yet ready to play).
+     * Other group members will be asked to wait.
+     *
+     * POST /SyncPlay/Buffering
+     * @param {Object} body - { When, PositionTicks, IsPlaying, PlaylistItemId }
+     */
+    async syncPlayBuffering(body) {
+        return this.post('/SyncPlay/Buffering', body);
+    }
+
+    /**
+     * Notify the server that this client is ready to play after buffering.
+     *
+     * POST /SyncPlay/Ready
+     * @param {Object} body - { When, PositionTicks, IsPlaying, PlaylistItemId }
+     */
+    async syncPlayReady(body) {
+        return this.post('/SyncPlay/Ready', body);
+    }
+
+    // ========================================================================
+    // SyncPlay Host Controls
+    // ========================================================================
+
+    async syncPlayPlay(options = {}) {
+        return this.post('/SyncPlay/Play', { body: JSON.stringify(options) });
+    }
+
+    async syncPlayUnpause(options = {}) {
+        // In fully conforming 10.7+ servers, Unpause is preferred for resuming from Pause
+        return this.post('/SyncPlay/Unpause', options);
+    }
+
+    async syncPlayPause(options = {}) {
+        return this.post('/SyncPlay/Pause', options);
+    }
+
+    async syncPlaySeek(positionTicks) {
+        return this.post('/SyncPlay/Seek', { PositionTicks: positionTicks });
+    }
+
+    async syncPlayStop(options = {}) {
+        return this.post('/SyncPlay/Stop', options);
+    }
+
+    async syncPlayNext() {
+        return this.post('/SyncPlay/NextItem');
+    }
+
+    async syncPlayPrevious() {
+        return this.post('/SyncPlay/PreviousItem');
+    }
+
+    /**
+     * Skip waiting for buffering clients (group leader action).
+     * Tells the server to proceed with playback even if some clients are still
+     * buffering — useful when a slow client is holding up the whole group.
+     *
+     * POST /SyncPlay/IgnoreWait
+     * @param {Object} body - { IgnoreWait: boolean }
+     */
+    async syncPlayIgnoreWait(body) {
+        return this.post('/SyncPlay/IgnoreWait', body);
+    }
+
+    // ========================================================================
+    // Favorites & Played State Endpoints
+    // ========================================================================
+
+    /**
+     * Mark an item as a user favourite.
+     *
+     * JF12+ canonical: POST /UserFavoriteItems/{itemId}   (userId from token)
+     * Legacy (pre-12):  POST /Users/{userId}/FavoriteItems/{itemId}
+     */
+    async markFavorite(itemId) {
+        if (this.isJF12Plus()) {
+            // New JF12 form — server infers the user from the auth token
+            return this.post(`/UserFavoriteItems/${itemId}`);
+        }
+        return this.post(`/Users/${this._userId}/FavoriteItems/${itemId}`);
+    }
+
+    /**
+     * Remove an item from user favourites.
+     *
+     * JF12+ canonical: DELETE /UserFavoriteItems/{itemId}
+     * Legacy (pre-12):  DELETE /Users/{userId}/FavoriteItems/{itemId}
+     */
+    async unmarkFavorite(itemId) {
+        if (this.isJF12Plus()) {
+            return this.delete(`/UserFavoriteItems/${itemId}`);
+        }
+        return this.delete(`/Users/${this._userId}/FavoriteItems/${itemId}`);
+    }
+
+    /**
+     * Mark an item as played (watched).
+     *
+     * JF12+ canonical: POST /UserPlayedItems/{itemId}   (userId from token)
+     * Legacy (pre-12):  POST /Users/{userId}/PlayedItems/{itemId}
+     */
+    async markPlayed(itemId) {
+        if (this.isJF12Plus()) {
+            return this.post(`/UserPlayedItems/${itemId}`);
+        }
+        return this.post(`/Users/${this._userId}/PlayedItems/${itemId}`);
+    }
+
+    /**
+     * Unmark an item as played.
+     *
+     * JF12+ canonical: DELETE /UserPlayedItems/{itemId}
+     * Legacy (pre-12):  DELETE /Users/{userId}/PlayedItems/{itemId}
+     */
+    async unmarkPlayed(itemId) {
+        if (this.isJF12Plus()) {
+            return this.delete(`/UserPlayedItems/${itemId}`);
+        }
+        return this.delete(`/Users/${this._userId}/PlayedItems/${itemId}`);
+    }
+
+    // ========================================================================
+    // WebSocket Connection (for online/offline status)
+    // ========================================================================
+
+    /**
+     * Open WebSocket connection to server
+     * This maintains the "online" status on the Jellyfin dashboard
+     * When WebSocket connects, server marks user online
+     * When WebSocket disconnects, server marks user offline
+     */
+    openWebSocket() {
+        // Must have server URL and access token
+        if (!this._serverUrl || !this._accessToken) {
+            log.warn('Cannot open WebSocket - not authenticated');
+            return;
+        }
+
+        // Already connected
+        if (this._webSocket && this._webSocket.readyState === WebSocket.OPEN) {
+            log.info('WebSocket already connected');
+            return;
+        }
+
+        // Close any existing connection
+        this.closeWebSocket();
+
+        // Convert http(s) to ws(s)
+        const wsUrl = this._serverUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+
+        /*
+         * Dynamically adapt WebSocket connection parameters for Emby.
+         * Emby connects via the '/embywebsocket' path rather than '/socket'.
+         * It also requires the lowercase query parameter 'api_key' instead of 'ApiKey'.
+         */
+        const isEmbyInstance = this.isEmby();
+        const wsEndpointPath = isEmbyInstance ? '/embywebsocket' : '/socket';
+        const authParamKey = isEmbyInstance ? 'api_key' : 'ApiKey';
+
+        /*
+         * Construct the complete WebSocket connection URL.
+         * We pass authorization and device details via the query parameters.
+         */
+        const fullUrl = `${wsUrl}${wsEndpointPath}?${authParamKey}=${encodeURIComponent(this._accessToken)}&deviceId=${encodeURIComponent(this._deviceId)}`;
+
+        log.info('Opening WebSocket connection...');
+
+        try {
+            this._webSocket = new WebSocket(fullUrl);
+
+            // Connection opened
+            this._webSocket.onopen = () => {
+                // Reset reconnect attempt counter upon successful handshake
+                this._wsReconnectAttempts = 0;
+                log.info('WebSocket connected - user is now online');
+                eventBus.emit('websocket:connected');
+
+                // Start keepalive ping interval (every 30 seconds)
+                this._startWebSocketKeepalive();
+            };
+
+            // Message received (for remote control commands, etc.)
+            this._webSocket.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    // Emit message for other parts of app to handle if needed
+                    eventBus.emit('websocket:message', message);
+                } catch (e) {
+                    // Ignore non-JSON messages (keepalive responses, etc.)
+                }
+            };
+
+            // Connection closed
+            this._webSocket.onclose = (event) => {
+                log.info('WebSocket disconnected - user appears offline');
+                this._stopWebSocketKeepalive();
+                eventBus.emit('websocket:disconnected');
+
+                /*
+                 * ============================================================
+                 * Progressive WebSocket Exponential Reconnect Backoff
+                 * ============================================================
+                 * Prevents connection thrashing, CPU churn, and log spam on TV
+                 * devices when upstream reverse proxies (e.g. Cloudflare Zero Trust)
+                 * reject the W3C WebSocket handshake (HTTP 403 Forbidden).
+                 *
+                 * Backs off from 5s up to 60s max. Emits actionable diagnostic log
+                 * on persistent failure pointing user to bypass reverse proxy rules.
+                 * ============================================================
+                 */
+                if (this._serverUrl && this._accessToken && !document.hidden) {
+                    // Increment consecutive reconnect failures
+                    this._wsReconnectAttempts = (this._wsReconnectAttempts || 0) + 1;
+
+                    // Calculate exponential delay (5s, 7.5s, 11s, 17s, 25s, 38s, up to 60s max)
+                    const baseDelay = 5000;
+                    const exponentialFactor = Math.pow(1.5, Math.min(this._wsReconnectAttempts - 1, 6));
+                    const delayMs = Math.min(60000, Math.round(baseDelay * exponentialFactor));
+                    const delaySec = Math.round(delayMs / 1000);
+
+                    // Throttle reconnect scheduling logs after the first few failures
+                    if (this._wsReconnectAttempts <= 3 || this._wsReconnectAttempts % 5 === 0) {
+                        log.info(
+                            `Scheduling WebSocket reconnect in ${delaySec} seconds (attempt ${this._wsReconnectAttempts})...`
+                        );
+                    }
+
+                    // Diagnostic guidance on persistent disconnection
+                    if (this._wsReconnectAttempts === 5) {
+                        log.warn(
+                            '[ApiClient] WebSocket handshake continuously failing. If using a reverse proxy or Cloudflare Access, ensure path /socket (or /embywebsocket) has a Bypass policy configured.'
+                        );
+                    }
+
+                    // Schedule next reconnect attempt
+                    if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+                    this._reconnectTimer = setTimeout(() => {
+                        if (!this.isWebSocketConnected) {
+                            if (this._wsReconnectAttempts <= 3 || this._wsReconnectAttempts % 5 === 0) {
+                                log.info('Attempting to reconnect WebSocket...');
+                            }
+                            this.openWebSocket();
+                        }
+                    }, delayMs);
+                }
+            };
+
+            // Connection error
+            this._webSocket.onerror = (error) => {
+                log.warn('WebSocket error:', error);
+                this._stopWebSocketKeepalive();
+            };
+        } catch (e) {
+            log.error('Failed to create WebSocket:', e);
+        }
+    }
+
+    /**
+     * Close WebSocket connection
+     * This will cause the server to mark the user as offline
+     */
+    closeWebSocket() {
+        this._stopWebSocketKeepalive();
+
+        // Reset reconnect attempts and clear any pending timer
+        this._wsReconnectAttempts = 0;
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+        }
+
+        if (this._webSocket) {
+            log.info('Closing WebSocket connection');
+            this._webSocket.onclose = null; // Prevent event handler from firing
+            this._webSocket.close();
+            this._webSocket = null;
+        }
+    }
+
+    /**
+     * Start keepalive ping to maintain connection
+     * Sends a KeepAlive message every 30 seconds
+     * @private
+     */
+    _startWebSocketKeepalive() {
+        this._stopWebSocketKeepalive(); // Clear any existing interval
+
+        this._keepaliveInterval = setInterval(() => {
+            if (this._webSocket && this._webSocket.readyState === WebSocket.OPEN) {
+                // Send Jellyfin-style keepalive message
+                this._webSocket.send(JSON.stringify({ MessageType: 'KeepAlive' }));
+            }
+        }, 30000); // 30 seconds
+    }
+
+    /**
+     * Stop keepalive ping
+     * @private
+     */
+    _stopWebSocketKeepalive() {
+        if (this._keepaliveInterval) {
+            clearInterval(this._keepaliveInterval);
+            this._keepaliveInterval = null;
+        }
+    }
+
+    /**
+     * ========================================================================
+     * Immediate WebSocket KeepAlive Dispatcher
+     * ========================================================================
+     * Dispatches an immediate KeepAlive ping frame over the open WebSocket.
+     * Crucial when handling server-issued 'ForceKeepAlive' challenges to
+     * prevent reverse proxies and the Jellyfin server from terminating
+     * the connection due to idle timeouts.
+     * ========================================================================
+     */
+    sendWebSocketKeepAlive() {
+        // Ensure the socket instance exists and is actively ready for communication
+        if (this._webSocket && this._webSocket.readyState === WebSocket.OPEN) {
+            try {
+                // Jellyfin protocol specifies standard KeepAlive message frame
+                this._webSocket.send(JSON.stringify({ MessageType: 'KeepAlive' }));
+            } catch (err) {
+                // Non-fatal warning if socket write throws
+                log.warn('Failed to send immediate WebSocket KeepAlive ping:', err);
+            }
+        }
+    }
+
+    /**
+     * Check if WebSocket is connected
+     * @returns {boolean} True if connected
+     */
+    get isWebSocketConnected() {
+        return this._webSocket && this._webSocket.readyState === WebSocket.OPEN;
+    }
+
+    // ========================================================================
+    // Remote Metadata & Identify Endpoints (Admin)
+    // ========================================================================
+
+    /**
+     * Search remote metadata providers for matching item candidates (e.g. TMDB, TVDB, IMDb).
+     * POST /Items/RemoteSearch/{ItemType}
+     *
+     * @param {string} itemType - Item type (e.g. 'Movie', 'Series', 'BoxSet', 'Person', 'MusicAlbum', 'MusicArtist', 'Book')
+     * @param {Object} searchInfo - Search info object { Name, Year, ProviderIds: { Tmdb, Imdb, Tvdb, ... } }
+     * @param {string} itemId - Target Jellyfin item ID
+     * @param {boolean} [includeDisabledProviders=false] - Whether to include disabled providers
+     * @returns {Promise<Array<Object>>} List of RemoteSearchResult objects
+     */
+    async getRemoteSearchResults(itemType, searchInfo, itemId, includeDisabledProviders = false) {
+        // Construct standard Jellyfin RemoteSearchQuery payload
+        const payload = {
+            SearchInfo: searchInfo || {},
+            ItemId: itemId,
+            IncludeDisabledProviders: !!includeDisabledProviders
+        };
+
+        // Normalize item type for endpoint path
+        const typeSegment = encodeURIComponent(itemType);
+        return this.post(`/Items/RemoteSearch/${typeSegment}`, payload);
+    }
+
+    /**
+     * Apply remote search result metadata and images to an item.
+     * POST /Items/RemoteSearch/Apply/{ItemId}?replaceAllImages={bool}
+     *
+     * @param {string} itemId - Target Jellyfin item ID
+     * @param {Object} searchResult - The RemoteSearchResult object returned from getRemoteSearchResults
+     * @param {boolean} [replaceAllImages=true] - Replace all existing images with provider images
+     * @returns {Promise<any>}
+     */
+    async applyRemoteSearchResult(itemId, searchResult, replaceAllImages = true) {
+        // Invalidate cached ETag entries since item metadata is being updated on server
+        this.clearEtagCache();
+
+        // Clear details page cached data to ensure immediate UI update
+        state.clearByPrefix(`details:${itemId}`);
+
+        const url = `/Items/RemoteSearch/Apply/${encodeURIComponent(itemId)}?replaceAllImages=${replaceAllImages ? 'true' : 'false'}`;
+        return this.post(url, searchResult);
+    }
+
+    // ========================================================================
+    // Item Images Endpoints (Admin & Management)
+    // ========================================================================
+
+    /**
+     * Get item image metadata for all currently existing images on the item.
+     * GET /Items/{ItemId}/Images
+     *
+     * @param {string} itemId - Target Jellyfin item ID
+     * @returns {Promise<Array<Object>>} Array of image info objects (ImageType, ImageIndex, ImageTag, Width, Height, Size, etc.)
+     */
+    async getItemImages(itemId) {
+        return this.get(`/Items/${encodeURIComponent(itemId)}/Images`);
+    }
+
+    /**
+     * Get available remote provider images for an item (e.g. from TMDB, Fanart.tv, TVDB).
+     * GET /Items/{ItemId}/RemoteImages
+     *
+     * @param {string} itemId - Target Jellyfin item ID
+     * @param {Object} [options={}] - Query options
+     * @param {string} [options.type] - Optional ImageType filter (e.g. 'Primary', 'Backdrop', 'Logo', 'Thumb', 'Art', 'Banner', 'Disc')
+     * @param {boolean} [options.includeAllLanguages=true] - Whether to include images in all languages
+     * @returns {Promise<Object>} { Images: Array, TotalRecordCount: number, Providers: Array }
+     */
+    async getItemRemoteImages(itemId, options = {}) {
+        const params = {};
+        if (options.type) {
+            params.type = options.type;
+        }
+        if (options.includeAllLanguages !== undefined) {
+            params.includeAllLanguages = options.includeAllLanguages;
+        } else {
+            params.includeAllLanguages = true;
+        }
+
+        return this.get(`/Items/${encodeURIComponent(itemId)}/RemoteImages`, params);
+    }
+
+    /**
+     * Download and set a remote provider image on the item.
+     * POST /Items/RemoteImages/Download?Type={Type}&ImageUrl={ImageUrl}&ProviderName={ProviderName}
+     *
+     * @param {string} itemId - Target Jellyfin item ID
+     * @param {string} type - ImageType (e.g. 'Primary', 'Backdrop', 'Logo', 'Thumb', 'Art', 'Banner', 'Disc')
+     * @param {string} imageUrl - Full URL of the remote image
+     * @param {string} [providerName=''] - Provider name (e.g. 'TheMovieDb', 'FanArt')
+     * @returns {Promise<any>}
+     */
+    async downloadRemoteImage(itemId, type, imageUrl, providerName = '') {
+        // Clear cached responses so refreshed image tags are fetched
+        this.clearEtagCache();
+        state.clearByPrefix(`details:${itemId}`);
+
+        const params = {
+            Type: type,
+            ImageUrl: imageUrl
+        };
+        if (providerName) {
+            params.ProviderName = providerName;
+        }
+
+        return this.post(`/Items/${encodeURIComponent(itemId)}/RemoteImages/Download`, null, { params });
+    }
+
+    /**
+     * Delete an existing image from an item.
+     * DELETE /Items/{ItemId}/Images/{ImageType} or DELETE /Items/{ItemId}/Images/{ImageType}/{Index}
+     *
+     * @param {string} itemId - Target Jellyfin item ID
+     * @param {string} imageType - ImageType (e.g. 'Primary', 'Backdrop', 'Logo', 'Thumb', 'Art', 'Banner', 'Disc')
+     * @param {number|null} [imageIndex=null] - Optional image index (for multi-image types like Backdrop)
+     * @returns {Promise<any>}
+     */
+    async deleteItemImage(itemId, imageType, imageIndex = null) {
+        // Clear cached responses
+        this.clearEtagCache();
+        state.clearByPrefix(`details:${itemId}`);
+
+        let endpoint = `/Items/${encodeURIComponent(itemId)}/Images/${encodeURIComponent(imageType)}`;
+        if (imageIndex !== null && imageIndex !== undefined) {
+            endpoint += `/${encodeURIComponent(imageIndex)}`;
+        }
+
+        return this.delete(endpoint);
+    }
+
+    /**
+     * Update the display order / priority index of an existing image on an item.
+     * Reorders multi-image collections (such as backdrops, thumbnails, or art)
+     * so that index 0 is used as the primary display asset across the server.
+     *
+     * POST /Items/{ItemId}/Images/{ImageType}/{Index}/Index?newIndex={newIndex}
+     *
+     * @param {string} itemId - Target Jellyfin item ID
+     * @param {string} imageType - ImageType (e.g. 'Backdrop', 'Thumb', 'Art', 'Banner')
+     * @param {number} imageIndex - Current 0-based image position index
+     * @param {number} newIndex - Desired 0-based target position index
+     * @returns {Promise<any>} Server acknowledgement
+     */
+    async updateItemImageIndex(itemId, imageType, imageIndex, newIndex) {
+        // Invalidate caching layers so updated image tag mappings resolve immediately
+        this.clearEtagCache();
+        state.clearByPrefix(`details:${itemId}`);
+
+        // Construct parameterized endpoint path targeting the selected image index
+        const safeItemId = encodeURIComponent(itemId);
+        const safeType = encodeURIComponent(imageType);
+        const safeIndex = encodeURIComponent(imageIndex);
+        const endpoint = `/Items/${safeItemId}/Images/${safeType}/${safeIndex}/Index`;
+
+        // Dispatch POST request carrying the newIndex query parameter
+        return this.post(endpoint, null, {
+            params: { newIndex }
+        });
+    }
+
+    // ========================================================================
+    // Getters
+    // ========================================================================
+
+    get isAuthenticated() {
+        return !!this._accessToken;
+    }
+}
+
+// ============================================================================
+// Server Discovery
+// ============================================================================
+
+/**
+ * Test if an address is a valid Jellyfin server.
+ *
+ * Uses XMLHttpRequest instead of fetch() + AbortController because:
+ *   - AbortController requires Chrome 66+
+ *   - WebOS 4 ships Chromium 53, Tizen 3.0 ships Chromium 47
+ *   - Without a working abort, fetch() hangs until OS TCP timeout (~60-120s)
+ *     which makes subnet scanning unbearably slow on older platforms
+ *   - XHR.timeout is a native hard-kill supported since Chrome 29
+ */
+export function testServer(address, timeout = 1000, parentSignal = null, headersOverride = null) {
+    return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        let resolved = false;
+
+        // Clean-up and resolution helper to prevent multiple resolutions
+        function done(result) {
+            if (resolved) return;
+            resolved = true;
+
+            // Clear our manual backup abort timer to free up system memory
+            if (abortTimer) {
+                clearTimeout(abortTimer);
+                abortTimer = null;
+            }
+
+            // Cleanup the parent signal listener before resolving
+            if (parentSignal && onParentAbort) {
+                parentSignal.removeEventListener('abort', onParentAbort);
+            }
+            resolve(result);
+        }
+
+        // ====================================================================
+        // MANUAL ABORT BACKUP TIMER (CHROME < 29 COMPATIBILITY)
+        // ====================================================================
+        // Older Chromium versions (like Chrome 26 on WebOS 1.x / Tizen 2.x)
+        // do not natively support xhr.timeout or throw errors when trying to set it.
+        // We set up a manual setTimeout to trigger xhr.abort() after the timeout period.
+        // This stops the request and frees up the browser's limited connection pool.
+        // ====================================================================
+        let abortTimer = setTimeout(() => {
+            try {
+                xhr.abort();
+            } catch (_) {}
+            done(null);
+        }, timeout);
+
+        // Native timeout setting (supported natively in Chromium 29+)
+        try {
+            xhr.timeout = timeout;
+        } catch (_) {}
+
+        // If the parent discovery scan was cancelled, abort this probe too
+        const onParentAbort = () => {
+            xhr.abort();
+            done(null);
+        };
+
+        if (parentSignal) {
+            // Already cancelled before we even started
+            if (parentSignal.aborted) {
+                done(null);
+                return;
+            }
+            parentSignal.addEventListener('abort', onParentAbort, { once: true });
+        }
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+
+            // Non-200 responses (e.g. server offline, not found) resolve as null
+            if (xhr.status !== 200) {
+                done(null);
+                return;
+            }
+
+            try {
+                const info = JSON.parse(xhr.responseText);
+
+                let serverName = info.ServerName;
+                if (!serverName || typeof serverName !== 'string' || serverName.trim() === '') {
+                    // Fall back to hostname extracted from the address URL
+                    try {
+                        serverName = new URL(address).hostname;
+                    } catch (_) {
+                        serverName = 'Jellyfin Server';
+                    }
+                }
+
+                done({
+                    address: address,
+                    name: serverName,
+                    id: info.Id,
+                    version: info.Version,
+                    operatingSystem: info.OperatingSystem
+                });
+            } catch (_) {
+                // Malformed JSON from the server — not a Jellyfin instance
+                done(null);
+            }
+        };
+
+        // Both timeout and network errors resolve to null (not found)
+        xhr.ontimeout = () => done(null);
+        xhr.onerror = () => done(null);
+
+        xhr.open('GET', `${address}/System/Info/Public`, /* async */ true);
+
+        // ====================================================================
+        // Custom Reverse Proxy Headers (Cloudflare Access / Pangolin)
+        // If specific headers are provided for this probe, or stored for this
+        // server address, apply them so discovery and connection succeed.
+        // ====================================================================
+        const probeHeaders = headersOverride || customHeaders.getNormalizedHeaders(address);
+        if (probeHeaders && typeof probeHeaders === 'object') {
+            for (const [headerKey, headerVal] of Object.entries(probeHeaders)) {
+                if (headerKey && headerVal) {
+                    try {
+                        xhr.setRequestHeader(headerKey, headerVal);
+                    } catch (_) {
+                        // Ignore XHR header errors on older Chromium engines
+                    }
+                }
+            }
+        }
+
+        xhr.send();
+    });
+}
+
+// -----------------------------------------------------------------------------
+// Tauri v2 Native Discovery & IPC Runtime Utilities
+// -----------------------------------------------------------------------------
+
+/**
+ * Checks whether the current runtime environment is a Tauri application shell.
+ * Returns true on Windows, macOS, Linux, and Android TV running via Tauri.
+ *
+ * @returns {boolean} True if running under Tauri runtime.
+ */
+function _isTauriRuntime() {
+    return (
+        typeof window !== 'undefined' && !!(window.__TAURI__ || window.__TAURI_METADATA__ || window.__TAURI_INTERNALS__)
+    );
+}
+
+/**
+ * Dispatches an IPC command across the Tauri bridge to the native Rust backend.
+ * Compatible with Tauri v2 internal bridge and core API wrappers.
+ *
+ * @param {string} command - Registered Tauri command name.
+ * @param {Object} [args={}] - Command parameters passed to Rust.
+ * @returns {Promise<any>} Response from the Rust command handler.
+ */
+async function _invokeTauriCommand(command, args = {}) {
+    // Primary Tauri v2 internal IPC bridge
+    if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__?.invoke) {
+        return window.__TAURI_INTERNALS__.invoke(command, args);
+    }
+    // Secondary fallback to core namespace if available
+    if (typeof window !== 'undefined' && window.__TAURI__?.core?.invoke) {
+        return window.__TAURI__.core.invoke(command, args);
+    }
+    throw new Error('Tauri IPC runtime bridge unavailable');
+}
+
+let activeDiscoveryController = null;
+
+/**
+ * Cancel any active discovery process across all platform backends.
+ */
+export function cancelDiscovery() {
+    // Signal cancellation to native Rust discovery worker if running on Tauri
+    if (_isTauriRuntime()) {
+        _invokeTauriCommand('cancel_server_discovery').catch(() => {});
+    }
+
+    if (activeDiscoveryController) {
+        log.info('Cancelling discovery scan...');
+        activeDiscoveryController.abort();
+        activeDiscoveryController = null;
+    }
+}
+
+/**
+ * Attempt Jellyfin server discovery via Tauri native UDP broadcast.
+ *
+ * Dispatches UDP probe packets on port 7359 directly from native Rust standard
+ * library sockets, bypassing browser webview network isolation entirely.
+ *
+ * @param {Function|null} onServerFound  Callback invoked immediately each time
+ *                                        a server response packet is parsed.
+ * @returns {Promise<Array|null>}  Found servers list, or null if Tauri IPC
+ *                                  could not be contacted (fall through to HTTP scan).
+ */
+async function _discoverViaTauriService(onServerFound, targetHints = []) {
+    if (!_isTauriRuntime()) {
+        return null;
+    }
+
+    log.info('Tauri fast path: Initiating native UDP server autodiscovery...');
+
+    const foundServers = [];
+    let serverEventListener = null;
+
+    // Attach real-time DOM listener for microsecond-latency server notification
+    if (typeof onServerFound === 'function') {
+        serverEventListener = (event) => {
+            const srv = event.detail;
+            if (srv && srv.address) {
+                const serverInfo = {
+                    address: srv.address,
+                    name: srv.name || srv.address,
+                    id: srv.id
+                };
+
+                // Deduplicate before firing onServerFound callback
+                const alreadyRecorded = foundServers.some(
+                    (s) => s.id === serverInfo.id || s.address === serverInfo.address
+                );
+
+                if (!alreadyRecorded) {
+                    log.info(`Tauri native UDP: discovered "${serverInfo.name}" at ${serverInfo.address}`);
+                    foundServers.push(serverInfo);
+                    onServerFound(serverInfo);
+                }
+            }
+        };
+
+        window.addEventListener('litefin:server-found', serverEventListener);
+    }
+
+    try {
+        // Dispatch Rust command with a 2500ms discovery window and any explicit hints
+        const results = await _invokeTauriCommand('discover_servers', {
+            timeoutMs: 2500,
+            targetHints: Array.isArray(targetHints) ? targetHints : []
+        });
+
+        if (Array.isArray(results)) {
+            for (const srv of results) {
+                const serverInfo = {
+                    address: srv.address,
+                    name: srv.name || srv.address,
+                    id: srv.id
+                };
+
+                const alreadyRecorded = foundServers.some(
+                    (s) => s.id === serverInfo.id || s.address === serverInfo.address
+                );
+
+                if (!alreadyRecorded) {
+                    foundServers.push(serverInfo);
+                    if (onServerFound) {
+                        onServerFound(serverInfo);
+                    }
+                }
+            }
+        }
+
+        return foundServers;
+    } catch (err) {
+        log.warn('Tauri native UDP discovery failed:', err);
+        return null;
+    } finally {
+        if (serverEventListener) {
+            window.removeEventListener('litefin:server-found', serverEventListener);
+        }
+    }
+}
+
+/**
+ * Attempt Jellyfin server discovery via the WebOS Luna background service.
+ *
+ * The service performs a native UDP broadcast on port 7359 and pushes
+ * discovered servers to us in real time via a Luna subscription.
+ *
+ * @param {Function|null} onServerFound  Called immediately each time a server
+ *                                        is discovered (same API as discoverServers).
+ * @returns {Promise<Array|null>}  Resolves with an array of found servers if
+ *                                  the Luna service is reachable (may be empty),
+ *                                  or null if the service could not be contacted
+ *                                  (caller should fall back to HTTP scan).
+ */
+/**
+ * Attempt Jellyfin server discovery via the Tizen background service HTTP endpoint.
+ *
+ * The Tizen service doesn't have a push bus like WebOS Luna, so instead we
+ * expose a simple GET /discover endpoint on the local HTTP proxy.  The service
+ * creates a one-shot UDP socket, broadcasts the autodiscovery probe, waits 3
+ * seconds for responses, then returns the found servers as JSON.
+ *
+ * This avoids the ~10 second HTTP subnet scan for users who have the background
+ * service enabled.
+ *
+ * @param {Function|null} onServerFound  Called immediately for each discovered server.
+ * @returns {Promise<Array|null>}  Array of found servers, or null if the service
+ *                                  is unreachable (fall through to HTTP scan).
+ */
+async function _discoverViaTizenService(onServerFound) {
+    return new Promise(function (resolve) {
+        let settled = false;
+        const foundServers = [];
+        let es = null;
+
+        // Fallback timeout in case the service hangs or never boots
+        const timeout = setTimeout(function () {
+            if (settled) return;
+            settled = true;
+            if (es) es.close();
+            log.warn('Tizen /discover: request timed out — falling back to HTTP scan');
+            resolve(foundServers.length > 0 ? foundServers : null);
+        }, 4200);
+
+        function connect() {
+            if (settled) return;
+
+            /*
+             * Tizen /discover endpoint returns a text/event-stream (SSE).
+             * This allows servers to be pushed to the UI instantly.
+             */
+            es = new EventSource('http://localhost:8123/discover');
+
+            es.onmessage = function (event) {
+                try {
+                    const srv = JSON.parse(event.data);
+                    const serverInfo = {
+                        address: srv.Address,
+                        name: srv.Name,
+                        id: srv.Id
+                    };
+                    log.info('Tizen /discover: found "' + srv.Name + '" at ' + srv.Address);
+                    foundServers.push(serverInfo);
+                    if (onServerFound) onServerFound(serverInfo);
+                } catch (err) {
+                    log.warn('Tizen /discover: parse error ' + err.message);
+                }
+            };
+
+            es.onerror = function () {
+                if (settled) return;
+                es.close(); // Prevent slow native auto-reconnect
+
+                if (foundServers.length > 0) {
+                    // Stream successfully completed its 3-second cycle
+                    settled = true;
+                    clearTimeout(timeout);
+                    log.info('Tizen /discover: stream complete — ' + foundServers.length + ' server(s) found');
+                    resolve(foundServers);
+                } else {
+                    // Connection refused — service is likely still booting.
+                    // Retry rapidly until the 4.2s global timeout hits.
+                    setTimeout(connect, 200);
+                }
+            };
+        }
+
+        connect();
+    });
+}
+
+async function _discoverViaLunaService(onServerFound) {
+    return new Promise((resolve) => {
+        const foundServers = [];
+        let settled = false;
+
+        /*
+         * Two-phase timeout strategy:
+         *
+         * Phase 1 — SERVICE_ALIVE_TIMEOUT_MS (1 second)
+         *   If onSuccess hasn't fired at all within 1s, the background service
+         *   is not running (emulator, service not installed, etc.).
+         *   Resolve null immediately → HTTP scan fallback kicks in within ~1s.
+         *   On real hardware the service responds in <100ms, so 1s is generous.
+         *
+         * Phase 2 — DISCOVERY_WINDOW_MS (3 seconds)
+         *   Once onSuccess fires (service confirmed alive), start a 3s window
+         *   to collect UDP server responses before resolving with the results.
+         */
+        const SERVICE_ALIVE_TIMEOUT_MS = 1000;
+        const DISCOVERY_WINDOW_MS = 3000;
+
+        // Phase 1: fast-fail if the service never responds
+        const serviceAliveTimeout = setTimeout(() => {
+            if (!settled) {
+                log.warn('Luna service timed out — no response received');
+                settled = true;
+                resolve(null);
+            }
+        }, SERVICE_ALIVE_TIMEOUT_MS);
+
+        let request;
+        try {
+            request = window.webOS.service.request('luna://org.litefin.app.service', {
+                method: 'discover',
+                parameters: { subscribe: true },
+
+                onSuccess(response) {
+                    if (settled) return;
+
+                    // First success response = service is alive; cancel the phase-1 timer
+                    // and start the 3s collection window to gather UDP server responses.
+                    if (!settled && foundServers.length === 0) {
+                        clearTimeout(serviceAliveTimeout);
+                        setTimeout(() => {
+                            if (!settled) {
+                                settled = true;
+                                try {
+                                    request && request.cancel();
+                                } catch (_) {}
+                                resolve(foundServers);
+                            }
+                        }, DISCOVERY_WINDOW_MS);
+                    }
+
+                    // Parse servers from the response map ({ [serverId]: serverInfo })
+                    if (response && response.results) {
+                        Object.values(response.results).forEach((srv) => {
+                            if (!foundServers.find((s) => s.id === srv.Id)) {
+                                const serverInfo = {
+                                    address: srv.Address,
+                                    name: srv.Name,
+                                    id: srv.Id
+                                };
+                                log.info(`Luna: discovered "${srv.Name}" at ${srv.Address}`);
+                                foundServers.push(serverInfo);
+                                if (onServerFound) onServerFound(serverInfo);
+                            }
+                        });
+                    }
+                },
+
+                onFailure(err) {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(serviceAliveTimeout);
+                    log.warn(`Luna service request failed: ${err.errorText || JSON.stringify(err)}`);
+                    // null signals "service unavailable, try HTTP scan"
+                    resolve(null);
+                }
+            });
+        } catch (err) {
+            // webOS.service.request itself threw — service API not available
+            log.warn(`Luna service API not available: ${err}`);
+            clearTimeout(serviceAliveTimeout);
+            resolve(null);
+        }
+    });
+}
+
+/**
+ * Send Wake-on-LAN Magic Packet via background service
+ * ============================================================================
+ * Initiates a request to the local Node.js companion service to broadcast
+ * a Wake-on-LAN magic packet targeting the specified server MAC address.
+ * Pre-launches the Tizen background service if required to ensure the HTTP
+ * proxy is active.
+ * ============================================================================
+ * @param {string} macAddress - Target server MAC address (e.g., '00:11:22:33:44:55')
+ * @returns {Promise<boolean>} True if the magic packet was successfully dispatched
+ */
+export async function sendWakeOnLan(macAddress) {
+    if (!macAddress) {
+        log.warn('Wake-on-LAN requested, but no MAC address was provided');
+        return false;
+    }
+
+    log.info(`Initiating Wake-on-LAN command for MAC: ${macAddress}`);
+
+    // 1. Tauri platform: native Rust UDP Magic Packet broadcast
+    if (_isTauriRuntime()) {
+        log.info('Platform Tauri: Dispatching native UDP WOL magic packet via Rust IPC');
+        try {
+            const ok = await _invokeTauriCommand('send_wake_on_lan', { macAddress });
+            if (ok) {
+                log.info('Tauri native WOL broadcast sent successfully');
+                return true;
+            }
+        } catch (tauriWolErr) {
+            log.warn('Tauri native WOL broadcast failed:', tauriWolErr);
+        }
+    }
+
+    // 2. WebOS implementation: dispatch Luna request to the background service
+    // Must strictly verify webOS platform identity and PalmServiceBridge presence
+    if (
+        platformInfo.isWebOS &&
+        typeof window.PalmServiceBridge !== 'undefined' &&
+        typeof window.webOS !== 'undefined' &&
+        window.webOS.service
+    ) {
+        log.info('Platform WebOS: Dispatching WOL request to Luna service org.litefin.app.service');
+
+        const sendLunaRequest = () =>
+            new Promise((resolve) => {
+                try {
+                    window.webOS.service.request('luna://org.litefin.app.service', {
+                        method: 'wol',
+                        parameters: { mac: macAddress },
+                        onSuccess(response) {
+                            log.info('Luna WOL request succeeded:', response);
+                            resolve({ success: true, response });
+                        },
+                        onFailure(err) {
+                            log.warn('Luna WOL request failed:', err);
+                            resolve({ success: false, err });
+                        }
+                    });
+                } catch (e) {
+                    log.error('Exception during Luna WOL request dispatch:', e);
+                    resolve({ success: false, err: e });
+                }
+            });
+
+        // First attempt to invoke Luna method
+        let res = await sendLunaRequest();
+
+        // If service is cold-booting, WebOS returns "org.litefin.app.service is not running" while starting it.
+        // Wait 600ms for the OS to initialize the Node.js background process and retry.
+        if (!res.success && res.err) {
+            const errStr = typeof res.err === 'string' ? res.err : res.err.errorText || JSON.stringify(res.err);
+            if (errStr.includes('not running')) {
+                log.info('Luna service process is cold-booting — waiting 600ms for startup retry...');
+                await new Promise((resolve) => setTimeout(resolve, 600));
+                res = await sendLunaRequest();
+            }
+        }
+
+        if (res.success) {
+            return true;
+        }
+    }
+
+    // 2. Tizen/HTTP Proxy implementation: fetch localhost:8123/wol
+    // We dynamically import PlayerSettings to prevent circular dependency cycles.
+    const { PlayerSettings } = await import('../utils/PlayerSettings.js');
+    const bgEnabled = PlayerSettings.get('enableBackgroundService') !== false;
+
+    if (bgEnabled) {
+        // Pre-launch ytresolver background service on Tizen if needed
+        if (typeof tizen !== 'undefined') {
+            try {
+                const appId = tizen.application.getCurrentApplication().appInfo.id;
+                const pkgId = appId.split('.')[0];
+                log.info(`Platform Tizen: Pre-launching ytresolver background service: ${pkgId}.ytresolver`);
+                tizen.application.launch(pkgId + '.ytresolver');
+
+                // Allow a brief 500ms delay for the service to bind port and start listening
+                await new Promise((resolve) => setTimeout(resolve, 500));
+            } catch (preLaunchErr) {
+                log.warn('Failed to pre-launch Tizen background service for WOL:', preLaunchErr);
+            }
+        }
+
+        log.info('Dispatching WOL request to local HTTP proxy on port 8123');
+        const url = `http://localhost:8123/wol?mac=${encodeURIComponent(macAddress)}`;
+        const maxHttpRetries = 6;
+        const httpRetryDelayMs = 600;
+
+        for (let attempt = 1; attempt <= maxHttpRetries; attempt++) {
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    timeout: 3000
+                });
+                const data = await res.json();
+                log.info(`Local HTTP WOL response received (attempt ${attempt}/${maxHttpRetries}):`, data);
+                if (data && data.success) {
+                    return true;
+                }
+            } catch (fetchErr) {
+                log.warn(
+                    `WOL request to local HTTP proxy attempt ${attempt}/${maxHttpRetries} failed (service cold-booting):`,
+                    fetchErr.message || fetchErr
+                );
+                if (attempt < maxHttpRetries) {
+                    await new Promise((resolve) => setTimeout(resolve, httpRetryDelayMs));
+                }
+            }
+        }
+        log.error('All WOL request attempts to local HTTP proxy failed.');
+        return false;
+    }
+
+    log.warn('WOL command skipped: background service is disabled or platform is unsupported');
+    return false;
+}
+
+/**
+ * Check if the current device/platform has a background UDP discovery service.
+ * - WebOS: true if Luna service is available (window.webOS.service)
+ * - Tizen: true if running on Tizen and background service is enabled
+ * - Others: false
+ *
+ * @returns {boolean} True if background UDP discovery service is present
+ */
+export function hasBackgroundDiscoveryService() {
+    // 1. Tauri native discovery support (Desktop & Android TV)
+    if (_isTauriRuntime()) {
+        return true;
+    }
+
+    // 2. WebOS Luna Service check
+    // Validate that the app is actually running on webOS and has native service bridge access
+    if (
+        platformInfo.isWebOS &&
+        typeof window.PalmServiceBridge !== 'undefined' &&
+        typeof window.webOS !== 'undefined' &&
+        window.webOS.service
+    ) {
+        return true;
+    }
+
+    // 3. Tizen HTTP Proxy / Discovery Service check
+    if (typeof tizen !== 'undefined') {
+        try {
+            const bgEnabled = storage.getItem('player:enableBackgroundService') !== 'false';
+            return bgEnabled;
+        } catch (_) {
+            return true;
+        }
+    }
+
+    // 4. Platforms without background UDP discovery service
+    return false;
+}
+
+/**
+ * Discover Jellyfin servers on local network
+ *
+ * @param {Function|null} onProgress - Optional callback receiving (checked, total)
+ * @param {Function|null} onServerFound - Optional callback receiving server info object
+ * @param {Object|boolean} [options={}] - Discovery options or allowHttpFallback flag
+ * @param {boolean} [options.isManual=false] - True if user manually triggered search via button
+ * @param {boolean} [options.allowHttpFallback] - Allow falling back to subnet HTTP scan
+ */
+export async function discoverServers(onProgress = null, onServerFound = null, options = {}) {
+    // Parse options object or boolean flag for backwards compatibility
+    const isManual = typeof options === 'object' && options !== null ? !!options.isManual : false;
+    const allowHttpFallback =
+        typeof options === 'object' && options !== null && 'allowHttpFallback' in options
+            ? !!options.allowHttpFallback
+            : isManual;
+
+    // Cancel any existing scan first
+    cancelDiscovery();
+
+    log.info(`Starting server discovery (isManual=${isManual}, allowHttpFallback=${allowHttpFallback})...`);
+
+    // =========================================================================
+    // WAKE-ON-LAN ON SERVER SCAN
+    // =========================================================================
+    // If enabled in settings, broadcast a Wake-on-LAN magic packet to wake
+    // sleeping servers on the local subnet while performing discovery.
+    // =========================================================================
+    const wolOnScanEnabled = storage.getItem('pref:enableWolOnServerScan') === 'true';
+    const wolMac = storage.getItem('pref:wolMacAddress');
+
+    if (wolOnScanEnabled && wolMac) {
+        log.info(`Server discovery initiated. Sending Wake-on-LAN packet to ${wolMac}...`);
+        sendWakeOnLan(wolMac).catch((e) => log.warn('Failed to send WOL on server discovery scan:', e));
+    }
+
+    /*
+     * =========================================================================
+     * Tauri Fast Path: Native UDP Discovery via Rust Standard Sockets
+     * =========================================================================
+     * Tauri builds (Desktop and Android TV) run native Rust code with full
+     * raw UDP socket capabilities. We broadcast the autodiscovery probe on
+     * UDP port 7359 and receive server responses within ~50ms without any
+     * Node.js dependency or slow HTTP subnet scanning.
+     * =========================================================================
+     */
+    if (_isTauriRuntime()) {
+        log.info('Tauri detected — trying native UDP discovery first...');
+
+        // Collect saved server addresses to pass as direct hints to Rust
+        let hints = [];
+        try {
+            const rawSaved = storage.getItem('jellyfin_saved_servers');
+            if (rawSaved) {
+                const parsed = JSON.parse(rawSaved);
+                if (Array.isArray(parsed)) {
+                    hints = parsed.map((s) => s.address || s.serverUrl).filter(Boolean);
+                }
+            }
+        } catch (_) {}
+
+        const tauriServers = await _discoverViaTauriService(onServerFound, hints);
+
+        if (tauriServers !== null) {
+            log.info(`Tauri discovery complete: ${tauriServers.length} server(s) found`);
+            return tauriServers;
+        }
+
+        log.warn('Tauri native discovery unavailable');
+        if (!allowHttpFallback) {
+            log.info('HTTP fallback disabled for automatic discovery — skipping HTTP subnet scan');
+            return [];
+        }
+    }
+
+    /*
+     * =========================================================================
+     * WebOS Fast Path: Native UDP Discovery via Luna Service
+     * =========================================================================
+     * WebOS background services run in Node.js and have access to raw UDP
+     * sockets. Our `org.litefin.app.service/discover` service broadcasts the
+     * Jellyfin autodiscovery probe on UDP port 7359 and pushes results
+     * instantly via the Luna bus.
+     *
+     * This yields results in <1 second vs the ~10s HTTP subnet scan on WebOS.
+     * If the service isn't available (emulators, older WebOS) we fall through
+     * to the standard HTTP scan below.
+     * =========================================================================
+     */
+    // Check for webOS platform identity and PalmServiceBridge before dispatching Luna discovery
+    if (
+        platformInfo.isWebOS &&
+        typeof window.PalmServiceBridge !== 'undefined' &&
+        typeof window.webOS !== 'undefined' &&
+        window.webOS.service
+    ) {
+        log.info('WebOS detected — trying Luna discovery service first...');
+
+        const lunaServers = await _discoverViaLunaService(onServerFound);
+
+        if (lunaServers !== null) {
+            // Luna service responded — skip the HTTP scan entirely
+            log.info(`Luna discovery complete: ${lunaServers.length} server(s) found`);
+            return lunaServers;
+        }
+
+        log.warn('Luna service unavailable');
+        if (!allowHttpFallback) {
+            log.info('HTTP fallback disabled for automatic discovery — skipping HTTP subnet scan');
+            return [];
+        }
+    }
+
+    /*
+     * =========================================================================
+     * Tizen Fast Path: Native UDP Discovery via HTTP Proxy Service
+     * =========================================================================
+     * The Tizen background service (service.js) exposes a GET /discover
+     * endpoint on localhost:8123.  It fires the same UDP broadcast as the
+     * WebOS service and returns discovered servers as JSON after a 3-second
+     * collection window.
+     *
+     * Only attempt this when:
+     *   a) Running on Tizen (the `tizen` global is defined), AND
+     *   b) The background service is enabled in PlayerSettings
+     *      (it is on by default — checking the setting avoids a hanging
+     *       XHR in the off chance the user has disabled it in settings).
+     *
+     * If the endpoint does not respond within its timeout (service not running,
+     * WGT not repackaged yet, etc.) we fall through to the HTTP scan below so
+     * the user still gets discovery — just slower.
+     * =========================================================================
+     */
+    if (typeof tizen !== 'undefined') {
+        const { PlayerSettings } = await import('../utils/PlayerSettings.js');
+        const bgEnabled = PlayerSettings.get('enableBackgroundService') !== false;
+
+        if (bgEnabled) {
+            log.info('Tizen detected — trying /discover service endpoint...');
+
+            const tizenServers = await _discoverViaTizenService(onServerFound);
+
+            if (tizenServers !== null) {
+                log.info(`Tizen /discover complete: ${tizenServers.length} server(s) found`);
+                return tizenServers;
+            }
+
+            log.warn('Tizen /discover unavailable');
+            if (!allowHttpFallback) {
+                log.info('HTTP fallback disabled for automatic discovery — skipping HTTP subnet scan');
+                return [];
+            }
+        } else {
+            log.info('Background service disabled — skipping Tizen /discover');
+            if (!allowHttpFallback) {
+                log.info('HTTP fallback disabled for automatic discovery — skipping HTTP subnet scan');
+                return [];
+            }
+        }
+    }
+
+    // Check if HTTP fallback scan is permitted
+    if (!allowHttpFallback) {
+        log.info('No background discovery service available and HTTP fallback disabled — skipping HTTP subnet scan');
+        return [];
+    }
+
+    // =========================================================================
+    // Standard HTTP scan (Tizen, web browsers, WebOS emulators)
+    // =========================================================================
+    activeDiscoveryController = new AbortController();
+    const signal = activeDiscoveryController.signal;
+
+    const foundServers = [];
+    const scannedIps = new Set();
+
+    // 1. Identify unique subnets to scan
+    const subnets = new Set();
+
+    // Local subnet
+    const localIP = await tizenAdapter.getIPAddress();
+    if (localIP) {
+        const parts = localIP.split('.');
+        if (parts.length === 4) {
+            subnets.add(`${parts[0]}.${parts[1]}.${parts[2]}.`);
+        }
+    }
+
+    // Common subnets
+    ['192.168.1.', '192.168.0.', '10.0.0.'].forEach((s) => subnets.add(s));
+
+    const uniqueSubnets = Array.from(subnets);
+    const totalIPs = uniqueSubnets.length * 254;
+    let globalScannedCount = 0;
+
+    log.debug(`Scanning ${uniqueSubnets.length} subnets (${totalIPs} IPs total)`);
+
+    const scanSubnet = async (prefix) => {
+        const batch = [];
+        for (let i = 1; i < 255; i++) {
+            const ip = `http://${prefix}${i}:8096`;
+            if (!scannedIps.has(ip)) {
+                batch.push(ip);
+                scannedIps.add(ip);
+            }
+        }
+
+        /*
+         * CHUNK_SIZE controls how many IPs are probed in parallel per round.
+         * Higher = faster scan but more concurrent connections.
+         * 30 is a safe ceiling for WebOS/Tizen embedded browsers.
+         *
+         * Timeout is 400ms — a real LAN server answers in <50ms,
+         * so this is generous while cutting worst-case scan time roughly in half
+         * vs the previous 800ms.
+         */
+        const CHUNK_SIZE = 15; // Reduced from 30 to prevent saturating network stack on older TVs
+        for (let i = 0; i < batch.length; i += CHUNK_SIZE) {
+            if (signal.aborted) return;
+
+            const chunk = batch.slice(i, i + CHUNK_SIZE);
+            const results = await Promise.all(chunk.map((addr) => testServer(addr, 400, signal)));
+
+            // Exit immediately if aborted during the probes
+            if (signal.aborted) return;
+
+            results
+                .filter((s) => s)
+                .forEach((s) => {
+                    if (!foundServers.find((existing) => existing.address === s.address)) {
+                        log.info(`Found server at ${s.address}`);
+                        foundServers.push(s);
+                        if (onServerFound) onServerFound(s);
+                    }
+                });
+
+            globalScannedCount += chunk.length;
+            if (onProgress) onProgress(globalScannedCount, totalIPs);
+
+            // Small yield to let UI breathe
+            await new Promise((r) => setTimeout(r, 10));
+        }
+    };
+
+    // Execute scans sequentially to avoid flooding network on weak TV hardware
+    for (const subnet of uniqueSubnets) {
+        if (signal.aborted) break;
+        log.debug(`Scanning subnet ${subnet}x`);
+        await scanSubnet(subnet);
+    }
+
+    if (signal.aborted) {
+        log.info('Discovery cancelled');
+    } else {
+        log.info(`Discovery complete. Found ${foundServers.length} server(s)`);
+    }
+
+    if (activeDiscoveryController?.signal === signal) {
+        activeDiscoveryController = null;
+    }
+
+    return foundServers;
+}
+
+// Create singleton instance
+export const api = new ApiClient();
+
+// Default export is the api instance for convenience
+export default api;

@@ -1,0 +1,413 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Ambient Glow Mode
+ * ============================================================================
+ * immersive dynamic background glow matching the active accent color.
+ * Surfaces are set to semi-translucent material variables for a gorgeous,
+ * integrated volumetric layout.
+ * ============================================================================
+ */
+
+[data-theme-mode="ambient"] {
+    /* Main overlays are deep translucent blacks */
+    --jf-overlay-bg: rgba(0, 0, 0, 0.85);
+
+    /* Text definitions with rich alpha-channel hierarchies */
+    --jf-text-primary: #ffffff;
+    --jf-text-secondary: rgba(255, 255, 255, 0.7);
+    --jf-text-tertiary: rgba(255, 255, 255, 0.5);
+    --jf-text-disabled: rgba(255, 255, 255, 0.3);
+
+    /* Contextual coloring guidelines */
+    --jf-success: #4caf50;
+    --jf-warning: #ff9800;
+    --jf-error: #f44336;
+    --jf-info: #2196f3;
+
+    /* Semi-translucent material surfaces for modern look */
+    --jf-input-bg: rgba(255, 255, 255, 0.05);
+    --jf-input-border: rgba(255, 255, 255, 0.1);
+    --jf-button-bg: rgba(255, 255, 255, 0.08);
+    --jf-button-hover: rgba(255, 255, 255, 0.15);
+    --jf-switch-bg: rgba(255, 255, 255, 0.15);
+    --jf-switch-handle: var(--jf-accent-content-color, #ffffff);
+
+    /* Dynamic shadows with volumetric spread */
+    --jf-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --jf-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --jf-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
+
+    /* High-contrast scrollbars for sleek aesthetic */
+    --jf-scrollbar: rgba(255, 255, 255, 0.15);
+    --jf-scrollbar-hover: rgba(255, 255, 255, 0.35);
+
+    /* Focus visual properties */
+    --jf-button-border-focus: #ffffff;
+
+    /* Action Buttons material adjustments */
+    --jf-action-btn-bg: rgba(255, 255, 255, 0.06);
+    --jf-action-btn-border: rgba(255, 255, 255, 0.1);
+    --jf-action-btn-color: var(--jf-text-primary);
+    --jf-action-btn-active-bg: var(--jf-accent);
+    --jf-action-btn-active-border: var(--jf-accent-content-color, #ffffff);
+    --jf-action-btn-active-color: var(--jf-accent-content-color);
+
+    /* Primary buttons (Play/Resume) */
+    --jf-primary-btn-bg: var(--jf-accent);
+    --jf-primary-btn-color: var(--jf-accent-content-color);
+}
+
+/*
+ * ============================================================================
+ * ACCENT-DYNAMIC AMBIENT GLOW BACKDROP (FULL SCREEN IMMERSION)
+ * ============================================================================
+ * Applies the ultra-dark charcoal foundation color combined with layered
+ * accent-dynamic radial gradient mesh glows.
+ *
+ * Hardware Compositing Optimization:
+ * Applying dual radial gradients directly to the body element with
+ * 'background-attachment: fixed' causes severe performance degradation on
+ * scrolling. Browsers cannot cache a fixed background on a scrolling root,
+ * which forces full-viewport GPU re-rasterization (millions of quadratic
+ * distance calculations) on every single scroll or layout frame.
+ *
+ * By isolating the dual radial gradients onto a dedicated, viewport-locked
+ * pseudo-element (body::before) promoted to its own GPU compositing layer:
+ * 1. The radial gradients rasterize exactly ONCE into a cached GPU texture.
+ * 2. Page scrolling, list navigation, and focus transitions run at full 60fps/120fps
+ *    with zero CPU/GPU gradient re-calculation.
+ * 3. Visual rendering remains 100% identical down to the subpixel.
+ * 4. Video playback drops the layer instantaneously via display: none.
+ */
+/*
+ * Base Canvas Foundation
+ * Deep charcoal background applied to the root HTML node to prevent edge bleed
+ * during scrolling and view transitions. Scoped strictly with :not(.player-active)
+ * so that full hardware overlay transparency is preserved when video playback begins.
+ */
+html[data-theme-mode="ambient"]:not(.player-active) {
+    /* 1. Deep charcoal foundation baseline to prevent edge bleed */
+    background-color: var(--jf-background) !important;
+}
+
+[data-theme-mode="ambient"] body {
+    /* 1. Set body background to transparent so hardware-accelerated layer shows through */
+    background-color: transparent !important;
+    background-image: none !important;
+    background-attachment: scroll !important;
+}
+
+/*
+ * Dedicated Hardware-Accelerated Ambient Backdrop Layer
+ * Pinned to the viewport with negative stacking and zero pointer interception.
+ */
+[data-theme-mode="ambient"] body::before {
+    /* 1. Pseudo-element DOM instantiation */
+    content: '';
+
+    /* 2. Lock viewport position without scroll invalidation penalties */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+
+    /* 3. Sit behind application content container and navigation bars */
+    z-index: -1;
+
+    /* 4. Ensure mouse, touch, and remote control events pass through freely */
+    pointer-events: none;
+
+    /* 5. Base deep charcoal foundation color beneath the ambient spotlights */
+    background-color: var(--jf-background) !important;
+
+    /* 6. Composed volumetric light layers reflecting the active accent */
+    background-image: 
+        /* Primary Spotlight (Top-Right): Rich atmospheric scattering glow. 
+           Utilizes a double-stop core-bloom (30% at center, 10% mid-way) 
+           falling off to transparent at 70% radius for extreme smoothness. */
+        radial-gradient(
+            circle at 85% 15%, 
+            rgba(var(--jf-accent-rgb), 0.30) 0%, 
+            rgba(var(--jf-accent-rgb), 0.10) 35%, 
+            transparent 70%
+        ),
+        /* Secondary Spotlight (Bottom-Left): Symmetrical high-vibrancy core-bloom.
+           Matches the primary spotlight's intense scattering (30% core, 10% mid-way)
+           to create organic atmospheric layout depth and full sidebar immersion. */
+        radial-gradient(
+            circle at 15% 85%, 
+            rgba(var(--jf-accent-rgb), 0.30) 0%, 
+            rgba(var(--jf-accent-rgb), 0.10) 35%, 
+            transparent 70%
+        ) !important;
+
+    /* 7. Ensure background fills the entire screen canvas properly */
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+
+    /* 8. Promote element to dedicated hardware GPU compositing layer */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+[data-theme-mode="ambient"] .page {
+    /* 1. Reset page background to transparent so body's atmospheric gradient shows through */
+    background: transparent !important;
+    background-image: none !important;
+}
+
+/*
+ * ============================================================================
+ * VIDEO PLAYBACK OPTIMIZATION
+ * ============================================================================
+ * Completely removes all backdrop paints and image overlays when video
+ * playback is active. Deallocating the GPU texture backing store guarantees
+ * 0% CPU/GPU overhead for hardware video decoders.
+ */
+/*
+ * Full-document transparency during active video playback.
+ * Tizen AVPlay and WebOS render on native hardware overlay planes behind the webview.
+ * Both the root HTML element and body must be completely transparent to reveal the video.
+ */
+html.player-active[data-theme-mode="ambient"],
+[data-theme-mode="ambient"] body.player-active,
+html.player-active[data-theme-mode="ambient"] body {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+[data-theme-mode="ambient"] body.player-active::before,
+html.player-active[data-theme-mode="ambient"] body::before {
+    /* Instantly unloads GPU layer from memory during active video playback */
+    display: none !important;
+}
+
+[data-theme-mode="ambient"] body.player-active .page,
+html.player-active[data-theme-mode="ambient"] .page {
+    background: transparent !important;
+    background-image: none !important;
+}
+
+/*
+ * ============================================================================
+ * HIGH-PERFORMANCE GLASS-FREE IMMERSIVE SIDEBARS
+ * ============================================================================
+ * Optimized specifically for low-overhead Smart TV graphic pipelines. 
+ * Completely avoids expensive GPU blur filters (backdrop-filter) and heavy 
+ * box shadows. The sidebar background is kept fully transparent when collapsed
+ * to let the underlying dynamic ambient atmospheric gradients bleed through.
+ * When the navigation sidebar expands, it renders a gorgeous, solid linear gradient
+ * that dynamically blends a soft hint of the accent color with the deep charcoal theme foundation.
+ */
+
+[data-theme-mode="ambient"] body:not(.sidebar-mode-hidden) .sidebar:not(.expanded):not(:hover):not(.black-collapsed):not(.semi-transparent-collapsed):not(.tinted-semi-collapsed),
+[data-theme-mode="ambient"] body:not(.sidebar-mode-hidden) .sidebar.transparent-collapsed:not(.expanded):not(:hover),
+html[data-theme-mode="ambient"] body:not(.sidebar-mode-hidden) .sidebar:not(.expanded):not(:hover):not(.black-collapsed):not(.semi-transparent-collapsed):not(.tinted-semi-collapsed),
+html[data-theme-mode="ambient"] body:not(.sidebar-mode-hidden) .sidebar.transparent-collapsed:not(.expanded):not(:hover) {
+    /* 1. Fully transparent background when collapsed in normal mode to maximize ambient bleeding */
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    
+    /* 2. Deactivates complex hardware-heavy graphic operations */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    
+    /* 3. Keeps rendering thread locked for fast GPU translations */
+    will-change: transform;
+}
+
+/* 
+ * Themed expanded sidebar in Ambient mode and revealed sidebars in Always Hidden mode:
+ * Restores the rich, seamless solid gradient when expanded across all layouts that expand 
+ * (Classic & Modern Sidebar) and for Modern Collapsed layout when revealed in Always Hidden mode.
+ * Layered over base color #0a0b0c so background elements never bleed through behind icons.
+ * Strictly applies when Follow Theme is active (i.e. no custom color classes).
+ */
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar:not(.transparent-expanded):not(.black-expanded):not(.semi-transparent-expanded):not(.tinted-semi-expanded):not(.black-collapsed):not(.semi-transparent-collapsed):not(.tinted-semi-collapsed),
+html[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar:not(.transparent-expanded):not(.black-expanded):not(.semi-transparent-expanded):not(.tinted-semi-expanded):not(.black-collapsed):not(.semi-transparent-collapsed):not(.tinted-semi-collapsed),
+html:not([data-layout-sidebar="modern-collapsed"]):not([data-layout-sidebar="floating-buttons"]):not([data-layout-sidebar="floating-island"]) [data-theme-mode="ambient"] .sidebar.expanded:not(.transparent-expanded):not(.black-expanded):not(.semi-transparent-expanded):not(.tinted-semi-expanded),
+html:not([data-layout-sidebar="modern-collapsed"]):not([data-layout-sidebar="floating-buttons"]):not([data-layout-sidebar="floating-island"]) [data-theme-mode="ambient"] .sidebar:hover:not(.transparent-expanded):not(.black-expanded):not(.semi-transparent-expanded):not(.tinted-semi-expanded),
+html:not([data-layout-sidebar="modern-collapsed"]):not([data-layout-sidebar="floating-buttons"]):not([data-layout-sidebar="floating-island"])[data-theme-mode="ambient"] .sidebar.expanded:not(.transparent-expanded):not(.black-expanded):not(.semi-transparent-expanded):not(.tinted-semi-expanded),
+html:not([data-layout-sidebar="modern-collapsed"]):not([data-layout-sidebar="floating-buttons"]):not([data-layout-sidebar="floating-island"])[data-theme-mode="ambient"] .sidebar:hover:not(.transparent-expanded):not(.black-expanded):not(.semi-transparent-expanded):not(.tinted-semi-expanded) {
+    background: linear-gradient(135deg, rgba(var(--jf-accent-rgb), 0) 0%, rgba(var(--jf-accent-rgb), 0.2) 50%, rgba(5, 5, 6, 0.99) 150%), #0a0b0c !important;
+    box-shadow: none !important;
+}
+
+/* User preference overrides for ambient theme mode */
+
+[data-theme-mode="ambient"] .sidebar.semi-transparent-collapsed:not(.expanded):not(:hover),
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar.semi-transparent-collapsed {
+    background: rgba(16, 16, 16, 0.4) !important;
+    background-color: rgba(16, 16, 16, 0.4) !important;
+    background-image: none !important;
+}
+
+[data-theme-mode="ambient"] .sidebar.tinted-semi-collapsed:not(.expanded):not(:hover),
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar.tinted-semi-collapsed {
+    background: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.65) !important;
+    background-color: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.65) !important;
+    background-image: none !important;
+}
+
+[data-theme-mode="ambient"] .sidebar.black-collapsed:not(.expanded):not(:hover),
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar.black-collapsed {
+    background: #000000 !important;
+    background-color: #000000 !important;
+    background-image: none !important;
+}
+
+[data-theme-mode="ambient"] .sidebar.transparent-expanded.expanded,
+[data-theme-mode="ambient"] .sidebar.transparent-expanded:hover,
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar.transparent-expanded {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+[data-theme-mode="ambient"] .sidebar.semi-transparent-expanded.expanded,
+[data-theme-mode="ambient"] .sidebar.semi-transparent-expanded:hover,
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar.semi-transparent-expanded {
+    background: rgba(16, 16, 16, 0.4) !important;
+    background-color: rgba(16, 16, 16, 0.4) !important;
+    background-image: none !important;
+}
+
+[data-theme-mode="ambient"] .sidebar.tinted-semi-expanded.expanded,
+[data-theme-mode="ambient"] .sidebar.tinted-semi-expanded:hover,
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar.tinted-semi-expanded {
+    background: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.85) !important;
+    background-color: rgba(var(--jf-accent-dark-rgb, 15, 15, 20), 0.85) !important;
+    background-image: none !important;
+}
+
+[data-theme-mode="ambient"] .sidebar.black-expanded.expanded,
+[data-theme-mode="ambient"] .sidebar.black-expanded:hover,
+[data-theme-mode="ambient"] body.sidebar-mode-hidden .sidebar.black-expanded {
+    background: #000000 !important;
+    background-color: #000000 !important;
+    background-image: none !important;
+}
+
+[data-theme-mode="ambient"] .settings-sidebar {
+    /* 1. Fully transparent split-view menu so background gradient shines through */
+    background: transparent !important;
+    
+    /* 2. Disables filters and shadows for high performance */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    
+    /* 3. Soft clean separator border */
+    border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/*
+ * ============================================================================
+ * HIGH-PERFORMANCE NAVIGATION HIGHLIGHTS & INTERACTIONS
+ * ============================================================================
+ * Clean focus/active states optimized for speed and maximum legibility.
+ * Restricts complex operations while preserving a premium spring-like feel.
+ */
+
+[data-theme-mode="ambient"] .sidebar-item {
+    /* Fast spring transition for active scale adjustments */
+    transition: transform 0.22s cubic-bezier(0.25, 0.8, 0.25, 1), color 0.15s ease !important;
+}
+
+/*
+ * ============================================================================
+ * HIGH-CONTRAST FOCUS ACCESSIBILITY OVERRIDES
+ * ============================================================================
+ * Since the sliding focus indicator capsule is colored using --jf-accent (the
+ * active accent color, e.g. vibrant pink/red), any text or SVGs on top of it
+ * must be forced to use --jf-primary-btn-color (typically pure white) to 
+ * avoid blending into the capsule and becoming invisible.
+ * We apply a high-specificity override to all descendants of the focused item.
+ */
+[data-theme-mode="ambient"] .sidebar-item:focus,
+[data-theme-mode="ambient"] .sidebar-item.focused,
+[data-theme-mode="ambient"] .sidebar-item:focus *,
+[data-theme-mode="ambient"] .sidebar-item.focused * {
+    /* Explicitly override standard active-state specificities to guarantee AAA legibility */
+    color: var(--jf-primary-btn-color, #ffffff) !important;
+}
+
+[data-theme-mode="ambient"] .sidebar-focus-indicator {
+    /* Inset macOS-style capsule indicator */
+    border-radius: 12px !important;
+    width: calc(100% - 24px) !important;
+    left: 12px !important;
+    /* Explicitly disable shadows to avoid paint lag during sliding transitions */
+    box-shadow: none !important;
+}
+
+[data-theme-mode="ambient"] .settings-menu-btn {
+    /* Snap spring transition curve */
+    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), background-color 0.15s ease, color 0.15s ease !important;
+}
+
+[data-theme-mode="ambient"] .settings-menu-btn.active {
+    /* Sleek transparent white active tab backing */
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme-mode="ambient"] .settings-menu-btn:focus,
+[data-theme-mode="ambient"] .settings-menu-btn.focused,
+[data-theme-mode="ambient"] .settings-menu-btn:focus *,
+[data-theme-mode="ambient"] .settings-menu-btn.focused * {
+    /* Explicitly override child specificities (like .menu-icon svg) to maintain pure high contrast */
+    color: var(--jf-primary-btn-color, #ffffff) !important;
+}
+
+[data-theme-mode="ambient"] .settings-menu-btn:focus,
+[data-theme-mode="ambient"] .settings-menu-btn.focused {
+    /* Solid high-contrast focus state with zero box shadow overhead */
+    background: var(--jf-accent) !important;
+    transform: scale(1.05) translateZ(0) !important;
+    box-shadow: none !important;
+    transition: transform 0.25s cubic-bezier(0.25, 1.25, 0.5, 1), background-color 0.15s ease, color 0.15s ease !important;
+}
+
+/* Soft divider color within settings sidebars for refined visual hierarchy */
+[data-theme-mode="ambient"] .settings-sidebar-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding-bottom: 15px !important;
+}
+
+/* Fallback cleanup for active video playback sessions */
+body.player-active[data-theme-mode="ambient"] .sidebar,
+body.player-active[data-theme-mode="ambient"] .settings-sidebar {
+    background: transparent !important;
+    border-right: none !important;
+}
+
+/* 
+ * ============================================================================
+ * MODERN LOGIN PAGE OVERRIDES FOR AMBIENT IMMERSION
+ * ============================================================================
+ * Removes solid backgrounds from .login-header and .login-section containers
+ * in the modern login layout so that the body's dynamic dynamic gradients 
+ * bleed through the layout cleanly.
+ */
+html[data-layout-login="modern"] .login-header,
+html[data-layout-login="modern"] .login-section {
+    background: transparent !important;
+    background-image: none !important;
+    border-right-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+
+
+

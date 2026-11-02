@@ -1,0 +1,512 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Layout Styles
+ * ============================================================================
+ */
+
+/* ============================================================================
+ * Display Scale Viewport Normalization (Full-Bleed Desktop & Web Scaling)
+ * ============================================================================
+ * When display zoom scaling is active, ensures html, body, #app, and .page
+ * fill 100% of the screen width and height, replacing static 100vw/100vh
+ * viewport units so the layout stays 100% full-bleed with zero black borders.
+ * ============================================================================
+ */
+html[data-display-scale],
+html[data-display-scale] body {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+html[data-display-scale] #app {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+html[data-display-scale] .page {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+html[data-display-scale] .page-loading,
+html[data-display-scale] .splash-content,
+html[data-display-scale] .details-backdrop,
+html[data-display-scale] .trailer-player-overlay {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/*
+ * Standardize Hero Carousel in scaled viewports.
+ * Uses 1080p canvas proportions so that global CSS zoom scales
+ * the carousel, row overlap, content padding, and indicators
+ * completely in lockstep with the card rows.
+ */
+html[data-display-scale] .hero-carousel-container.immersive .hero-carousel,
+html[data-display-scale] .hero-carousel-container.immersive.compact .hero-carousel,
+html[data-display-scale] .hero-carousel-container.immersive-performance .hero-carousel,
+html[data-display-scale] .hero-carousel-container.immersive-performance.compact .hero-carousel {
+    /* Full immersive canvas height maintained across display-scaled viewports */
+    height: var(--hero-carousel-height-immersive, 972px) !important;
+    min-height: 0 !important;
+}
+
+html[data-display-scale] .hero-carousel-container:not(.immersive):not(.immersive-performance):not(.banner) .hero-carousel {
+    /* Fallback height reserved strictly for standard semi-immersive mode */
+    height: var(--hero-carousel-height-semi, 756px) !important;
+    min-height: 0 !important;
+}
+
+html[data-display-scale] .hero-carousel-container:not(.immersive):not(.immersive-performance):not(.banner).compact .hero-carousel {
+    /* Compact canvas height reserved strictly for semi-immersive mode */
+    height: var(--hero-carousel-height-semi-compact, 540px) !important;
+    min-height: 0 !important;
+}
+
+html[data-display-scale] .hero-carousel-container.banner .hero-carousel {
+    height: var(--hero-carousel-height-banner, 648px) !important;
+    min-height: 0 !important;
+}
+
+html[data-display-scale] .hero-carousel-container.banner.compact .hero-carousel {
+    height: var(--hero-carousel-height-banner-compact, 432px) !important;
+    min-height: 0 !important;
+}
+
+html[data-display-scale] #home-hero-placeholder.style-immersive + .home-rows,
+html[data-display-scale] #home-hero-placeholder.style-immersive-performance + .home-rows {
+    /* Deep media row upward overlap behind both standard and performance immersive backdrops */
+    margin-top: var(--hero-carousel-overlap-immersive, -450px) !important;
+}
+
+html[data-display-scale] #home-hero-placeholder.style-immersive.style-compact + .home-rows,
+html[data-display-scale] #home-hero-placeholder.style-immersive-performance.style-compact + .home-rows {
+    /* Compact deep upward overlap */
+    margin-top: var(--hero-carousel-overlap-compact, -550px) !important;
+}
+
+html[data-display-scale] .hero-carousel-container.immersive .hero-item,
+html[data-display-scale] .hero-carousel-container.immersive-performance .hero-item {
+    /* Elevated text padding matching deep row overlap */
+    padding-bottom: var(--hero-carousel-padding-immersive, 470px) !important;
+}
+
+html[data-display-scale] .hero-carousel-container.immersive.compact .hero-item,
+html[data-display-scale] .hero-carousel-container.immersive-performance.compact .hero-item {
+    /* Compact elevated text padding */
+    padding-bottom: var(--hero-carousel-padding-compact, 570px) !important;
+}
+
+html[data-display-scale] .hero-carousel-container.immersive .hero-indicators,
+html[data-display-scale] .hero-carousel-container.immersive-performance .hero-indicators {
+    /* Indicator bottom offset aligned with text baseline */
+    bottom: var(--hero-carousel-indicators-immersive, 430px) !important;
+}
+
+html[data-display-scale] .hero-carousel-container.immersive.compact .hero-indicators,
+html[data-display-scale] .hero-carousel-container.immersive-performance.compact .hero-indicators {
+    /* Compact indicator bottom offset */
+    bottom: var(--hero-carousel-indicators-compact, 530px) !important;
+}
+
+.page {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background: var(--jf-background);
+    display: flex;
+    flex-direction: column;
+}
+
+.library-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 30px 60px 0 60px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+}
+
+.header-left > *:not(:last-child) {
+    margin-right: 20px;
+}
+
+.header-logo {
+    display: flex;
+    align-items: center;
+}
+
+.header-logo > *:not(:last-child) {
+    margin-right: 12px;
+}
+
+.header-mid {
+    position: absolute;
+    left: 50%;
+    -webkit-transform: translateX(-50%);
+    transform: translateX(-50%);
+    display: flex;
+}
+
+.header-mid > *:not(:last-child) {
+    margin-right: 15px;
+}
+
+.logo-text {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--jf-text-primary);
+}
+
+.header-nav {
+    display: flex;
+}
+
+.header-nav > *:not(:last-child) {
+    margin-right: 12px;
+}
+
+/*
+ * ── Ultra-Legacy Overrides (Chrome <47 / Tizen 2.x) ──────────────────────────
+ * Chrome 32 has broken flex alignment in many contexts.
+ * Replace flex with inline-block + ghost ::before centering trick.
+ * These rules deliberately override the flex defaults above.
+ */
+html[data-layout-tier="ultra-legacy"] .header-left {
+    display: inline-block;
+    vertical-align: middle;
+    height: 100%;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-left::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-left > * {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 20px;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-left > *:last-child {
+    margin-right: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-logo {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-logo > * {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 12px;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-logo > *:last-child {
+    margin-right: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-mid {
+    display: inline-block;
+    vertical-align: middle;
+    height: 100%;
+    text-align: center;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-mid::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-mid > * {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 15px;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-mid > *:last-child {
+    margin-right: 0;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-nav {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-nav > * {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 12px;
+}
+
+html[data-layout-tier="ultra-legacy"] .header-nav > *:last-child {
+    margin-right: 0;
+}
+
+.header-clock {
+    display: flex;
+    align-items: center;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--jf-text-primary);
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.global-clock {
+    position: fixed;
+    top: 32px;
+    right: 50px;
+    z-index: 100000; /* Above everything including screensaver */
+    font-size: 1.4rem;
+    font-weight: 500;
+    color: var(--jf-text-primary);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    letter-spacing: 0.05em;
+    font-family: inherit;
+    opacity: 0.9;
+    transition: opacity 0.3s ease;
+}
+
+.page-content {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 40px;
+    position: relative;
+    /* CRITICAL: Ensures offsetTop of children is relative to this scroll container */
+
+    /* Use 'auto' not 'smooth' - FocusManager handles scrolling programmatically
+     * with adaptive behavior (instant for rapid navigation, smooth for single moves). */
+    scroll-behavior: auto;
+
+    /* GPU acceleration for smoother scrolling on TV devices */
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: scroll-position;
+
+    /* PERFORMANCE: Isolate layout and paint from the rest of the page.
+       This prevents changes inside the scroll container from triggering
+       global layout recalcs on the TV's CPU. */
+    contain: layout paint style;
+}
+
+/* Page loading styles moved to base.css */
+.page.loading .page-content>*:not(.page-loading) {
+    opacity: 0;
+}
+
+/* Global Horizontal Scroll Row (Moved from home.css) */
+.row-items {
+    display: block; 
+    overflow: hidden; /* Hide scrollbars, disable native scrolling */
+    
+    /* 
+     * VERTICAL CLEARANCE & CLIPPING PREVENTION:
+     * 24px top padding provides generous breathing room for the row title above
+     * and prevents focus card scaling (1.05x-1.08x) from clipping against the container.
+     * 38px bottom padding (scaled by font preference) ensures card subtitles have
+     * complete clearance, while working with 28px row margin to keep subtitles
+     * completely off-screen above the viewport when subsequent rows are focused.
+     */
+    padding: 24px 0 calc(38px * var(--card-title-font-scale, 1)); 
+    
+    /* PERFORMANCE: Isolate horizontal rows */
+    contain: layout paint style;
+}
+
+/* GPU Accelerated slide track wrapper */
+.row-items-track {
+    position: relative; /* GUARANTEE offsetParent for JS calculation */
+    display: inline-flex;
+    padding-left: 0;
+    padding-right: 0; /* Spacer managed by JS for virtual rows */
+    
+    -webkit-transform: translateZ(0); /* Hardware accelerate */
+    transform: translateZ(0); /* Hardware accelerate */
+    will-change: transform;
+    -webkit-transition: -webkit-transform 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: transform 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Media Row Scroll Navigation Arrows — hidden by default, revealed smoothly on hover */
+.row-scroll-arrows {
+    position: absolute;
+    top: 0;
+    right: 160px; /* Offset from right edge to clear clock */
+    display: flex;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.scroll-arrow.left-arrow {
+    margin-right: 12px;
+}
+
+[dir="rtl"] .scroll-arrow.left-arrow {
+    margin-right: 0;
+    margin-left: 12px;
+}
+
+/* Reveal on hover over the parent row section across all platforms */
+.media-row:hover .row-scroll-arrows {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+[dir="rtl"] .row-scroll-arrows {
+    right: auto;
+    left: 160px;
+}
+
+[dir="rtl"] .scroll-arrow svg {
+    transform: rotate(180deg);
+}
+
+.scroll-arrow {
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    color: var(--jf-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.2s, color 0.2s;
+
+
+}
+
+.scroll-arrow:hover {
+    background: var(--jf-accent-content-color);
+    color: var(--jf-accent);
+    transform: scale(1.05);
+    transition: background .2s, transform .2s, color .2s;
+}
+
+.scroll-arrow:active {
+    transform: scale(0.95);
+}
+
+.scroll-arrow svg {
+    pointer-events: none;
+}
+
+/* ============================================================================
+ * Sidebar Layout Support
+ * ============================================================================ */
+
+/* Sidebar Container (Fixed Left) */
+#sidebar-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width-collapsed, 100px);
+    /* Match sidebar.css var */
+    z-index: 200;
+    overflow: visible;
+    pointer-events: none; /* Let clicks through the empty container area */
+}
+
+/* Ensure the sidebar itself re-enables pointer events */
+#sidebar-container .sidebar {
+    pointer-events: auto;
+}
+
+/* Page Container (Fills rest of screen) */
+#page-container {
+    position: absolute;
+    top: 0;
+    left: var(--sidebar-width-collapsed, 100px);
+    right: 0;
+    bottom: 0;
+    /* PERFORMANCE: Disable transition of left property to avoid reflows */
+    /* transition: left 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); */
+
+    /* Ensure pages mount here correctly */
+    display: flex;
+    flex-direction: column;
+}
+
+#page-container .page {
+    width: 100%;
+    height: 100%;
+}
+
+/* ============================================================================
+ * Utility Classes
+ * ============================================================================ */
+
+/* Hide sidebar and expand content area */
+body.no-sidebar #sidebar-container {
+    display: none;
+}
+
+body.no-sidebar #page-container {
+    left: 0;
+}
+
+/* ============================================================================
+ * Sidebar Hidden Mode Support
+ * ============================================================================ */
+
+body.sidebar-mode-hidden #sidebar-container {
+    width: 0;
+}
+
+body.sidebar-mode-hidden #page-container {
+    left: 0;
+}
+
+
+/*
+ * ── Chrome 26 Quirks Overrides: Global Page Scroll Constraints ───────────────
+ * Forces the base .page container into a vertical 2009 box model, and sets 
+ * .page-content to box-flex: 1 with height: 0. This forces the browser to 
+ * subtract header heights and constrain the content panel's vertical height, 
+ * enabling standard internal scrolling (overflow-y: auto) on Chrome 26.
+ */
+html[data-layout-quirks="c26"] .page {
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    width: 100% !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+html[data-layout-quirks="c26"] .page-content {
+    display: block !important;
+    -webkit-box-flex: 1 !important;
+    height: 0 !important; /* Constrains height to force overflow triggers */
+    overflow-y: auto !important;
+}

@@ -1,0 +1,764 @@
+/**
+ * SubtitleStyles - Subtitle Style Generator
+ *
+ * Generates CSS styles from player subtitle settings.
+ * Adapts logic from jellyfin-web's subtitleappearancehelper.js
+ */
+
+import { PlayerSettings } from './PlayerSettings.js';
+import { getFallbackFontFamily, getFallbackFontName } from './FallbackFonts.js';
+
+/**
+ * Convert HEX color to RGBA
+ * @param {string} hex - Hex color code (e.g., #ffffff)
+ * @param {number} opacity - Opacity percentage (0-100)
+ * @returns {string} RGBA color string
+ */
+function _hexToRgba(hex, opacity) {
+    if (!hex || hex === 'transparent') return 'transparent';
+
+    // Remove hash
+    hex = hex.replace('#', '');
+
+    // Parse values
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const a = (opacity / 100).toFixed(2);
+
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+/**
+ * Resolves responsive height calculation for subtitle sizing and margins.
+ *
+ * Supports modern engines and mobile viewports (where AndroidAdapter applies CSS zoom
+ * and sets --litefin-app-h) by referencing var(--litefin-app-h, 100vh). This ensures
+ * subtitle cues scale proportionally with the rest of the 1600px/750px UI canvas
+ * rather than shrinking twice under viewport zoom.
+ *
+ * For ultra-legacy engines lacking CSS custom property support (e.g. Chrome 38 on Tizen 2.4),
+ * falls back gracefully to standard vh units.
+ *
+ * @param {number} fraction - Fractional height value (e.g., 0.05 for 5vh)
+ * @returns {string} CSS size expression
+ */
+function _getResponsiveHeight(fraction) {
+    // Check if browser/engine natively supports CSS custom properties
+    if (
+        typeof window !== 'undefined' &&
+        typeof CSS !== 'undefined' &&
+        typeof CSS.supports === 'function' &&
+        CSS.supports('--a', '0')
+    ) {
+        return `calc(var(--litefin-app-h, 100vh) * ${fraction})`;
+    }
+    // Safe legacy fallback to standard viewport height
+    return `${fraction * 100}vh`;
+}
+
+// ============================================================================
+// Text Styles Generator
+// ============================================================================
+
+/**
+ * Generate text CSS styles from settings
+ *
+ * Supports dynamic selection of subtitle opacity settings depending on
+ * whether the current playing video is encoded in SDR or HDR format.
+ *
+ * @param {boolean} isHdr - Whether the active playback stream is High Dynamic Range
+ * @returns {Object[]} Array of {name, value} CSS properties
+ */
+export function getTextStyles(isHdr = false) {
+    const styles = [];
+
+    // Reset properties that might have been set by other modes (like 'border')
+    styles.push({ name: 'webkitTextStroke', value: '' });
+    styles.push({ name: 'paintOrder', value: '' });
+
+    // ========================================================================
+    // Font Size
+    // Options: small, medium, large, larger, extralarge
+    // ========================================================================
+    const size = PlayerSettings.get('subtitleSize') || 'medium';
+    switch (size) {
+        case 'extralarge':
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(0.08) });
+            break;
+        case 'larger':
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(0.07) });
+            break;
+        case 'large':
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(0.06) });
+            break;
+        case 'mediumlarge':
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(0.055) });
+            break;
+        case 'small':
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(0.04) });
+            break;
+        case 'smaller':
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(0.03) });
+            break;
+        case 'custom': {
+            const customSizeV = PlayerSettings.get('subtitleSizeCustomValue') ?? 5;
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(customSizeV / 100) });
+            break;
+        }
+        case 'medium':
+        default:
+            styles.push({ name: 'fontSize', value: _getResponsiveHeight(0.05) });
+            break;
+    }
+
+    // ========================================================================
+    // Font Weight
+    // Options: normal, bold
+    // ========================================================================
+    const weight = PlayerSettings.get('subtitleWeight') || 'normal';
+    styles.push({ name: 'fontWeight', value: weight });
+
+    // ========================================================================
+    // Text Shadow / Drop Shadow
+    // Options: uniform, dropshadow, raised, depressed, none
+    // ========================================================================
+    // ========================================================================
+    // Text Opacity
+    // Select the appropriate opacity configuration key dynamically.
+    // HDR content requires distinct luminance levels for overlay transparency.
+    // ========================================================================
+    const opacityKey = isHdr ? 'subtitleTextOpacityHdr' : 'subtitleTextOpacity';
+
+    /* -------------------------------------------------------------
+       Fetch transparency percentage from player settings backend.
+       Fallback value defaults to 100% (fully opaque).
+       ------------------------------------------------------------- */
+    const textOpacity = PlayerSettings.get(opacityKey) ?? 100;
+
+    // ========================================================================
+    // Text Shadow / Drop Shadow
+    // Options: dropshadow, heavy, raised, depressed, uniform, none
+    // ========================================================================
+    const shadow = PlayerSettings.get('subtitleDropShadow') || 'uniform';
+
+    // Custom Shadow Settings
+    const shadowOpacity = PlayerSettings.get('subtitleDropShadowOpacity') ?? 20;
+    const shadowColorHex = PlayerSettings.get('subtitleDropShadowColor') || '#000000';
+    const shadowBlur = PlayerSettings.get('subtitleDropShadowBlur') ?? 6;
+    const blurPx = `${shadowBlur}px`;
+
+    const borderWidth = PlayerSettings.get('subtitleBorderWidth') ?? 3;
+    const borderPx = `${borderWidth}px`;
+    const borderOpacity = PlayerSettings.get('subtitleBorderOpacity') ?? 100;
+
+    // Generate valid RGBA for shadow, border, and highlight (for 3D effects).
+    const borderShadowColor = _hexToRgba(shadowColorHex, borderOpacity);
+    const shadowColor = _hexToRgba(shadowColorHex, shadowOpacity);
+    const highlightColor = _hexToRgba('#ffffff', shadowOpacity); // Keep highlight white but respect opacity
+
+    switch (shadow) {
+        case 'heavy':
+        case 'dropshadow':
+            // "Heavy" and "Drop Shadow" are effectively custom shadows now
+            styles.push({ name: 'textShadow', value: `${shadowColor} 0px 0px ${blurPx}` });
+            break;
+        case 'raised':
+            styles.push({
+                name: 'textShadow',
+                value: `-1px -1px ${blurPx} ${highlightColor}, 0px -1px ${blurPx} ${highlightColor}, -1px 0px ${blurPx} ${highlightColor}, 1px 1px ${blurPx} ${shadowColor}, 0px 1px ${blurPx} ${shadowColor}, 1px 0px ${blurPx} ${shadowColor}`
+            });
+            break;
+        case 'depressed':
+            styles.push({
+                name: 'textShadow',
+                value: `1px 1px ${blurPx} ${highlightColor}, 0px 1px ${blurPx} ${highlightColor}, 1px 0px ${blurPx} ${highlightColor}, -1px -1px ${blurPx} ${shadowColor}, 0px -1px ${blurPx} ${shadowColor}, -1px 0px ${blurPx} ${shadowColor}`
+            });
+            break;
+        case 'uniform':
+            styles.push({
+                name: 'textShadow',
+                value: `${shadowColor} 0px 1px ${blurPx}, ${shadowColor} 0px -1px ${blurPx}, ${shadowColor} 1px 0px ${blurPx}, ${shadowColor} -1px 0px ${blurPx}, ${shadowColor} 1px 1px ${blurPx}, ${shadowColor} -1px 1px ${blurPx}, ${shadowColor} 1px -1px ${blurPx}, ${shadowColor} -1px -1px ${blurPx}`
+            });
+            break;
+        case 'border':
+            // Solid border logic using -webkit-text-stroke.
+            // Using 'paint-order: stroke fill' ensures the border stays behind the text
+            // so it doesn't thin out the glyphs even at high widths.
+            styles.push({ name: 'webkitTextStroke', value: `${borderPx} ${borderShadowColor}` });
+            styles.push({ name: 'paintOrder', value: 'stroke fill' });
+            styles.push({ name: 'textShadow', value: 'none' });
+            break;
+        case 'uniform_border':
+            // Combines stroke-based border outline with uniform drop shadow blur.
+            styles.push({ name: 'webkitTextStroke', value: `${borderPx} ${borderShadowColor}` });
+            styles.push({ name: 'paintOrder', value: 'stroke fill' });
+            styles.push({
+                name: 'textShadow',
+                value: `${shadowColor} 0px 1px ${blurPx}, ${shadowColor} 0px -1px ${blurPx}, ${shadowColor} 1px 0px ${blurPx}, ${shadowColor} -1px 0px ${blurPx}, ${shadowColor} 1px 1px ${blurPx}, ${shadowColor} -1px 1px ${blurPx}, ${shadowColor} 1px -1px ${blurPx}, ${shadowColor} -1px -1px ${blurPx}`
+            });
+            break;
+        case 'none':
+            styles.push({ name: 'textShadow', value: 'none' });
+            break;
+        default:
+            styles.push({ name: 'textShadow', value: `${shadowColor} 0px 0px ${blurPx}` });
+            break;
+    }
+
+    // ========================================================================
+    // Text Color
+    // Select the appropriate color configuration key dynamically.
+    // HDR media might benefit from softer gray/yellow tones to prevent eye strain.
+    // ========================================================================
+    const colorKey = isHdr ? 'subtitleTextColorHdr' : 'subtitleTextColor';
+
+    /* -------------------------------------------------------------
+       Fetch selected hex code from player settings backend.
+       Fallback value defaults to standard White (#ffffff).
+       ------------------------------------------------------------- */
+    const textColor = PlayerSettings.get(colorKey) || '#ffffff';
+    // textOpacity is already defined above for shadows
+    styles.push({ name: 'color', value: _hexToRgba(textColor, textOpacity) });
+
+    // ========================================================================
+    // Background Color
+    // ========================================================================
+    const background = PlayerSettings.get('subtitleTextBackground') || 'transparent';
+    const bgOpacity = PlayerSettings.get('subtitleBackgroundOpacity') ?? 100;
+
+    if (background === 'transparent' || background === 'none') {
+        styles.push({ name: 'backgroundColor', value: 'transparent' });
+    } else {
+        styles.push({ name: 'backgroundColor', value: _hexToRgba(background, bgOpacity) });
+    }
+
+    // ========================================================================
+    // Font Family
+    // Options: default, typewriter, print, console, cursive, casual, smallcaps
+    // ========================================================================
+    const font = PlayerSettings.get('subtitleFont') || '';
+    styles.push({
+        name: 'fontFamily',
+        value: getFallbackFontName(font) ? `"${getFallbackFontFamily(font)}", sans-serif` : ''
+    });
+
+    switch (font) {
+        case 'typewriter':
+            styles.push({ className: 'font-typewriter' });
+            break;
+        case 'print':
+            styles.push({ className: 'font-print' });
+            break;
+        case 'console':
+            styles.push({ className: 'font-console' });
+            break;
+        case 'cursive':
+            styles.push({ className: 'font-cursive' });
+            break;
+        case 'casual':
+            styles.push({ className: 'font-casual' });
+            break;
+        case 'smallcaps':
+            styles.push({ className: 'font-smallcaps' });
+            break;
+        case 'poppins':
+            styles.push({ className: 'font-poppins' });
+            break;
+        case 'roboto':
+            styles.push({ className: 'font-roboto' });
+            break;
+        case 'google':
+            styles.push({ className: 'font-google' });
+            break;
+        case 'noto-arabic':
+            styles.push({ className: 'font-noto-arabic' });
+            break;
+        case 'retrotech':
+            styles.push({ className: 'font-retrotech' });
+            break;
+        case 'kitty':
+            styles.push({ className: 'font-kitty' });
+            break;
+        case 'inter':
+            styles.push({ className: 'font-inter' });
+            break;
+        case 'proxima':
+            styles.push({ className: 'font-proxima' });
+            break;
+        case 'baloo':
+            styles.push({ className: 'font-baloo' });
+            break;
+        case 'silkscreen':
+            styles.push({ className: 'font-silkscreen' });
+            break;
+        case 'space-grotesk':
+            styles.push({ className: 'font-space-grotesk' });
+            break;
+        case 'poiret-one':
+            styles.push({ className: 'font-poiret-one' });
+            break;
+        case 'zen-kaku-gothic-new':
+            styles.push({ className: 'font-zen-kaku-gothic-new' });
+            break;
+        case 'opendyslexic':
+            styles.push({ className: 'font-opendyslexic' });
+            break;
+        case 'atkinson':
+            styles.push({ className: 'font-atkinson' });
+            break;
+        case 'manrope':
+            styles.push({ className: 'font-manrope' });
+            break;
+        case 'fallback-font':
+            styles.push({ className: 'font-fallback-font' });
+            break;
+        default:
+            styles.push({ className: 'font-default' });
+            break;
+    }
+
+    // Vertical Position (affects margin)
+    // Negative = from bottom, Positive = from top
+    // ========================================================================
+    // Vertical Position (affects margin)
+    // Negative = from bottom, Positive = from top
+    // ========================================================================
+    const posSetting = PlayerSettings.get('subtitleVerticalPosition');
+
+    if (posSetting === 'custom') {
+        // Custom positioning is handled by getWindowStyles (absolute positioning)
+        // so we remove any text margins
+        styles.push({ name: 'marginBottom', value: '' });
+        styles.push({ name: 'marginTop', value: '' });
+    } else {
+        let pos = parseFloat(posSetting);
+        if (isNaN(pos)) pos = -2; // Default to bottom standard
+        const step = 0.05; // 5% height step
+
+        if (pos < 0) {
+            // Bottom: pos is -1, -2, -5...
+            const marginFraction = Math.abs(pos + 1) * step;
+            styles.push({ name: 'marginBottom', value: _getResponsiveHeight(marginFraction) });
+            styles.push({ name: 'marginTop', value: '' });
+        } else {
+            // Top: pos is 0, 2...
+            const marginFraction = pos * step;
+            styles.push({ name: 'marginBottom', value: '' });
+            styles.push({ name: 'marginTop', value: _getResponsiveHeight(marginFraction) });
+        }
+    }
+
+    return styles;
+}
+
+// ============================================================================
+// Window/Container Styles Generator
+// ============================================================================
+
+/**
+ * Generate container/window CSS styles from settings
+ * @returns {Object[]} Array of {name, value} CSS properties
+ */
+export function getWindowStyles() {
+    const styles = [];
+    const posSetting = PlayerSettings.get('subtitleVerticalPosition');
+
+    if (posSetting === 'custom') {
+        const customPos = PlayerSettings.get('subtitleVerticalPositionCustom') ?? 10;
+        styles.push({ name: 'top', value: '' });
+        styles.push({ name: 'bottom', value: `${customPos}%` });
+    } else {
+        let pos = parseFloat(posSetting);
+        if (isNaN(pos)) pos = -2; // Default to bottom standard
+
+        if (pos < 0) {
+            // Position at bottom
+            styles.push({ name: 'top', value: '' });
+            styles.push({ name: 'bottom', value: _getResponsiveHeight(0.02) }); // Lower base constraint
+        } else {
+            // Position at top
+            styles.push({ name: 'top', value: _getResponsiveHeight(0.02) }); // Lower base constraint
+            styles.push({ name: 'bottom', value: '' });
+        }
+    }
+
+    return styles;
+}
+
+// ============================================================================
+// Secondary Subtitle Style Generators
+// Secondary subtitles inherit ALL primary appearance settings (color, shadow,
+// font family, weight, opacity, background) but have their own independent
+// size and position controls.
+// ============================================================================
+
+/**
+ * Generate text styles for the secondary subtitle overlay.
+ * Inherits all primary text styles, then overrides fontSize with the
+ * secondary-specific size setting.
+ *
+ * @param {boolean} isHdr - Whether the active playback stream is High Dynamic Range
+ * @returns {Object[]} Array of {name, value} CSS properties
+ */
+export function getSecondaryTextStyles(isHdr = false) {
+    /* -------------------------------------------------------------
+       Fetch baseline visual attributes from the primary text styles.
+       Pass down HDR context to apply appropriate opacity setting.
+       ------------------------------------------------------------- */
+    const styles = getTextStyles(isHdr);
+
+    // Override just the font size with the secondary-specific size preference
+    const size = PlayerSettings.get('secondarySubtitleSize') || 'medium';
+    const fontSizeMap = {
+        extralarge: _getResponsiveHeight(0.08),
+        larger: _getResponsiveHeight(0.07),
+        large: _getResponsiveHeight(0.06),
+        mediumlarge: _getResponsiveHeight(0.055),
+        medium: _getResponsiveHeight(0.05),
+        small: _getResponsiveHeight(0.04),
+        smaller: _getResponsiveHeight(0.03)
+    };
+    const resolvedSize = fontSizeMap[size] || _getResponsiveHeight(0.05);
+
+    // Patch the existing fontSize entry in-place (getTextStyles always adds one)
+    const fontSizeIdx = styles.findIndex((s) => s.name === 'fontSize');
+    if (fontSizeIdx !== -1) {
+        styles[fontSizeIdx].value = resolvedSize;
+    } else {
+        // Safety fallback — should never happen, but just in case
+        styles.unshift({ name: 'fontSize', value: resolvedSize });
+    }
+
+    // Also override the margin values — secondary position is fully managed
+    // by getSecondaryWindowStyles() instead, so we clear any margin offsets
+    // that the primary getTextStyles() may have injected based on primary position.
+    const marginBottomIdx = styles.findIndex((s) => s.name === 'marginBottom');
+    const marginTopIdx = styles.findIndex((s) => s.name === 'marginTop');
+    if (marginBottomIdx !== -1) styles[marginBottomIdx].value = '';
+    if (marginTopIdx !== -1) styles[marginTopIdx].value = '';
+
+    return styles;
+}
+
+/**
+ * Generate container/window CSS styles for the secondary subtitle overlay.
+ * Uses secondary-specific position settings; logic mirrors getWindowStyles()
+ * but reads secondarySubtitleVerticalPosition instead.
+ *
+ * @returns {Object[]} Array of {name, value} CSS properties
+ */
+export function getSecondaryWindowStyles() {
+    const styles = [];
+    const posSetting = PlayerSettings.get('secondarySubtitleVerticalPosition') || 'custom';
+
+    /*
+     * ========================================================================
+     * Secondary Subtitle Positioning Logic
+     * ========================================================================
+     * Secondary subtitles default to custom absolute top percentage positioning.
+     * Setting 'bottom: auto' explicitly neutralizes any primary subtitle bottom
+     * anchor inherited from the base .subtitle-overlay class.
+     * ========================================================================
+     */
+    if (posSetting === 'custom') {
+        // Custom: absolute % from top of screen (Standard for secondary)
+        const customPos = PlayerSettings.get('secondarySubtitleVerticalPositionCustom') ?? 10;
+        styles.push({ name: 'top', value: `${customPos}%` });
+        styles.push({ name: 'bottom', value: 'auto' });
+    } else {
+        let pos = parseFloat(posSetting);
+        // Fallback or legacy preset handling
+        if (isNaN(pos)) pos = 1;
+
+        if (pos >= 0) {
+            // Top-anchored position
+            styles.push({ name: 'top', value: _getResponsiveHeight(0.02) });
+            styles.push({ name: 'bottom', value: 'auto' });
+        } else {
+            // Bottom-anchored position
+            styles.push({ name: 'top', value: 'auto' });
+            styles.push({ name: 'bottom', value: _getResponsiveHeight(0.02) });
+        }
+    }
+
+    return styles;
+}
+
+/**
+ * ============================================================================
+ * Smart Screen Hemisphere Classification Helpers
+ * ============================================================================
+ * Determine whether a subtitle overlay is positioned in the upper or lower half
+ * of the television display viewport.
+ *
+ * This directional classification powers context-aware OSD dodging:
+ * - Subtitles placed in the bottom half dodge UPWARDS when player controls show.
+ * - Subtitles placed in the top half dodge DOWNWARDS when the top bar shows.
+ *
+ * Primary subtitle custom position represents percentage offset from screen BOTTOM.
+ * Secondary subtitle custom position represents percentage offset from screen TOP.
+ * ============================================================================
+ */
+
+/**
+ * Evaluates whether the primary subtitle track is positioned within the lower half.
+ *
+ * @returns {boolean} True if situated in the bottom hemisphere; false if top.
+ */
+export function isPrimarySubtitleInBottomHalf() {
+    // Retrieve the active vertical positioning setting string or preset
+    const posSetting = PlayerSettings.get('subtitleVerticalPosition');
+
+    // Handle user-specified numeric percentage slider offset
+    if (posSetting === 'custom') {
+        // Primary custom position is anchored from the bottom of the screen (0% - 100%)
+        const customPos = PlayerSettings.get('subtitleVerticalPositionCustom') ?? 10;
+
+        // Offsets strictly below 50% from the bottom reside in the lower hemisphere
+        return customPos < 50;
+    }
+
+    // Parse legacy or preset numerical strings (e.g., "-2" for bottom, "0" for top)
+    let pos = parseFloat(posSetting);
+
+    // Default to -2 (bottom standard baseline constraint) when unset or invalid
+    if (isNaN(pos)) pos = -2;
+
+    // Negative positions correspond to bottom-anchored placement
+    return pos < 0;
+}
+
+/**
+ * Evaluates whether the secondary subtitle track is positioned within the lower half.
+ *
+ * @returns {boolean} True if situated in the bottom hemisphere; false if top.
+ */
+export function isSecondarySubtitleInBottomHalf() {
+    // Secondary positioning defaults to custom slider percentage from the top
+    const posSetting = PlayerSettings.get('secondarySubtitleVerticalPosition') || 'custom';
+
+    // Handle user-specified numeric percentage slider offset
+    if (posSetting === 'custom') {
+        // Secondary custom position is measured as an absolute % from the TOP of the display
+        const customPos = PlayerSettings.get('secondarySubtitleVerticalPositionCustom') ?? 10;
+
+        // When custom position is >= 50% (e.g., 75%, 85%, 90%), the cue renders in
+        // the lower hemisphere (directly above or alongside primary subtitles).
+        // Therefore, it must dodge UPWARDS away from bottom OSD playback controls.
+        return customPos >= 50;
+    }
+
+    // Parse legacy or preset numerical values if configured
+    let pos = parseFloat(posSetting);
+
+    // Preset fallback defaults to 1 (top standard layout)
+    if (isNaN(pos)) pos = 1;
+
+    // Negative preset values represent bottom-anchored placement
+    return pos < 0;
+}
+
+// List of all possible font classes for cleanup
+const fontClasses = [
+    'font-typewriter',
+    'font-print',
+    'font-console',
+    'font-cursive',
+    'font-casual',
+    'font-smallcaps',
+    'font-poppins',
+    'font-noto-arabic',
+    'font-roboto',
+    'font-google',
+    'font-silkscreen',
+    'font-space-grotesk',
+    'font-retrotech',
+    'font-kitty',
+    'font-inter',
+    'font-proxima',
+    'font-baloo',
+    'font-poiret-one',
+    'font-zen-kaku-gothic-new',
+    'font-opendyslexic',
+    'font-atkinson',
+    'font-manrope',
+    'font-fallback-font',
+    'font-default'
+];
+
+/**
+ * Apply styles to an element
+ * @param {HTMLElement} element
+ * @param {Object[]} styles
+ */
+export function applyStyles(element, styles) {
+    if (!element) return;
+
+    // First, clear any existing font classes
+    element.classList.remove(...fontClasses);
+
+    // Ultra-legacy hardware uses !important in player-page.css for fallback styles.
+    // We must apply inline styles with !important priority to override them dynamically.
+    const isUltraLegacy = document.documentElement.getAttribute('data-layout-tier') === 'ultra-legacy';
+
+    for (const style of styles) {
+        if (style.className) {
+            element.classList.add(style.className);
+        } else if (style.value !== undefined) {
+            if (isUltraLegacy) {
+                // Convert camelCase to kebab-case
+                const propName = style.name.replace(/([A-Z])/g, '-$1').toLowerCase();
+                element.style.setProperty(propName, style.value, 'important');
+            } else {
+                element.style[style.name] = style.value;
+            }
+        }
+    }
+}
+
+/**
+ * Get the current subtitle font ID from settings
+ * Used by PlayerPage to trigger font preloading
+ * @returns {string|null} The font ID (e.g. 'typewriter', 'cursive') or null
+ */
+function getCurrentFontId(settingKey = 'subtitleFont') {
+    const font = PlayerSettings.get(settingKey) || '';
+    // Return null for 'default' or empty (no Google Font needed)
+    return font && font !== 'default' ? font : null;
+}
+
+export default {
+    getTextStyles,
+    getWindowStyles,
+    getSecondaryTextStyles,
+    getSecondaryWindowStyles,
+    applyStyles,
+    getCurrentFontId,
+    isPrimarySubtitleInBottomHalf,
+    isSecondarySubtitleInBottomHalf,
+    getFontClassName: (settingKey = 'subtitleFont') => {
+        const font = PlayerSettings.get(settingKey) || '';
+        switch (font) {
+            case 'typewriter':
+                return 'font-typewriter';
+            case 'print':
+                return 'font-print';
+            case 'console':
+                return 'font-console';
+            case 'cursive':
+                return 'font-cursive';
+            case 'casual':
+                return 'font-casual';
+            case 'smallcaps':
+                return 'font-smallcaps';
+            case 'poppins':
+                return 'font-poppins';
+            case 'roboto':
+                return 'font-roboto';
+            case 'google':
+                return 'font-google';
+            case 'noto-arabic':
+                return 'font-noto-arabic';
+            case 'silkscreen':
+                return 'font-silkscreen';
+            case 'space-grotesk':
+                return 'font-space-grotesk';
+            case 'retrotech':
+                return 'font-retrotech';
+            case 'kitty':
+                return 'font-kitty';
+            case 'inter':
+                return 'font-inter';
+            case 'proxima':
+                return 'font-proxima';
+            case 'baloo':
+                return 'font-baloo';
+            case 'poiret-one':
+                return 'font-poiret-one';
+            case 'zen-kaku-gothic-new':
+                return 'font-zen-kaku-gothic-new';
+            case 'opendyslexic':
+                return 'font-opendyslexic';
+            case 'atkinson':
+                return 'font-atkinson';
+            case 'manrope':
+                return 'font-manrope';
+            case 'fallback-font':
+                return 'font-fallback-font';
+            default:
+                return 'font-default';
+        }
+    },
+    getFontFamily: (settingKey = 'subtitleFont') => {
+        const font = PlayerSettings.get(settingKey) || '';
+        const fallbackFamily = getFallbackFontFamily(font);
+        if (fallbackFamily) return fallbackFamily;
+        switch (font) {
+            case 'typewriter':
+                return 'Courier Prime';
+            case 'print':
+                return 'Merriweather';
+            case 'console':
+                return 'Inconsolata';
+            case 'cursive':
+                return 'Dancing Script';
+            case 'casual':
+                return 'Patrick Hand';
+            case 'smallcaps':
+                return 'Cinzel';
+            case 'poppins':
+                return 'Poppins';
+            case 'roboto':
+                return 'Roboto';
+            case 'google':
+                return 'Google Sans';
+            case 'noto-arabic':
+                return 'Noto Sans Arabic';
+            case 'silkscreen':
+                return 'Silkscreen';
+            case 'retrotech':
+                return 'RETROTECH';
+            case 'kitty':
+                return 'Kitty';
+            case 'inter':
+                return 'Inter';
+            case 'proxima':
+                return 'Proxima Nova';
+            case 'baloo':
+                return 'Baloo Bhaijaan 2';
+            case 'space-grotesk':
+                return 'Space Grotesk';
+            case 'poiret-one':
+                return 'Poiret One';
+            case 'zen-kaku-gothic-new':
+                return 'Zen Kaku Gothic New';
+            case 'opendyslexic':
+                return 'OpenDyslexic';
+            case 'atkinson':
+                return 'Atkinson Hyperlegible';
+            case 'manrope':
+                return 'Manrope';
+            case 'fallback-font':
+                return 'Jellyfin Fallback Font';
+            default:
+                // Return null when no specific font is selected, so callers that
+                // respect a null value (e.g. _preProcessAssContent) won't override
+                // the ASS file's own Fontname with a platform default.
+                return null;
+        }
+    },
+    getFontScale: (settingKey = 'subtitleFont') => {
+        const font = PlayerSettings.get(settingKey) || '';
+        const userScale = PlayerSettings.get('subtitleFontScale') ?? 1.0;
+
+        let baseScale = 1.0;
+        switch (font) {
+            case 'noto-arabic':
+                baseScale = 2.0; // Noto Arabic is visually much smaller/thinner
+                break;
+        }
+
+        return baseScale * userScale;
+    }
+};

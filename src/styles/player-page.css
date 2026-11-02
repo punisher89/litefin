@@ -1,0 +1,1080 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Player Page Styles
+ * ============================================================================
+ * Styles for full-screen video player, OSD, and subtitle overlays.
+ * Uses glassmorphism and smooth animations.
+ * ============================================================================
+ */
+
+/* ==========================================================================
+   Player Page Container
+   ========================================================================== */
+
+.player-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* On Tizen, AVPlayer renders on a hardware plane BEHIND HTML.
+       We must use a transparent background so the video is visible.
+       For web/browser fallback, the <video> element itself has a black bg. */
+    background: transparent;
+    z-index: 2000;
+    /* Above sidebar (1000) */
+}
+
+/* ==========================================================================
+   Loading Overlay & Backdrop Transition Layer
+   ========================================================================== */
+
+/*
+ * To prevent desktop see-through on Tauri / Windows builds with transparent windows,
+ * the player loading overlay must always initialize with an opaque pitch-black background.
+ * As the item backdrop loads, it smoothly cross-fades into view above the solid black base.
+ */
+.player-page .page-loading {
+    background-color: #000000 !important;
+    background: #000000 !important;
+}
+
+/* Dedicated backdrop image presentation plane within the player loading screen */
+.player-page .loading-backdrop-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Ensure the central loading indicator is elevated above the backdrop layer */
+.player-page .page-loading .loading-spinner,
+.player-page .page-loading .loading-spinner-container {
+    position: relative;
+    z-index: 1;
+}
+
+/* ==========================================================================
+   Video Container
+   ========================================================================== */
+
+.player-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Clip overflowing video or canvas elements in zoom/crop mode */
+    overflow: hidden;
+    /* Transparent to allow Tizen AVPlayer video to show through */
+    background: transparent;
+}
+
+/* ==========================================================================
+   WebOS Video Surface Normalization
+   ==========================================================================
+   On webOS, WebOSPlayer dynamically fits the <video> layout box directly
+   to the active media stream aspect ratio (_fitVideoBox) to prevent hardware
+   plane distortion on non-16:9 streams. Because document-level player-active
+   transparency rules make ancestor layers transparent, the container itself
+   must maintain an opaque pitch-black presentation background so letterbox
+   and pillarbox margins do not reveal the host platform's white canvas.
+   ========================================================================== */
+html[data-platform="webos"] .player-container {
+    background: #000000 !important;
+}
+
+.player-container video,
+.player-container movi-player,
+.player-container .movi-player-container,
+.player-container canvas.movi-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}
+
+/* ExoPlayer Surface Proxy:
+   Kept 100% transparent so the zero-copy hardware SurfaceView beneath
+   the WebView remains visible with zero compositor overhead. */
+.player-container .exoplayer-surface-proxy {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: transparent !important;
+    pointer-events: none;
+}
+
+/* ==========================================================================
+   Audio / Music Visualizer Overlay
+   ========================================================================== */
+
+.audio-visual-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 40; /* Above video (0) but below OSD (50) */
+    display: -webkit-flex;
+    display: flex;
+    -webkit-justify-content: center;
+    justify-content: center;
+    -webkit-align-items: center;
+    align-items: center;
+    background: #000;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+.audio-visual-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.audio-backdrop {
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 120%;
+    height: 120%;
+    background-size: cover;
+    background-position: center;
+    filter: blur(150px) brightness(0.4);
+    z-index: 1;
+}
+
+.audio-player-center {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    z-index: 2;
+    /* Keep the album art and metadata vertically centered */
+    -webkit-transform: translateY(10px);
+    transform: translateY(10px);
+    -webkit-transition: -webkit-transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+}
+
+body.lyrics-active .audio-player-center {
+    /* Translate the wrapper to the left and keep the slight upward position when lyrics are active */
+    -webkit-transform: translate(-20vw, 10px);
+    transform: translate(-20vw, 10px);
+}
+
+.audio-album-art {
+    position: relative;
+    width: 550px;
+    height: 550px;
+    border-radius: 18px;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 25px 40px rgba(0, 0, 0, 0.35);
+    -webkit-transition: opacity 0.4s ease;
+    transition: opacity 0.4s ease;
+}
+
+.audio-metadata {
+    margin-top: 24px; /* Clean, spacious distance between cover photo and the track details */
+    text-align: center;
+    color: #fff;
+    max-width: 660px;
+    z-index: 3;
+}
+
+/*
+ * Track name title typography
+ * Inherits and utilizes the globally configured Litefin UI font family
+ */
+.audio-title {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 2px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.5px;
+    /* Respect global UI font preference configured in overall settings */
+    font-family: var(--jf-font-family, sans-serif);
+}
+
+/*
+ * Track metadata subtitle typography (artist, album, and release year)
+ * Inherits and utilizes the globally configured Litefin UI font family
+ */
+.audio-subtitle {
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.75);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    /* Respect global UI font preference configured in overall settings */
+    font-family: var(--jf-font-family, sans-serif);
+}
+
+/* ==========================================================================
+   Light Music Player Mode (Performance Optimization for Older TVs)
+   ========================================================================== */
+
+/* Hardware-accelerated bilinear-scaled BlurHash ambient canvas */
+.audio-blurhash-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    -webkit-transition: opacity 0.5s ease-out;
+    transition: opacity 0.5s ease-out;
+}
+
+/* Deep ambient vignette backdrop when Light Music Player is active */
+html[data-light-music-player="true"] .audio-visual-overlay {
+    background: radial-gradient(circle at 50% 40%, #161822 0%, #0c0d12 60%, #040507 100%);
+}
+
+/* Subtle darkened vignette overlay on top of blurhash canvas to maximize typography and album art contrast */
+html[data-light-music-player="true"] .audio-visual-overlay::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 45%, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.8) 100%);
+    z-index: 1;
+    pointer-events: none;
+}
+
+html[data-light-music-player="true"] .audio-backdrop {
+    /* Completely eliminate GPU blur filter calculation and hide backdrop layer */
+    display: none !important;
+    filter: none !important;
+}
+
+html[data-light-music-player="true"] .audio-album-art {
+    /* Eliminate heavy drop shadow to prevent continuous layer composite repaints */
+    box-shadow: none !important;
+    /* Clean hairline border for subtle depth without rendering penalties */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html[data-light-music-player="true"] .audio-title,
+html[data-light-music-player="true"] .audio-subtitle {
+    /* Eliminate text shadows for lighter font rasterization */
+    text-shadow: none !important;
+}
+
+/* ==========================================================================
+   Loading State
+   ========================================================================== */
+
+
+
+/* ==========================================================================
+   Error State
+   ========================================================================== */
+
+.player-error {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-justify-content: center;
+    justify-content: center;
+    -webkit-align-items: center;
+    align-items: center;
+    background: var(--jf-overlay-bg, rgba(0, 0, 0, 0.9));
+    z-index: 2100;
+    /* Above player container */
+    opacity: 0;
+    -webkit-transition: opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    pointer-events: none;
+}
+
+.player-error:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.error-panel {
+    width: 960px;
+    padding: 50px 60px;
+    border-radius: 40px;
+    background: rgba(28, 28, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+
+
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    -webkit-align-items: center;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+    -webkit-transform: translateY(20px);
+    transform: translateY(20px);
+    -webkit-transition: -webkit-transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.player-error:not(.hidden) .error-panel {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+}
+
+.error-content {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    -webkit-align-items: center;
+    align-items: center;
+    width: 100%;
+}
+
+.error-icon-container {
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+    min-height: 100px;
+    flex: 0 0 100px;
+    margin: 0 auto 32px auto;
+    background: var(--jf-accent-light);
+    color: var(--jf-error, #f44336);
+    border-radius: 50%;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-justify-content: center;
+    justify-content: center;
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+.error-icon-container svg {
+    width: 50px !important;
+    height: 50px !important;
+    min-width: 50px;
+    min-height: 50px;
+    flex: none;
+}
+
+.error-title {
+    font-size: 52px;
+    font-weight: 700;
+    color: #fff;
+    margin: 10px 0 15px;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+}
+
+.error-message {
+    font-size: 26px;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0 0 55px;
+    font-weight: 400;
+}
+
+.error-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    width: 100%;
+    max-width: 720px;
+    justify-content: center;
+}
+
+.error-actions .btn {
+    width: 100%;
+    height: 68px;
+    border-radius: var(--jf-border-radius-lg);
+    font-size: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 0 20px;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    box-sizing: border-box;
+    -webkit-transition: -webkit-transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.error-actions .btn.span-2 {
+    grid-column: span 2;
+}
+
+.error-actions .btn-primary {
+    background: var(--jf-primary-btn-bg, #fff);
+    color: var(--jf-primary-btn-color, #000);
+    margin: 12px;
+}
+
+.error-actions .btn-primary:focus,
+.error-actions .btn-primary.focused {
+    background: var(--jf-accent);
+    color: #fff;
+    -webkit-transform: scale(1.05);
+    transform: scale(1.05);
+    box-shadow: var(--jf-shadow-md);
+}
+
+.error-actions .btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.error-actions .btn-secondary:focus,
+.error-actions .btn-secondary.focused {
+    background: rgba(255, 255, 255, 0.25);
+    border: 3px solid var(--jf-button-border-focus, #fff);
+    -webkit-transform: scale(1.05);
+    transform: scale(1.05);
+    box-shadow: var(--jf-shadow-md);
+}
+
+/* Responsive adjustments across mobile, tablet, and TV layouts */
+@media (max-width: 640px) {
+    .error-panel {
+        width: 92vw;
+        padding: 32px 24px;
+        border-radius: 28px;
+    }
+
+    .error-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .error-actions .btn.span-2 {
+        grid-column: span 1;
+    }
+}
+
+/* ==========================================================================
+   OSD (On-Screen Display) Overlay
+   ========================================================================== */
+
+.player-osd {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 50;
+}
+
+.player-osd.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* OSD Header (Title, Time) */
+.osd-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 60px 60px;
+}
+
+.osd-title {
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--osd-text-color, #fff);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    margin: 0 0 8px 0;
+}
+
+.osd-subtitle {
+    font-size: 18px;
+    color: var(--jf-text-secondary, rgba(255, 255, 255, 0.7));
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* OSD Footer (Controls) */
+.osd-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 60px;
+    background: linear-gradient(to top,
+            var(--osd-gradient-dark, rgba(0, 0, 0, 0.9)) 0%,
+            rgba(0, 0, 0, 0.7) 50%,
+            rgba(0, 0, 0, 0) 100%);
+}
+
+/* Progress Bar */
+.osd-progress {
+    margin-bottom: 24px;
+}
+
+/* Time Display */
+.osd-time {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    font-size: 1.2em;
+    color: var(--jf-text-primary);
+    margin-top: 2px;
+}
+
+/* Control Buttons */
+.osd-controls {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-justify-content: center;
+    justify-content: center;
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+
+/* Play/Pause Button (Larger) */
+
+/* Play/Pause Button (Larger) - Specific scale */
+.osd-btn-play {
+    width: 72px;
+    height: 72px;
+}
+
+.osd-btn-play svg {
+    width: 32px;
+    height: 32px;
+}
+
+/* Secondary Controls (Right Side) */
+.osd-secondary-controls {
+    position: absolute;
+    right: 60px;
+    bottom: 160px;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+}
+
+.osd-secondary-controls .osd-btn {
+    margin-bottom: 12px;
+}
+
+/* ==========================================================================
+   Subtitle Overlay
+   ========================================================================== */
+
+.subtitle-overlay {
+    position: absolute;
+    bottom: 12%;
+    left: 10%;
+    right: 10%;
+    text-align: center;
+    z-index: 40;
+    pointer-events: none;
+
+    /*
+     * Hardware-accelerated GPU spring transition physics:
+     * Fluid cubic-bezier(0.16, 1, 0.3, 1) transition curves with transform-origin
+     * anchored at bottom center. Promotes layer to GPU compositor.
+     */
+    -webkit-transform-origin: bottom center;
+    transform-origin: bottom center;
+    -webkit-transition: -webkit-transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+}
+
+.subtitle-line {
+    display: inline-block;
+    background: var(--jf-overlay-bg, rgba(0, 0, 0, 0.75));
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: var(--jf-border-radius);
+    line-height: 1.4;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+
+    /* Smooth padding and font-size transitions for responsive compact scaling */
+    -webkit-transition: padding 0.38s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: padding 0.38s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Secondary Subtitle (Top) */
+.subtitle-overlay.secondary {
+    bottom: auto;
+    top: 10%;
+    -webkit-transform-origin: top center;
+    transform-origin: top center;
+}
+
+.subtitle-overlay.secondary .subtitle-line {
+    opacity: 0.9;
+}
+
+/* ==========================================================================
+ * DYNAMIC SMART SUBTITLE SHIFTING (HEMISPHERE-AWARE DODGING)
+ * ==========================================================================
+ * Intelligently shifts subtitle overlays away from active OSD chrome based on
+ * the track's configured vertical screen position:
+ * - Subtitles positioned in the bottom half (.pos-bottom) dodge UPWARD
+ *   away from the bottom OSD controls and seekbar.
+ * - Subtitles positioned in the top half (.pos-top) dodge DOWNWARD
+ *   away from the top OSD header bar and back button.
+ *
+ * Stacking & Dual-Subtitle Scenario:
+ * When both primary and secondary tracks are positioned in the same hemisphere
+ * (e.g. secondary positioned directly above primary near the bottom), BOTH
+ * tracks shift in the same direction by the exact same offset, perfectly
+ * preserving their relative vertical spacing and preventing overlaps.
+ * Compact 88% scaling is applied to preserve sightlines during dual playback.
+ * ========================================================================== */
+
+/* Transform-origin alignment according to vertical hemisphere */
+.subtitle-overlay.pos-bottom,
+.subtitle-overlay:not(.secondary):not(.pos-top),
+.player-page .subtitle-overlay.pos-bottom,
+.player-container ~ .subtitle-overlay.pos-bottom {
+    -webkit-transform-origin: bottom center;
+    transform-origin: bottom center;
+}
+
+.subtitle-overlay.pos-top,
+.subtitle-overlay.secondary:not(.pos-bottom),
+.player-page .subtitle-overlay.pos-top,
+.player-container ~ .subtitle-overlay.pos-top {
+    -webkit-transform-origin: top center;
+    transform-origin: top center;
+}
+
+/* --------------------------------------------------------------------------
+ * 1. Single Subtitle Dodging (not .has-dual-subtitles)
+ * -------------------------------------------------------------------------- */
+
+/* Bottom-half subtitles: Elevate smoothly above bottom OSD controls */
+.player-page.osd-active:not(.osd-dodging-disabled) .subtitle-overlay:not(.secondary),
+.player-page.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) .subtitle-overlay.pos-bottom,
+.player-container.osd-active:not(.osd-dodging-disabled) ~ .subtitle-overlay:not(.secondary),
+.player-container.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-bottom {
+    -webkit-transform: translateY(-18.5vh) !important;
+    -webkit-transform: translateY(calc(var(--litefin-app-h, 100vh) * -0.185)) !important;
+    transform: translateY(-18.5vh) !important;
+    transform: translateY(calc(var(--litefin-app-h, 100vh) * -0.185)) !important;
+}
+
+/* Top-half subtitles: Push downward to clear top OSD header bar */
+.player-page.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) .subtitle-overlay.pos-top,
+.player-page.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) .subtitle-overlay.secondary:not(.pos-bottom),
+.player-container.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-top,
+.player-container.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) ~ .subtitle-overlay.secondary:not(.pos-bottom) {
+    -webkit-transform: translateY(14vh) !important;
+    -webkit-transform: translateY(calc(var(--litefin-app-h, 100vh) * 0.14)) !important;
+    transform: translateY(14vh) !important;
+    transform: translateY(calc(var(--litefin-app-h, 100vh) * 0.14)) !important;
+}
+
+/* --------------------------------------------------------------------------
+ * 2. Dual Subtitles Dodging (.has-dual-subtitles with compact 0.88 scale)
+ * -------------------------------------------------------------------------- */
+
+/* Bottom-half subtitles in dual playback: Elevate + compact scale */
+.player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay.pos-bottom,
+.player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay:not(.secondary):not(.pos-top),
+.player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-bottom,
+.player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay:not(.secondary):not(.pos-top) {
+    -webkit-transform: translateY(-17.5vh) scale(0.88) !important;
+    -webkit-transform: translateY(calc(var(--litefin-app-h, 100vh) * -0.175)) scale(0.88) !important;
+    transform: translateY(-17.5vh) scale(0.88) !important;
+    transform: translateY(calc(var(--litefin-app-h, 100vh) * -0.175)) scale(0.88) !important;
+}
+
+/* Top-half subtitles in dual playback: Push downward + compact scale */
+.player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay.pos-top,
+.player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay.secondary:not(.pos-bottom),
+.player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-top,
+.player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay.secondary:not(.pos-bottom) {
+    -webkit-transform: translateY(12vh) scale(0.88) !important;
+    -webkit-transform: translateY(calc(var(--litefin-app-h, 100vh) * 0.12)) scale(0.88) !important;
+    transform: translateY(12vh) scale(0.88) !important;
+    transform: translateY(calc(var(--litefin-app-h, 100vh) * 0.12)) scale(0.88) !important;
+}
+
+/* Secondary Subtitle baseline: Stationary without vertical translation, position configured dynamically */
+.subtitle-overlay.secondary,
+.player-page .subtitle-overlay.secondary,
+.player-container ~ .subtitle-overlay.secondary {
+    bottom: auto;
+}
+
+/* Dual Subtitles Active: Compact padding to minimize screen obstruction */
+.player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-line,
+.player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-line {
+    padding: 6px 13px !important;
+}
+
+/* ==========================================================================
+ * MOBILE & TOUCH RESPONSIVE SUBTITLE SCALING
+ * Ensures subtitle cue frames and bounding boxes scale naturally on phone
+ * and tablet screens without overflowing or obscuring the video viewport.
+ * ========================================================================== */
+html[data-litefin-scaled] .subtitle-overlay,
+html[data-litefin-touch] .subtitle-overlay {
+    bottom: 8%;
+    left: 4%;
+    right: 4%;
+}
+
+html[data-litefin-scaled] .subtitle-line,
+html[data-litefin-touch] .subtitle-line {
+    padding: 8px 18px;
+    border-radius: 12px;
+    max-width: 94%;
+    word-break: break-word;
+}
+
+/* Portrait mobile layout adjustments */
+@media (orientation: portrait) {
+    html[data-litefin-scaled] .subtitle-overlay,
+    html[data-litefin-touch] .subtitle-overlay {
+        bottom: 14%;
+        left: 2%;
+        right: 2%;
+    }
+
+    html[data-litefin-scaled] .subtitle-line,
+    html[data-litefin-touch] .subtitle-line {
+        font-size: calc(var(--litefin-app-h, 100vh) * 0.038) !important;
+        padding: 6px 14px;
+        border-radius: 8px;
+    }
+}
+
+/* ==========================================================================
+   Ultra-Legacy Overrides (Chrome <47 / Tizen 2.x / WebOS 1-2.x)
+   ==========================================================================
+   Chrome 38 has two major bugs relevant to the player:
+
+   1. `position: fixed` elements do NOT create a containing block for
+      `position: absolute` children when the fixed element also has a
+      `transform` (or even without one in some Chrome 32 builds).
+      Fix: switch .player-page to position:relative + 100vw/100vh.
+
+   2. The #osd-overlay (position:absolute, class="player-osd") needs its
+      containing block explicitly sized to 100% of the viewport.
+      Fix: force width/height 100% on the container directly.
+   ========================================================================== */
+
+html[data-layout-tier="ultra-legacy"] .player-page {
+    /* Switch from position:fixed to relative so that absolute children
+     * (.player-osd, #osd-overlay, .subtitle-overlay) have a reliable
+     * containing block. We simulate fixed by stretching to fill the viewport.
+     *
+     * CRITICAL: position:relative alone does NOT establish a stacking context
+     * in Chrome 38 — z-index on child elements then competes unpredictably in
+     * the root stacking context. Adding an explicit z-index forces Chrome 38
+     * to treat .player-page as a proper stacking context root, so the OSD's
+     * z-index:100 is correctly above the video's z-index:auto. */
+    position: relative !important;
+    z-index: 2000 !important;
+    width: 100% !important;
+    height: 100% !important;
+    /* Ensure it still covers the full screen */
+    min-height: 100%;
+}
+
+html[data-layout-tier="ultra-legacy"] .player-container {
+    /* Without position:fixed parent, absolute children need explicit dimensions */
+    width: 100% !important;
+    height: 100% !important;
+}
+
+html[data-layout-tier="ultra-legacy"] #osd-overlay {
+    /* Explicit pixel-based full-screen anchoring.
+     * Chrome 38 right:0/bottom:0 on absolute inside relative sometimes fails
+     * if the containing block width was set via width:100% instead of explicit px.
+     * Position absolutely inside .player-page and stretch to fill. */
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Subtitle overlay: also needs explicit anchoring for the same reason as #osd-overlay.
+ * On Chrome 38, position:absolute+bottom:12% inside a position:relative parent
+ * can silently fail to resolve when the parent width/height comes from percentages.
+ * Also hard-code all CSS var() fallbacks — the ponyfill runs async and may
+ * not have resolved before the first subtitle cue renders. */
+html[data-layout-tier="ultra-legacy"] .subtitle-overlay {
+    position: absolute !important;
+    bottom: 12% !important;
+    left: 10% !important;
+    right: 10% !important;
+    width: auto !important;
+    /* Elevate above video (0) and below OSD (100) */
+    z-index: 50 !important;
+    pointer-events: none !important;
+    text-align: center !important;
+    -webkit-transform-origin: bottom center !important;
+    transform-origin: bottom center !important;
+    -webkit-transition: -webkit-transform 0.38s ease !important;
+    transition: transform 0.38s ease !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .subtitle-overlay.secondary {
+    /* Secondary subtitles sit at the top, position configured dynamically */
+    bottom: auto !important;
+    -webkit-transform-origin: top center !important;
+    transform-origin: top center !important;
+    -webkit-transform: none !important;
+    transform: none !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .subtitle-overlay.pos-bottom,
+html[data-layout-tier="ultra-legacy"] .subtitle-overlay:not(.secondary):not(.pos-top) {
+    -webkit-transform-origin: bottom center !important;
+    transform-origin: bottom center !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .subtitle-overlay.pos-top,
+html[data-layout-tier="ultra-legacy"] .subtitle-overlay.secondary:not(.pos-bottom) {
+    -webkit-transform-origin: top center !important;
+    transform-origin: top center !important;
+}
+
+/* Ultra-legacy single subtitle dodging */
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active:not(.osd-dodging-disabled) .subtitle-overlay:not(.secondary),
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) .subtitle-overlay.pos-bottom,
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active:not(.osd-dodging-disabled) ~ .subtitle-overlay:not(.secondary),
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-bottom {
+    -webkit-transform: translateY(-18.5vh) !important;
+    transform: translateY(-18.5vh) !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) .subtitle-overlay.pos-top,
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) .subtitle-overlay.secondary:not(.pos-bottom),
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-top,
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active:not(.has-dual-subtitles):not(.osd-dodging-disabled) ~ .subtitle-overlay.secondary:not(.pos-bottom) {
+    -webkit-transform: translateY(14vh) !important;
+    transform: translateY(14vh) !important;
+}
+
+/* Ultra-legacy dual subtitle dodging */
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay.pos-bottom,
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay:not(.secondary):not(.pos-top),
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-bottom,
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay:not(.secondary):not(.pos-top) {
+    -webkit-transform: translateY(-17.5vh) scale(0.88) !important;
+    transform: translateY(-17.5vh) scale(0.88) !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay.pos-top,
+html[data-layout-tier="ultra-legacy"] .player-page.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) .subtitle-overlay.secondary:not(.pos-bottom),
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay.pos-top,
+html[data-layout-tier="ultra-legacy"] .player-container.osd-active.has-dual-subtitles:not(.osd-dodging-disabled) ~ .subtitle-overlay.secondary:not(.pos-bottom) {
+    -webkit-transform: translateY(12vh) scale(0.88) !important;
+    transform: translateY(12vh) scale(0.88) !important;
+}
+
+html[data-layout-tier="ultra-legacy"] .subtitle-line {
+    /* Hard-code var() fallbacks so first paint renders correctly even before
+     * the CSS-vars ponyfill has run (it initializes async after boot). */
+    display: inline-block !important;
+    background: rgba(0, 0, 0, 0.75) !important;
+    color: #ffffff !important;
+    font-size: 1.2em !important;
+    font-weight: 500 !important;
+    padding: 6px 14px !important;
+    /* border-radius: var(--jf-border-radius) → hard fallback */
+    -webkit-border-radius: 4px !important;
+    border-radius: 4px !important;
+    line-height: 1.4 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9) !important;
+    /* Avoid flex/inline-flex display bugs in Chrome 38 */
+    vertical-align: baseline !important;
+}
+
+/* ============================================================================
+ * RECONNECTION HUD (NETWORK RESILIENCE OVERLAY)
+ * ============================================================================
+ * Minimalist, elegant floating notification card inspired by macOS / tvOS.
+ * Uses high-depth backdrop blur, subtle 1px border highlight, soft spring
+ * transitions, and responsive scaling across TV, desktop, and mobile viewports.
+ * ============================================================================
+ */
+
+.reconnect-hud {
+    position: absolute;
+    top: 54px;
+    left: 50%;
+    -webkit-transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) translateY(0);
+    z-index: 1500;
+    pointer-events: none;
+    opacity: 1;
+    -webkit-transition: opacity 0.4s ease, -webkit-transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.reconnect-hud.hidden {
+    opacity: 0;
+    pointer-events: none;
+    -webkit-transform: translateX(-50%) translateY(-24px) scale(0.96);
+    transform: translateX(-50%) translateY(-24px) scale(0.96);
+}
+
+.reconnect-card {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-align-items: center;
+    align-items: center;
+    gap: 18px;
+    padding: 14px 26px 14px 20px;
+    /* High-performance solid dark background without GPU-heavy blur or shadows on TV chips */
+    background: #141418;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 9999px;
+    min-width: 320px;
+    max-width: 90vw;
+}
+
+.reconnect-spinner-wrap {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+}
+
+.reconnect-spinner {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(255, 255, 255, 0.18);
+    border-top-color: #007aff;
+    border-right-color: #0a84ff;
+    -webkit-animation: reconnect-spin 0.85s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+    animation: reconnect-spin 0.85s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+.reconnect-pulse {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #0a84ff;
+    -webkit-animation: reconnect-glow 1.5s ease-in-out infinite;
+    animation: reconnect-glow 1.5s ease-in-out infinite;
+}
+
+.reconnect-details {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+}
+
+.reconnect-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.2px;
+    line-height: 1.2;
+    -webkit-font-smoothing: antialiased;
+}
+
+.reconnect-status {
+    font-size: 13px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.65);
+    letter-spacing: -0.1px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+@-webkit-keyframes reconnect-spin {
+    0% {
+        -webkit-transform: rotate(0deg);
+        transform: rotate(0deg);
+    }
+    100% {
+        -webkit-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes reconnect-spin {
+    0% {
+        -webkit-transform: rotate(0deg);
+        transform: rotate(0deg);
+    }
+    100% {
+        -webkit-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+
+@-webkit-keyframes reconnect-glow {
+    0%, 100% {
+        opacity: 0.4;
+        -webkit-transform: scale(0.85);
+        transform: scale(0.85);
+    }
+    50% {
+        opacity: 1;
+        -webkit-transform: scale(1.15);
+        transform: scale(1.15);
+    }
+}
+
+@keyframes reconnect-glow {
+    0%, 100% {
+        opacity: 0.4;
+        -webkit-transform: scale(0.85);
+        transform: scale(0.85);
+    }
+    50% {
+        opacity: 1;
+        -webkit-transform: scale(1.15);
+        transform: scale(1.15);
+    }
+}
+

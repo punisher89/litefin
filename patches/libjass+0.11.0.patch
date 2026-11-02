@@ -1,0 +1,352 @@
+diff --git a/node_modules/libjass/libjass.js b/node_modules/libjass/libjass.js
+index ddea430..28d9258 100644
+--- a/node_modules/libjass/libjass.js
++++ b/node_modules/libjass/libjass.js
+@@ -1375,7 +1375,7 @@
+                 for (var next = this._peek(); this._haveMore() && next >= "0" && next <= "9"; next = this._peek()) {
+                     characteristicNode.value += next;
+                 }
+-                if (characteristicNode.value.length === 0) {
++                if (characteristicNode.value.length === 0 && this._peek() !== ".") {
+                     parent.pop();
+                     return null;
+                 }
+@@ -6227,7 +6227,40 @@
+                         sub.style.top = (this._scaleY * part.y).toFixed(3) + "px";
+                     } else if (part instanceof parts.Move) {
+                         sub.style.position = "absolute";
+-                        dialogueAnimationCollection.add("linear", [ new keyframe_1.Keyframe(0, new map_1.Map([ [ "left", (this._scaleX * part.x1).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y1).toFixed(3) + "px" ] ])), new keyframe_1.Keyframe(part.t1, new map_1.Map([ [ "left", (this._scaleX * part.x1).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y1).toFixed(3) + "px" ] ])), new keyframe_1.Keyframe(part.t2, new map_1.Map([ [ "left", (this._scaleX * part.x2).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y2).toFixed(3) + "px" ] ])), new keyframe_1.Keyframe(dialogue.end - dialogue.start, new map_1.Map([ [ "left", (this._scaleX * part.x2).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y2).toFixed(3) + "px" ] ])) ]);
++                        
++                        // Detect Tizen to use a compatible animation strategy
++                        var isTizenMove = typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.indexOf("Tizen") !== -1;
++                        
++                        if (isTizenMove) {
++                            // TIZEN FIX: CSS @keyframe animations for left/top/transform/margin all silently fail on Tizen WebKit.
++                            // The root cause is that libjass injects animation rules into a <style> tag that is appended AFTER
++                            // the element is inserted into the DOM, and Tizen WebKit doesn't re-evaluate dynamically injected stylesheets
++                            // for already-active CSS animation names.
++                            //
++                            // Solution: Store the move parameters directly on the DOM element and drive the position via
++                            // JavaScript on every clock tick in _onClockTick. This bypasses CSS animations entirely for Tizen.
++                            sub.style.left = (this._scaleX * part.x1).toFixed(3) + "px";
++                            sub.style.top = (this._scaleY * part.y1).toFixed(3) + "px";
++                            
++                            // Stamp the animation data as a data attribute so _onClockTick can drive it.
++                            // CRITICAL: we cannot use a plain JS property here because libjass clones the
++                            // pre-rendered sub via cloneNode(true) before inserting it into the DOM.
++                            // cloneNode does NOT copy custom JS properties, but it DOES preserve data-* attributes.
++                            sub.setAttribute("data-tizen-move", JSON.stringify({
++                                x1: this._scaleX * part.x1,
++                                y1: this._scaleY * part.y1,
++                                x2: this._scaleX * part.x2,
++                                y2: this._scaleY * part.y2,
++                                t1: part.t1,           // relative ms from dialogue.start when motion begins
++                                t2: part.t2,           // relative ms from dialogue.start when motion ends
++                                dialogueStart: dialogue.start,
++                                dialogueEnd: dialogue.end
++                            }));
++                            // No CSS animation — JS tick handler takes over
++                        } else {
++                            // WEB / Standard: animate left and top via CSS keyframes (works fine on modern browsers)
++                            dialogueAnimationCollection.add("linear", [ new keyframe_1.Keyframe(0, new map_1.Map([ [ "left", (this._scaleX * part.x1).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y1).toFixed(3) + "px" ] ])), new keyframe_1.Keyframe(part.t1, new map_1.Map([ [ "left", (this._scaleX * part.x1).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y1).toFixed(3) + "px" ] ])), new keyframe_1.Keyframe(part.t2, new map_1.Map([ [ "left", (this._scaleX * part.x2).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y2).toFixed(3) + "px" ] ])), new keyframe_1.Keyframe(dialogue.end - dialogue.start, new map_1.Map([ [ "left", (this._scaleX * part.x2).toFixed(3) + "px" ], [ "top", (this._scaleY * part.y2).toFixed(3) + "px" ] ])) ]);
++                        }
+                     } else if (part instanceof parts.Fade) {
+                         dialogueAnimationCollection.add("linear", [ new keyframe_1.Keyframe(0, new map_1.Map([ [ "opacity", "0" ] ])), new keyframe_1.Keyframe(part.start, new map_1.Map([ [ "opacity", "1" ] ])), new keyframe_1.Keyframe(dialogue.end - dialogue.start - part.end, new map_1.Map([ [ "opacity", "1" ] ])), new keyframe_1.Keyframe(dialogue.end - dialogue.start, new map_1.Map([ [ "opacity", "0" ] ])) ]);
+                     } else if (part instanceof parts.ComplexFade) {
+@@ -6318,16 +6351,158 @@
+                         startNewSpan(true);
+                     }
+                 }
++                
++                // STAIRCASE FIX: In ASS, geometric transforms like \frz (rotation) and \fax/\fay (shear)
++                // should apply to the ENTIRE dialogue text as one unit, not to each <span> individually.
++                // When applied per-span, each inline-block element rotates from its own local origin,
++                // creating a cascading \staircase/ visual artifact.
++                //
++                // This also handles pure scale transforms (\fscx/\fscy) which benefit from container-level
++                // application so that line-heights and inter-sub spacing compress proportionally.
++                //
++                // Three handling strategies depending on transform type and whether \pos is present:
++                //
++                // 1. ROTATION/SHEAR (causeStaircase = true):
++                //    → geoWrapper div (inline-block, carries the transform)
++                //    → Outer sub handles \pos alignment only; wrapper rotates around text block center
++                //    → Avoids rotation-origin shift that would occur if composing on the same element
++                //
++                // 2. PURE SCALE, \pos present (causeStaircase = false, hasPosTag = true):
++                //    → Store in sub._sharedScaleTransform; second loop prepends to divTransformStyle
++                //    → Safe because scale around the alignment anchor doesn't shift visual anchor
++                //
++                // 3. PURE SCALE, NO \pos (causeStaircase = false, hasPosTag = false):
++                //    → Apply directly to sub.style.transform (the sub is in block flow, not absolute)
++                //    → ALSO scale the sub's marginTop/marginBottom proportionally, so the visual gap
++                //      between two simultaneously shown stacked dialogue subs is proportional to the
++                //      compressed text height rather than the unscaled layout height
++                //
++                // NOTE: libjass always creates a trailing empty placeholder <span> with no transform.
++                // We skip untransformed spans in the shared-transform check.
++
++                // Pre-check: does this dialogue have a \pos or \move tag?
++                // This determines which scale-handling path to use.
++                var hasPosTag = false;
++                for (var pi = 0; pi < dialogue.parts.length; pi++) {
++                    if (dialogue.parts[pi] instanceof parts.Position || dialogue.parts[pi] instanceof parts.Move) {
++                        hasPosTag = true;
++                        break;
++                    }
++                }
++
++                var allSpans = sub.querySelectorAll("span");
++                if (allSpans.length > 0) {
++                    var firstSpanTransform = null;
++                    var allMatch = true;
++                    for (var si = 0; si < allSpans.length; si++) {
++                        var spanT = allSpans[si].style.webkitTransform || allSpans[si].style.transform || "";
++                        if (spanT === "") continue; // skip empty trailing placeholder spans
++                        if (firstSpanTransform === null) {
++                            firstSpanTransform = spanT;
++                        } else if (spanT !== firstSpanTransform) {
++                            allMatch = false;
++                            break;
++                        }
++                    }
++                    if (allMatch && firstSpanTransform !== null) {
++                        // Determine if the transform causes staircase: rotation and shear do, pure scale doesn't.
++                        var causeStaircase = /rotate/i.test(firstSpanTransform);
++                        if (!causeStaircase) {
++                            // Check for shear in matrix(a,b,c,d,e,f): non-zero b or c → shear → staircase
++                            var matrixMatch = firstSpanTransform.match(/matrix\(([^)]+)\)/);
++                            if (matrixMatch) {
++                                var mVals = matrixMatch[1].split(",").map(function(s) { return parseFloat(s.trim()); });
++                                if (mVals.length >= 4 && (Math.abs(mVals[1]) > 0.001 || Math.abs(mVals[2]) > 0.001)) {
++                                    causeStaircase = true;
++                                }
++                            }
++                        }
++
++                        // Clear the shared transform from all individual spans (applies in all 3 paths)
++                        for (var si = 0; si < allSpans.length; si++) {
++                            allSpans[si].style.webkitTransform = "";
++                            allSpans[si].style.transform = "";
++                        }
++
++                        if (causeStaircase) {
++                            // PATH 1: ROTATION / SHEAR — geoWrapper div approach.
++                            // A separate inline-block wrapper carries the rotation/shear, so the entire
++                            // text block transforms around the wrapper's center (correct behavior), while
++                            // the outer sub handles alignment/positioning with a clean transform-origin.
++                            var geoWrapper = document.createElement("div");
++                            geoWrapper.style.display = "inline-block";
++                            geoWrapper.style.webkitTransform = firstSpanTransform;
++                            geoWrapper.style.transform = firstSpanTransform;
++                            while (sub.firstChild) { geoWrapper.appendChild(sub.firstChild); }
++                            sub.appendChild(geoWrapper);
++
++                        } else if (hasPosTag) {
++                            // PATH 2: PURE SCALE + \pos — store for second loop to prepend to divTransformStyle.
++                            // Scale on a positioned element is safe to compose with the alignment translate.
++                            sub._sharedScaleTransform = firstSpanTransform;
++
++                        } else {
++                            // PATH 3: PURE SCALE + NO \pos — apply directly to the sub container.
++                            // The sub lives in normal block flow inside the .an* wrapper. Applying scaleY
++                            // to it compresses the whole block visually. We also proportionally reduce
++                            // sub.marginTop/marginBottom so the gap between simultaneously stacked
++                            // dialog subs is proportional to the compressed height, not the full layout height.
++                            sub.style.webkitTransform = firstSpanTransform;
++                            sub.style.transform = firstSpanTransform;
++
++                            // Extract the Y-scale factor to proportionally scale the vertical margins.
++                            // This ensures that when two dialogue boxes are stacked in .an2, the gap
++                            // between them visually matches the compressed line height, not the full height.
++                            var scaleYFactor = 1;
++                            var scaleYMatch = firstSpanTransform.match(/scaleY\(([^)]+)\)/);
++                            if (scaleYMatch) {
++                                scaleYFactor = parseFloat(scaleYMatch[1]);
++                            } else {
++                                // matrix(a,b,c,d,e,f): the d-term (index 3) is the Y scale factor
++                                var scaleMatrixMatch = firstSpanTransform.match(/matrix\(([^)]+)\)/);
++                                if (scaleMatrixMatch) {
++                                    var sm = scaleMatrixMatch[1].split(",").map(function(s) { return parseFloat(s.trim()); });
++                                    if (sm.length >= 4) scaleYFactor = Math.abs(sm[3]);
++                                }
++                            }
++                            if (scaleYFactor !== 1 && scaleYFactor > 0) {
++                                var marginV = parseFloat(sub.style.marginTop) || 0;
++                                sub.style.marginTop    = (marginV * scaleYFactor).toFixed(3) + "px";
++                                sub.style.marginBottom = (marginV * scaleYFactor).toFixed(3) + "px";
++                            }
++                        }
++                    }
++                }
++                
+                 for (var _d = 0, _e = dialogue.parts; _d < _e.length; _d++) {
+                     var part = _e[_d];
+                     if (part instanceof parts.Position || part instanceof parts.Move) {
+                         var transformOrigin = WebRenderer._transformOrigins[dialogue.alignment];
++                        
++                        // Build the base alignment transform string (unchanged from original libjass logic)
+                         var divTransformStyle = "translate(" + -transformOrigin[0] + "%, " + -transformOrigin[1] + "%) translate(-" + sub.style.marginLeft + ", -" + sub.style.marginTop + ")";
+                         var transformOriginString = transformOrigin[0] + "% " + transformOrigin[1] + "%";
++                        
++                        // For pure-scale shared transforms (\fscx/\fscy), prepend the scale to the container
++                        // transform so line-height is also compressed/expanded correctly. This is safe with
++                        // scale (unlike rotation) because scale around the alignment anchor doesn't shift the
++                        // visual anchor point noticeably.
++                        if (sub._sharedScaleTransform) {
++                            divTransformStyle = sub._sharedScaleTransform + " " + divTransformStyle;
++                            delete sub._sharedScaleTransform;
++                        }
++                        
++                        // Apply base static transforms (alignment via percentage translate + margin offset)
+                         sub.style.webkitTransform = divTransformStyle;
+                         sub.style.webkitTransformOrigin = transformOriginString;
+                         sub.style.transform = divTransformStyle;
+                         sub.style.transformOrigin = transformOriginString;
++                        
++                        // Note: For \move, Tizen uses margin-left/margin-top animation (added in first loop).
++                        // No additional transform animation is needed here — the alignment transform above stays static.
++                        // For Web, the left/top CSS animation is handled in the first loop, and this alignment
++                        // transform is applied as a static style, which CSS animations for left/top don't override.
++                        
+                         break;
+                     }
+                 }
+@@ -6462,11 +6637,25 @@
+                 var dialogueAnimationStylesElement = result.getElementsByTagName("style")[0];
+                 if (dialogueAnimationStylesElement !== undefined) {
+                     var sheet = dialogueAnimationStylesElement.sheet;
+-                    if (sheet.cssRules.length === 0) {
++                    if (sheet && sheet.cssRules && sheet.cssRules.length === 0) {
+                         sheet.cssText = dialogueAnimationStylesElement.textContent;
+                     }
+                 }
+                 this._currentSubs.set(dialogue, result);
++                // If this is a Tizen JS-driven move sub, kick off the RAF smooth-animation loop.
++                if (result.getAttribute("data-tizen-move") !== null) {
++                    // Stamp the wall-clock time when this sub first appears in the DOM.
++                    // The RAF loop will use this + performance.now() to compute smooth elapsed time,
++                    // completely bypassing Tizen's low-frequency clock.currentTime updates (~5fps).
++                    var moveAttr = result.getAttribute("data-tizen-move");
++                    try {
++                        var moveObj = JSON.parse(moveAttr);
++                        moveObj.wallStart = performance.now();           // ms wall-clock at sub appearance
++                        moveObj.clockAtWallStart = this.clock.currentTime; // libjass clock seconds at that moment
++                        result.setAttribute("data-tizen-move", JSON.stringify(moveObj));
++                    } catch (e) {}
++                    this._ensureTizenMoveRAF();
++                }
+             };
+             WebRenderer.prototype._onClockPlay = function () {
+                 _super.prototype._onClockPlay.call(this);
+@@ -6484,6 +6673,9 @@
+                         _this._removeSub(sub);
+                     }
+                 });
++                
++                // Tizen move position updates are driven by the RAF loop (_ensureTizenMoveRAF),
++                // not the clock tick, to ensure smooth 60fps animation.
+                 _super.prototype._onClockTick.call(this);
+             };
+             WebRenderer.prototype._onClockPause = function () {
+@@ -6493,6 +6685,11 @@
+             WebRenderer.prototype._onClockStop = function () {
+                 _super.prototype._onClockStop.call(this);
+                 this._subsWrapper.style.display = "none";
++                // Cancel the Tizen move RAF loop when playback stops
++                if (this._tizenMoveRAFId != null) {
++                    cancelAnimationFrame(this._tizenMoveRAFId);
++                    this._tizenMoveRAFId = null;
++                }
+             };
+             WebRenderer.prototype._onClockRateChange = function () {
+                 _super.prototype._onClockRateChange.call(this);
+@@ -6527,6 +6724,58 @@
+             WebRenderer.prototype._removeSub = function (sub) {
+                 sub.parentNode.removeChild(sub);
+             };
++            /**
++             * Starts a requestAnimationFrame-based smooth position update loop for Tizen \move subtitles.
++             * The loop self-terminates when no active subs with 'data-tizen-move' remain in _currentSubs.
++             * This bypasses the clock-tick frequency limit (~200ms) for fluid 60fps animation.
++             */
++            WebRenderer.prototype._ensureTizenMoveRAF = function () {
++                // Guard: only start one loop at a time
++                if (this._tizenMoveRAFId != null) return;
++                var _this = this;
++                var loop = function () {
++                    var hasMoves = false;
++                    // Use wall clock for smooth time extrapolation.
++                    // clock.currentTime on Tizen updates only at ~5fps (every ~200ms), so reading it
++                    // directly from RAF causes position to repeat 12 frames then jump — visible stutter.
++                    // Instead we record clock time + wall time when the sub appears (in draw()), and
++                    // extrapolate smooth elapsed seconds using performance.now().
++                    var nowMs = performance.now();
++                    _this._currentSubs.forEach(function (sub) {
++                        var attr = sub.getAttribute("data-tizen-move");
++                        if (!attr) return;
++                        hasMoves = true;
++                        var moveData;
++                        try { moveData = JSON.parse(attr); } catch (e) { return; }
++                        if (!moveData || moveData.wallStart == null) return;
++                        // Smooth elapsed seconds since this sub appeared, extrapolated via wall clock
++                        var elapsedSec = (nowMs - moveData.wallStart) / 1000;
++                        // Map wall-clock elapsed time to dialogue-relative time (all in seconds)
++                        // clockAtWallStart is the libjass clock time (= absolute seconds) when sub appeared,
++                        // dialogueStart is also in absolute libjass seconds.
++                        var rel = (moveData.clockAtWallStart - moveData.dialogueStart) + elapsedSec;
++                        var x, y;
++                        if (rel <= moveData.t1) {
++                            x = moveData.x1; y = moveData.y1;
++                        } else if (rel >= moveData.t2) {
++                            x = moveData.x2; y = moveData.y2;
++                        } else {
++                            var p = (rel - moveData.t1) / (moveData.t2 - moveData.t1);
++                            x = moveData.x1 + p * (moveData.x2 - moveData.x1);
++                            y = moveData.y1 + p * (moveData.y2 - moveData.y1);
++                        }
++                        sub.style.left = x.toFixed(3) + "px";
++                        sub.style.top = y.toFixed(3) + "px";
++                    });
++                    // Continue loop if any move subs are still visible; otherwise clean up
++                    if (hasMoves) {
++                        _this._tizenMoveRAFId = requestAnimationFrame(loop);
++                    } else {
++                        _this._tizenMoveRAFId = null;
++                    }
++                };
++                this._tizenMoveRAFId = requestAnimationFrame(loop);
++            };
+             WebRenderer.prototype._removeAllSubs = function () {
+                 var _this = this;
+                 this._currentSubs.forEach(function (sub) {
+@@ -6654,6 +6903,14 @@
+                 }
+                 span.style.textDecoration = textDecoration.trim();
+                 var transform = "";
++                // Tizen WebKit FIX: 3D perspective MUST be explicitly in the transform string for inline-blocks
++                // Otherwise it flattens the rotations (e.g. \frx, \fry).
++                var isTizen = typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.indexOf("Tizen") !== -1;
++                var has3D = (this._rotationX !== null && this._rotationX !== 0) || (this._rotationY !== null && this._rotationY !== 0);
++                if (has3D && isTizen) {
++                     transform += "perspective(400px) ";
++                }
++                
+                 if (isTextOnlySpan) {
+                     if (this._fontScaleY !== this._fontScaleX) {
+                         transform += "scaleY(" + (this._fontScaleY / this._fontScaleX).toFixed(3) + ") ";
+@@ -6678,7 +6935,13 @@
+                 if (this._skewX !== null || this._skewY !== null) {
+                     var skewX = SpanStyles._valueOrDefault(this._skewX, 0);
+                     var skewY = SpanStyles._valueOrDefault(this._skewY, 0);
+-                    transform += "matrix(1, " + skewY + ", " + skewX + ", 1, 0, 0) ";
++                    // Tizen WebKit FIX: Mixing 2D `matrix` with 3D `rotateX/Y` forces the rendering pipeline 
++                    // to flatten the 3D context down to 2D. We must use `matrix3d` to preserve the Z axis!
++                    if (has3D && isTizen) {
++                        transform += "matrix3d(1, " + skewY + ", 0, 0, " + skewX + ", 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1) ";
++                    } else {
++                        transform += "matrix(1, " + skewY + ", " + skewX + ", 1, 0, 0) ";
++                    }
+                 }
+                 if (transform !== "") {
+                     span.style.webkitTransform = transform;

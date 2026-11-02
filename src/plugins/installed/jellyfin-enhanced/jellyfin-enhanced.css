@@ -1,0 +1,30 @@
+.enhanced-media-format[hidden] {
+    display: none;
+}
+
+.enhanced-media-format {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 14px 0;
+}
+.enhanced-media-format h3 {
+    margin: 0;
+    font-size: .95rem;
+}
+.enhanced-media-format__values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.enhanced-media-format__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 999px;
+    background: rgba(255,255,255,.07);
+    font-size: .8rem;
+    font-weight: 600;
+}

@@ -1,0 +1,502 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - Router
+ * ============================================================================
+ * Simple hash-based router for single-page navigation. Uses URL hash to
+ * manage current page state without requiring History API support.
+ *
+ * Usage:
+ *   router.register('/home', HomePage);
+ *   router.register('/library/:id', LibraryPage);
+ *   router.navigate('/library/movies');
+ * ============================================================================
+ */
+
+import { eventBus } from './EventBus.js';
+import { state } from './StateManager.js';
+import { navigationState } from './NavigationState.js';
+import { logger } from '../utils/Logger.js';
+import { pluginManager } from '../plugins/PluginManager.js';
+
+const log = logger.create('Router');
+
+class Router {
+    constructor() {
+        // Registered routes: pattern -> handler
+        this._routes = [];
+
+        // Current page instance
+        this._currentPage = null;
+
+        // Navigation history for back support
+        this._history = [];
+
+        // Maximum history length (memory management)
+        this._maxHistory = 20;
+
+        // Bind hash change handler
+        this._onHashChange = this._onHashChange.bind(this);
+
+        // Navigation state tracking
+        // Set to true when navigating back (triggers state restoration)
+        this._isBackNavigation = false;
+        // State to restore when back navigation completes
+        this._pendingRestoreState = null;
+    }
+
+    /**
+     * Initialize the router - call once on app start
+     */
+    init() {
+        window.addEventListener('hashchange', this._onHashChange);
+
+        // Handle initial route
+        this._onHashChange();
+
+        log.info('Initialized');
+    }
+
+    /**
+     * Clean up router listeners
+     */
+    destroy() {
+        window.removeEventListener('hashchange', this._onHashChange);
+    }
+
+    /**
+     * Register a route pattern with a page class
+     * @param {string} pattern - Route pattern (e.g., '/library/:id')
+     * @param {Function} PageClass - Page class to instantiate for this route
+     */
+    register(pattern, PageClass) {
+        // Convert pattern to regex
+        // :param becomes a named capture group
+        const paramNames = [];
+        const regexPattern = pattern.replace(/:([^/]+)/g, (match, paramName) => {
+            paramNames.push(paramName);
+            return '([^/]+)';
+        });
+
+        this._routes.push({
+            pattern,
+            regex: new RegExp(`^${regexPattern}$`),
+            paramNames,
+            PageClass
+        });
+
+        log.debug(`Registered route "${pattern}"`);
+    }
+
+    /**
+     * Navigate to a new route
+     * @param {string} path - Path to navigate to
+     * @param {Object} [options] - Navigation options
+     * @param {boolean} [options.replace=false] - Replace current history entry
+     * @param {Object} [options.state] - Additional state to pass to the page
+     */
+    navigate(path, options = {}) {
+        const { replace = false, state: pageState = null, isBack = false } = options;
+
+        if (isBack) {
+            this._isBackNavigation = true;
+        }
+
+        // Store state for the incoming page
+        if (pageState) {
+            state.set('router:pageState', pageState);
+        }
+
+        // Track this navigation so _onHashChange knows it was expected
+        this._lastNavigatePath = path;
+
+        // Tab Navigation / History Jump Support:
+        // If navigating to a path that is already in the history stack (like clicking a sidebar item),
+        // we truncate the stack and restore its saved state instead of pushing a fresh duplicate.
+        const existingIndex = this._history.findIndex((entry) => entry.path === path);
+        if (existingIndex !== -1 && existingIndex < this._history.length - 1 && !replace) {
+            log.info(`Path "${path}" found in history at index ${existingIndex}. Jumping back and restoring state.`);
+            // Truncate history to the existing entry
+            this._history = this._history.slice(0, existingIndex + 1);
+
+            const targetEntry = this._history[this._history.length - 1];
+
+            // Flag as back navigation to trigger Page.js state restoration
+            this._isBackNavigation = true;
+            this._pendingRestoreState = targetEntry ? targetEntry.state : null;
+
+            window.location.replace(`#${path}`);
+            return;
+        }
+
+        if (replace) {
+            // Remove the current entry from internal history so the next one replaces it
+            this._history.pop();
+            // Replace current hash without adding to browser history
+            window.location.replace(`#${path}`);
+        } else {
+            // Check if we are already sitting on this path
+            if (this.getCurrentPath() === path) {
+                // If already at target path, setting window.location.hash is a no-op in browsers.
+                // Trigger hash change listener directly to force route reload / instantiation.
+                this._onHashChange();
+            } else {
+                // Standard push navigation by updating URL hash
+                window.location.hash = path;
+            }
+        }
+    }
+
+    /**
+     * =========================================================================
+     * Check if back navigation is possible
+     * =========================================================================
+     * Evaluates whether the user can navigate back in the application.
+     * Returns true when:
+     * 1. Navigation history contains prior routes (_history.length > 1), or
+     * 2. The current active route is not root / home (e.g. direct deep-link).
+     *
+     * @returns {boolean} True if back navigation can be initiated.
+     */
+    canGoBack() {
+        // Multi-level history entries indicate an ancestor route is present
+        if (this._history.length > 1) {
+            return true;
+        }
+
+        // Direct deep-link or browser refresh on a 2nd-level page: allow return to Home
+        const currentPath = this.getCurrentPath();
+        return currentPath !== '/home' && currentPath !== '/' && currentPath !== '';
+    }
+
+    /**
+     * =========================================================================
+     * Go back to previous page
+     * =========================================================================
+     * Pops the current route from navigation history and transitions back
+     * to the previous page. If history is empty but the user is on a 2nd-level
+     * page (such as after refreshing or launching via deep link), safely
+     * falls back to the primary '/home' route.
+     *
+     * @returns {boolean} True if back navigation was successfully triggered.
+     */
+    back() {
+        // Multi-entry history stack: pop current entry and restore preceding route
+        if (this._history.length > 1) {
+            // Remove current page from active history stack
+            this._history.pop();
+
+            // Peek at the target previous entry (which now sits at top of stack)
+            const previousEntry = this._history[this._history.length - 1];
+
+            // Flag as back navigation to tell Page lifecycle to restore previous scroll/focus
+            this._isBackNavigation = true;
+
+            // Preserve cached page state for restoration upon mount
+            this._pendingRestoreState = previousEntry ? previousEntry.state : null;
+
+            // Resolve target URL hash (defaults to '/home' if entry was corrupt)
+            const previousPath = previousEntry ? previousEntry.path : '/home';
+
+            // Mark expected path so _onHashChange does not treat as unexpected jump
+            this._lastNavigatePath = previousPath;
+
+            // Replace hash in window location without creating a new forward history entry
+            window.location.replace(`#${previousPath}`);
+            return true;
+        }
+
+        // Deep-link or refresh fallback: navigate cleanly to Home if on a sub-page
+        const currentPath = this.getCurrentPath();
+        if (currentPath !== '/home' && currentPath !== '/' && currentPath !== '') {
+            log.info(`No prior history entry available; falling back to /home from "${currentPath}"`);
+            this.navigate('/home');
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Reset history and navigate to a new path (clears stack)
+     * @param {string} path - Path to navigate to
+     */
+    reset(path) {
+        if (this.getCurrentPath() === path) {
+            this._history = [{ path: path, state: null }];
+            return;
+        }
+        this._history = [];
+        this.navigate(path, { replace: true });
+    }
+
+    /**
+     * Get current route path
+     * @returns {string} Current path without the hash
+     */
+    getCurrentPath() {
+        return window.location.hash.slice(1) || '/';
+    }
+
+    /**
+     * Get current page instance
+     * @returns {Page|null} Current page
+     */
+    getCurrentPage() {
+        return this._currentPage;
+    }
+
+    /**
+     * Handle hash change events
+     * @private
+     */
+    _onHashChange() {
+        // Extract query string if present
+        const fullPath = this.getCurrentPath();
+        const [path, queryString] = fullPath.split('?');
+
+        // ====================================================================
+        // Redundant Hash Change Filter
+        // ====================================================================
+        // If a page instance is already active and the browser emits a duplicate
+        // hashchange event for the exact same path that is already being rendered,
+        // ignore the event. This prevents duplicate page instantiation and DOM
+        // split-screen issues during cold boot when native deep links set location.hash
+        // before router.init(), triggering a trailing hashchange on the next tick.
+        // ====================================================================
+        if (this._currentPage && this._lastNavigatePath !== fullPath && state.get('router:currentPath') === fullPath) {
+            log.info(`Ignoring redundant hashchange for current path "${path}"`);
+            return;
+        }
+
+        // Clear expected navigation tracking (used to detect unexpected hash changes)
+        this._lastNavigatePath = null;
+
+        log.info(`Navigating to "${path}"`);
+
+        // Find matching route
+        for (const route of this._routes) {
+            const match = path.match(route.regex);
+
+            if (match) {
+                // Extract route params (e.g., /player/:id)
+                const params = {};
+                route.paramNames.forEach((name, index) => {
+                    params[name] = match[index + 1];
+                });
+
+                // Extract and merge query parameters (e.g., ?startPositionTicks=...)
+                if (queryString) {
+                    const searchParams = new URLSearchParams(queryString);
+                    for (const [key, value] of searchParams.entries()) {
+                        params[key] = value;
+                    }
+                }
+
+                // Capture state from current page before destroying
+                // This saves focus, scroll, and page-specific state
+                // Only capture state into history if this is forward navigation;
+                // during back navigation, currentEntry is the DESTINATION page entry!
+                if (this._currentPage && !this._isBackNavigation) {
+                    const capturedState = navigationState.captureState(this._currentPage);
+
+                    // Update the current history entry with captured state
+                    const currentEntry = this._history[this._history.length - 1];
+                    if (currentEntry && typeof currentEntry === 'object') {
+                        currentEntry.state = capturedState;
+                    }
+                }
+
+                // Destroy current page (after capturing state)
+                if (this._currentPage && typeof this._currentPage.destroy === 'function') {
+                    const prevPageId = this._currentPage._routePattern
+                        ? this._currentPage._routePattern.split('/')[1]
+                        : 'unknown';
+                    pluginManager.notifyPageUnload(
+                        prevPageId,
+                        this._currentPage.el || document.getElementById('page-container')
+                    );
+                    this._currentPage.destroy();
+                }
+
+                // Detect browser back/forward navigation — restore state from history
+                // This handles cases where hashchange fires without navigate() or back()
+                // being called (e.g., browser back button, sidebar click on a seen path).
+                if (!this._isBackNavigation) {
+                    const existingIndex = this._history.findIndex((entry) => entry.path === fullPath);
+                    if (existingIndex !== -1 && existingIndex < this._history.length - 1) {
+                        this._isBackNavigation = true;
+                        this._pendingRestoreState = this._history[existingIndex].state;
+                        this._history = this._history.slice(0, existingIndex + 1);
+                    }
+                }
+
+                // Add to history as an object with path and state
+                // Skip if: back navigation and the path is already at the top of the stack (we just returned there)
+                const topPath = this._history.length > 0 ? this._history[this._history.length - 1]?.path : null;
+                if (this._isBackNavigation && fullPath === topPath) {
+                    // We DO NOT clear the flag here. Page.js will consume it and clear it.
+                } else {
+                    if (fullPath !== topPath) {
+                        // Only push if path is different from top of history
+                        this._history.push({ path: fullPath, state: null });
+                        if (this._history.length > this._maxHistory) {
+                            this._history.shift();
+                        }
+                    }
+                }
+
+                // Create new page instance
+                // Handle both class constructors and plain object handlers
+                if (typeof route.PageClass === 'function') {
+                    // It's a class/constructor - use 'new'
+                    this._currentPage = new route.PageClass();
+                } else {
+                    // It's a plain object with methods (like the '/' redirect route)
+                    this._currentPage = route.PageClass;
+                }
+
+                this._currentPage._routePattern = route.pattern;
+
+                // Initialize the page with route params
+                if (typeof this._currentPage.init === 'function') {
+                    this._currentPage.init(params);
+                }
+
+                const pageId = route.pattern.split('/')[1] || 'unknown';
+                pluginManager.notifyPageLoad(
+                    pageId,
+                    this._currentPage.el || document.getElementById('page-container'),
+                    this._currentPage
+                );
+
+                // Update state
+                state.set('router:currentPath', fullPath);
+                state.set('router:currentParams', params);
+
+                // Emit navigation event
+                eventBus.emit('router:navigate', { path: fullPath, params });
+
+                return;
+            }
+        }
+
+        // No matching route - handle 404
+        log.warn(`No route found for "${path}"`);
+        eventBus.emit('router:notFound', { path });
+    }
+
+    /**
+     * Get a shallow copy of the current navigation history stack.
+     * Each entry contains the route path and optional captured state.
+     *
+     * @returns {Array<{path: string, state: any}>} Array of history entries
+     */
+    getHistory() {
+        // Return a shallow copy of the internal history array
+        return [...this._history];
+    }
+
+    /**
+     * ========================================================================
+     * CLEAR HISTORY PAGE STATE BY ROUTE PREFIX
+     * ========================================================================
+     * Purges captured page state (scroll offset, focus index, cached batch data)
+     * from history entries matching a specific route prefix (e.g. '/library').
+     *
+     * Essential when global layout or pagination preferences change (such as
+     * items-per-page limit or infinite scroll mode) so returning to preceding
+     * pages via back navigation forces a fresh fetch rather than restoring
+     * obsolete item collections.
+     * ========================================================================
+     * @param {string} pathPrefix - Route prefix to invalidate (e.g. '/library')
+     */
+    clearHistoryState(pathPrefix) {
+        if (!Array.isArray(this._history) || !pathPrefix) return;
+
+        // Iterate through all recorded history entries
+        for (let i = 0; i < this._history.length; i++) {
+            const entry = this._history[i];
+            // If the history route starts with the target prefix, drop its cached state
+            if (entry && entry.path && entry.path.startsWith(pathPrefix)) {
+                entry.state = null;
+            }
+        }
+
+        // Also clear pending restoration snapshot if current route matches prefix
+        if (this._pendingRestoreState && this.getCurrentPath().startsWith(pathPrefix)) {
+            this._pendingRestoreState = null;
+        }
+
+        log.info(`Cleared navigation history state for routes matching prefix: "${pathPrefix}"`);
+    }
+
+    /**
+     * Set or seed the navigation history stack with predetermined routes.
+     *
+     * Essential for deep-link scenarios (such as Samsung Smart Hub preview tiles)
+     * where launching directly into a detail or playback page requires preceding
+     * breadcrumbs (e.g., ['/home', '/details/seriesId']) in the back stack.
+     * This guarantees that pressing the Return / Back key walks back up the app's
+     * logical hierarchy to the homepage rather than abruptly exiting the app.
+     *
+     * @param {Array<string|{path: string, state?: any}>} entries - Ordered history entries (oldest first)
+     */
+    setHistory(entries) {
+        // Guard against non-array input
+        if (!Array.isArray(entries)) {
+            log.warn('setHistory called with non-array argument:', entries);
+            return;
+        }
+
+        // Normalize string paths into standard history entry objects
+        this._history = entries.map((entry) => {
+            if (typeof entry === 'string') {
+                return { path: entry, state: null };
+            }
+            return { path: entry.path, state: entry.state || null };
+        });
+
+        // Enforce maximum history capacity boundary
+        if (this._history.length > this._maxHistory) {
+            this._history = this._history.slice(-this._maxHistory);
+        }
+
+        log.info(
+            'Navigation history seeded:',
+            this._history.map((e) => e.path)
+        );
+    }
+
+    /**
+     * Reload the current route in-place
+     * Useful for resuming the app after sleep to fetch fresh data
+     */
+    reload() {
+        if (!this._currentPage) return;
+
+        log.info('Reloading current route');
+
+        // Capture current state to preserve scroll/focus during the reload
+        const capturedState = navigationState.captureState(this._currentPage);
+        const currentEntry = this._history[this._history.length - 1];
+        if (currentEntry && typeof currentEntry === 'object') {
+            currentEntry.state = capturedState;
+        }
+
+        // Flag as back navigation temporarily so the newly instantiated page
+        // will pick up the stored state, and we don't push duplicate history.
+        this._isBackNavigation = true;
+        this._pendingRestoreState = capturedState;
+
+        this._onHashChange();
+    }
+}
+
+// Export singleton instance
+export const router = new Router();
+
+// Expose router on window for components that can't import (e.g., OSD IIFE)
+window.router = router;
+
+// Also export class for testing
+export default Router;

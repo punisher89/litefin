@@ -1,0 +1,1443 @@
+/**
+ * ============================================================================
+ * Litefin Tizen - FocusManager
+ * ============================================================================
+ * Manages focus navigation for TV remote D-pad control.
+ * Uses robust spatial navigation for grid traversal.
+ * ============================================================================
+ */
+
+import { eventBus } from '../core/EventBus.js';
+import { logger } from '../utils/Logger.js';
+import { spatialNavigator } from './SpatialNavigator.js';
+import { scrollController } from './ScrollController.js';
+import { storage } from '../utils/StorageService.js';
+
+const log = logger.create('FocusManager');
+
+// Focusable element selector
+// Strictly exclude tabindex="-1" from ALL elements (buttons, inputs, etc.)
+const FOCUSABLE_SELECTOR = `
+    a[href]:not([tabindex="-1"]),
+    button:not([disabled]):not([tabindex="-1"]),
+    input:not([disabled]):not([tabindex="-1"]),
+    select:not([disabled]):not([tabindex="-1"]),
+    textarea:not([disabled]):not([tabindex="-1"]),
+    [tabindex]:not([tabindex="-1"])
+`
+    .replace(/\s+/g, ' ')
+    .trim();
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+// Minimum time (ms) between directional key events to rate-limit navigation.
+// Caps held key repeat rate to ~8 moves per second (every 125ms) so the layout,
+// progressive DOM insertion, and smooth scroll animations have ample time to
+// breathe and render without being overwhelmed or letting focus run off-screen.
+// Deliberate user keypresses (>150ms) experience 0ms added latency.
+const KEY_DEBOUNCE_MS = 125;
+
+// Maximum number of empty sections to skip through when leaving a section.
+// Prevents infinite loops if section linking is misconfigured.
+const MAX_SECTION_SKIP_DEPTH = 20;
+
+// Rapid navigation threshold (ms) for streak tracking.
+// Remote hardware key repeats fire at ~100-130ms intervals. Setting this to 145ms
+// cleanly captures continuous hardware holds while ensuring deliberate manual
+// double/triple taps (>150ms) reset the streak, keeping manual browsing silky smooth.
+const RAPID_MOVE_THRESHOLD_MS = 145;
+
+// Minimum consecutive rapid moves in the SAME direction required to engage fast scroll.
+// Increased from 2 to 5 so deliberate brisk tapping (2-4 items) never triggers fast
+// scroll prematurely. The user must continuously hold the D-pad through 5 items
+// (~625ms of sustained holding) before the camera switches into fast navigation.
+const RAPID_MOVE_STREAK_REQUIRED = 5;
+
+class FocusManager {
+    constructor() {
+        // Registered sections: name -> config
+        this._sections = new Map();
+
+        // Currently active section name
+        this._activeSection = null;
+
+        // Focus memory: section -> { element, index }
+        this._focusMemory = new Map();
+
+        // PERFORMANCE: Cache focusables per section
+        this._focusablesCache = new Map();
+
+        // Currently focused element
+        this._focusedElement = null;
+
+        // Focus trap stack (for modals)
+        this._trapStack = [];
+
+        // Debounce handling - track PREVIOUS move time for rapid navigation detection
+        this._lastMoveTime = 0;
+        this._prevMoveTime = 0;
+        this._rapidMoveStreak = 0;
+
+        // Suspended flag — when true, all key processing is skipped.
+        // Used by components that manage their own focus (e.g. PlayerOSD)
+        this._suspended = false;
+
+        // Track the current focusable index to avoid O(n) indexOf on every move
+        this._currentFocusIndex = -1;
+
+        // Pending memory update RAF handle — coalesces rapid moves into one update
+        this._pendingMemoryUpdate = false;
+
+        // Delegated utilities (extracted from this God Object)
+        this._spatial = spatialNavigator;
+        this._scroll = scrollController;
+
+        // Initialize
+        this._init();
+    }
+
+    // _cancelScrollAnimation → moved to ScrollController
+    // _smoothScrollTo → moved to ScrollController
+
+    /**
+     * Initialize focus manager
+     * @private
+     */
+    _init() {
+        // Listen for key events from TizenAdapter
+        // PREVENT DEFAULT on all handled keys to avoid browser/native double-handling
+        eventBus.on('key:up', (e) => {
+            if (this._suspended) return;
+            e?.preventDefault();
+            this._handleKey('up');
+        });
+        eventBus.on('key:down', (e) => {
+            if (this._suspended) return;
+            e?.preventDefault();
+            this._handleKey('down');
+        });
+        eventBus.on('key:left', (e) => {
+            if (this._suspended) return;
+            e?.preventDefault();
+            this._handleKey('left');
+        });
+        eventBus.on('key:right', (e) => {
+            if (this._suspended) return;
+            e?.preventDefault();
+            this._handleKey('right');
+        });
+
+        let lastMouseDownTime = 0;
+
+        document.addEventListener(
+            'mousedown',
+            () => {
+                lastMouseDownTime = Date.now();
+            },
+            { capture: true, passive: true }
+        );
+
+        eventBus.on('key:enter', (e) => {
+            if (this._suspended) return;
+
+            // Magic Remote cursor clicks generate a synthetic 'Enter' keydown
+            // immediately after 'mousedown'. If we intercept it, we break the native
+            // mouse click sequence and trigger the wrong focused element.
+            // By ignoring Enter keys right after a mousedown, the cursor acts exactly like a real mouse.
+            if (Date.now() - lastMouseDownTime < 500) {
+                return;
+            }
+
+            e?.preventDefault(); // Prevent native button click (we trigger it manually for D-pad)
+            this._activate();
+        });
+
+        // REMOVED: Direct document keydown listener
+        // We now rely solely on TizenAdapter -> EventBus to be the Single Source of Truth.
+        // This fixes double-handling issues.
+
+        // Track focus changes globally
+        document.addEventListener('focusin', (e) => {
+            // NOTE: Page.setLoading(false) only removes the 'loading' class from the
+            // page root — it never removes the '.page-loading' overlay div itself, so
+            // that element stays in the DOM (just CSS-hidden via display:none) for the
+            // rest of the page's lifetime. Checking for its mere presence therefore
+            // treats the page as "loading" forever after the first spinner, silently
+            // dropping every subsequent focusin (e.g. DetailsPage's resumeBtn.focus()),
+            // so we must also verify it's actually visible before treating it as active.
+            const pageLoadingEl = document.querySelector('.page-loading');
+            const isPageLoading =
+                document.body.classList.contains('app-splash-active') ||
+                document.querySelector('.page.loading') ||
+                (pageLoadingEl && getComputedStyle(pageLoadingEl).display !== 'none');
+
+            if (isPageLoading) {
+                const sectionName = this.getSectionForElement(e.target);
+                log.debug(`Ignoring focusin on "${sectionName || 'unknown'}" because page is loading`);
+                return;
+            }
+
+            if (this._focusedElement !== e.target) {
+                this._handleFocusChange(e.target);
+            }
+        });
+
+        // REMOVED: Proactive mousedown focus sync.
+        // It caused layout shifts and blur() calls during the click sequence,
+        // which caused TV browsers to cancel the click event (the "not opening" bug).
+        // Magic Remote is now handled purely as a native mouse via the Enter bypass above.
+
+        // MAGIC CURSOR: Wheel Navigation
+        // Allows scrolling the Magic Remote wheel to navigate vertically between rows/items.
+        document.addEventListener(
+            'wheel',
+            (e) => {
+                if (this._suspended) return;
+
+                // Respect the user setting (default to false)
+                if (storage.getItem('pref:hoverScrollNavigation') !== 'true') return;
+
+                // Ignore if player is active or OSD is focused (PlayerOSD handles its own wheel behavior)
+                if (
+                    document.body.classList.contains('player-active') ||
+                    this.activeSection === 'osd' ||
+                    this.activeSection === 'player' ||
+                    this._activeSection === 'sidebar' ||
+                    document.querySelector('.sidebar.expanded') ||
+                    document.querySelector('.sidebar:hover') ||
+                    (this._activeSection && this._activeSection.startsWith('settings-'))
+                )
+                    return;
+
+                // Normalize deltaY based on deltaMode for cross-platform compatibility.
+                // webOS Magic Remote reports wheel events in DOM_DELTA_LINE (deltaMode=1)
+                // where a single tick is deltaY=1-3, which would be swallowed by a
+                // raw pixel threshold. Convert all modes to approximate pixels:
+                //   - DOM_DELTA_PIXEL (0): already pixels
+                //   - DOM_DELTA_LINE  (1): multiply by 20px per line
+                //   - DOM_DELTA_PAGE  (2): multiply by viewport height
+                let deltaY = e.deltaY;
+                const dm = e.deltaMode || 0;
+                if (dm === 1) deltaY *= 20;
+                else if (dm === 2) deltaY *= window.innerHeight;
+
+                // Threshold to prevent accidental jitter moves (Magic Remotes are sensitive)
+                if (Math.abs(deltaY) < 30) return;
+
+                const direction = deltaY > 0 ? 'down' : 'up';
+                this._handleKey(direction);
+            },
+            { passive: true }
+        );
+
+        log.info('Initialized (v3 Single Source Rewrite)');
+    }
+
+    /**
+     * Internal logic for handling a focus change to a new element.
+     * @param {HTMLElement} target - The element receiving focus
+     * @private
+     */
+    _handleFocusChange(target) {
+        // If trap is active, check if focus is escaping
+        if (this.isTrapped()) {
+            const trapConfig = this._sections.get('__trap__');
+            if (trapConfig && trapConfig.container && !trapConfig.container.contains(target)) {
+                // Focus escaped the trap! Force it back
+                log.warn('Focus escaped trap, forcing back');
+                const focusables = this._getFocusables('__trap__', true);
+                if (focusables.length > 0) {
+                    this.focusElement(focusables[0]);
+                }
+                return;
+            }
+        }
+
+        // Explicitly remove .focused class from the previous element
+        if (this._focusedElement) {
+            this._focusedElement.classList.remove('focused');
+
+            // Remove generic .focused-row from parent settings items if applicable
+            const oldSettingItem = this._focusedElement.closest('.setting-item');
+            if (oldSettingItem) {
+                oldSettingItem.classList.remove('focused-row');
+            }
+        }
+
+        this._focusedElement = target;
+
+        // Add .focused to the new element so focus styling applies correctly
+        if (this._focusedElement) {
+            this._focusedElement.classList.add('focused');
+
+            // Add generic .focused-row to parent settings items to highlight the whole row
+            const newSettingItem = this._focusedElement.closest('.setting-item');
+            if (newSettingItem) {
+                newSettingItem.classList.add('focused-row');
+            }
+        }
+
+        // Auto-sync active section if the element belongs to one (but not during trap)
+        if (this._trapStack.length === 0) {
+            const sectionName = this.getSectionForElement(target);
+            if (sectionName && this._activeSection !== sectionName) {
+                if (this._activeSection) {
+                    this._previousSection = this._activeSection;
+                }
+                this._activeSection = sectionName;
+                eventBus.emit('focus:sectionChanged', sectionName);
+                log.debug(`Auto-synced active section to "${sectionName}" via focusin`);
+            }
+        }
+
+        // Cancel any pending deferred memory update — we write synchronously here
+        this._pendingMemoryUpdate = false;
+        this._updateFocusMemory();
+    }
+
+    // REMOVED: _onKeyDown (Redundant)
+
+    /**
+     * Handle directional key press
+     * @param {string} direction
+     */
+    _handleKey(direction) {
+        // Simple debounce to prevent event flooding. A keypress in the OPPOSITE
+        // direction of the previous one always passes through: auto-repeat only
+        // repeats the same direction, so a direction change is an intentional
+        // correction — most noticeable at page boundaries where the previous
+        // press was a dead key (e.g. Down at the last row, then immediately Up).
+        // Without this passthrough the correction key would be silently
+        // swallowed and navigation would feel frozen for KEY_DEBOUNCE_MS.
+        const now = Date.now();
+        const isDebouncedGap = now - this._lastMoveTime < KEY_DEBOUNCE_MS;
+        const isDirectionChange = this._lastMoveDirection != null && direction !== this._lastMoveDirection;
+        if (isDebouncedGap && !isDirectionChange) return;
+
+        // Track previous move time BEFORE updating current
+        // This allows us to detect rapid key holds
+        const gap = now - this._lastMoveTime;
+        const isRapidGap = this._lastMoveTime > 0 && gap < RAPID_MOVE_THRESHOLD_MS;
+
+        this._prevMoveTime = this._lastMoveTime;
+        this._lastMoveTime = now;
+
+        // Update rapid move streak
+        if (isRapidGap && this._lastMoveDirection === direction) {
+            this._rapidMoveStreak++;
+        } else {
+            this._rapidMoveStreak = 0;
+            this._lastMoveDirection = direction;
+        }
+
+        // SLIDER HANDLING: When a range input is focused, Left/Right keys
+        // should adjust the slider value instead of navigating to other elements.
+        // On TV remotes, arrow keys are intercepted by FocusManager before
+        // the native <input type="range"> can process them.
+        if ((direction === 'left' || direction === 'right') && this._focusedElement) {
+            const el = this._focusedElement;
+            if (el.tagName === 'INPUT' && el.type === 'range') {
+                const step = parseFloat(el.step) || 1;
+                const min = parseFloat(el.min) || 0;
+                const max = parseFloat(el.max) || 100;
+                let value = parseFloat(el.value) || 0;
+
+                // Detect if the slider is rendered in RTL mode
+                let isRTL = document.documentElement.dir === 'rtl';
+                if (window.getComputedStyle) {
+                    isRTL = window.getComputedStyle(el).direction === 'rtl';
+                }
+
+                // In RTL, min is on the right and max is on the left visually.
+                // Pressing Left should increase value (move towards max).
+                let effectiveDirection = direction;
+                if (isRTL) {
+                    effectiveDirection = direction === 'left' ? 'right' : 'left';
+                }
+
+                // Adjust value based on effective direction
+                if (effectiveDirection === 'right') {
+                    value = Math.min(max, value + step);
+                } else {
+                    value = Math.max(min, value - step);
+                }
+
+                // Apply the new value and fire the input event
+                // so that any listeners (e.g. SettingsPage._bindSliderEvents) react
+                el.value = value;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                return; // Don't navigate, we handled it
+            }
+        }
+
+        this._move(direction);
+    }
+
+    /**
+     * Register a focusable section
+     * @param {string} name - Section identifier
+     * @param {HTMLElement} container - Section container element
+     * @param {Object} [options] - Section options
+     */
+    register(name, container, options = {}) {
+        const config = {
+            container,
+            orientation: options.orientation || 'horizontal', // 'horizontal', 'vertical', 'grid'
+            loop: options.loop || false,
+            // Navigation overrides
+            leaveUp: options.leaveUp || null,
+            leaveDown: options.leaveDown || null,
+            leaveLeft: options.leaveLeft || null,
+            leaveRight: options.leaveRight || null,
+            // Directional Entry logic
+            enterTo: options.enterTo || null, // 'first' or null (spatial/memory)
+            // Custom Override
+            onMove: options.onMove || null,
+            onEnter: options.onEnter || null,
+            onRestoreIndex: options.onRestoreIndex || null,
+            // Custom Scroll Logic
+            scrollOffsetTop: options.scrollOffsetTop || 0,
+            // CSS selector for the default element to focus when entering the section.
+            // If provided, overrides spatial/memory entry logic.
+            // Example: '#sidebar-home' to always land on the Home button.
+            defaultFocusSelector: options.defaultFocusSelector || null,
+            // Custom selector
+            selector: options.selector || FOCUSABLE_SELECTOR,
+            // Column count for mathematical grid navigation — when set alongside
+            // orientation: 'grid', _move() uses index math instead of SpatialNavigator
+            // to compute the next focusable, eliminating getBoundingClientRect loops.
+            columns: options.columns || null
+        };
+
+        this._sections.set(name, config);
+        this.invalidateCache(name);
+
+        // PERFORMANCE: Tag the container with its section name so getSectionForElement
+        // can use a single O(1) closest() DOM lookup instead of looping all sections.
+        // The attribute is removed in unregister() to keep the DOM clean.
+        container.dataset.fmSection = name;
+
+        log.debug(`Registered section "${name}"`);
+    }
+
+    /**
+     * Unregister a section
+     * @param {string} name
+     */
+    unregister(name) {
+        // If the focused element is in this section, clear it before removing the config
+        if (this._focusedElement) {
+            const section = this.getSectionForElement(this._focusedElement);
+            if (section === name) {
+                this.clearFocus();
+            }
+        }
+
+        // PERFORMANCE: Remove the data-fm-section tag we set in register()
+        // so the container is clean and doesn't confuse future closest() calls.
+        const config = this._sections.get(name);
+        if (config && config.container && config.container.dataset) {
+            delete config.container.dataset.fmSection;
+        }
+
+        this._sections.delete(name);
+        this._focusMemory.delete(name);
+        // CRITICAL: Clear cache to prevent returning detached elements if section name is reused
+        this.invalidateCache(name);
+
+        if (this._activeSection === name) this._activeSection = null;
+    }
+
+    /**
+     * Explicitly remove focus from the current element.
+     * Use this when a page is being destroyed or a section is removed.
+     * @param {boolean} [force=false] - Force clearing focus even if a trap is active
+     */
+    clearFocus(force = false) {
+        // If a focus trap is active, prevent clearing focus unless forced by trap exit
+        if (this.isTrapped() && !force) {
+            log.warn('clearFocus: Blocked attempt to clear focus while modal focus trap is active');
+            return;
+        }
+
+        if (this._focusedElement) {
+            this._focusedElement.classList.remove('focused');
+
+            // Remove generic .focused-row from parent settings items
+            const oldSettingItem = this._focusedElement.closest('.setting-item');
+            if (oldSettingItem) {
+                oldSettingItem.classList.remove('focused-row');
+            }
+
+            this._focusedElement.blur();
+            this._focusedElement = null;
+            log.debug('Focus cleared');
+        }
+    }
+
+    /**
+     * Clear cached DOM references
+     */
+    resetDOMCache() {
+        this._focusablesCache.clear();
+        this._scroll.resetCache();
+    }
+
+    /**
+     * Set the active section and focus inside it
+     * @param {string} name
+     * @param {boolean} restoreFocus
+     * @param {HTMLElement} [fromElement] - Element user is coming FROM (for spatial entry)
+     */
+    setActiveSection(name, restoreFocus = true, fromElement = null, options = {}) {
+        if (!this._sections.has(name)) {
+            log.warn(`Unknown section "${name}"`);
+            return;
+        }
+
+        // ====================================================================
+        // MODAL FOCUS TRAP ENFORCEMENT
+        // ====================================================================
+        // When a focus trap is active (e.g. ExitDialog, SeerrRequestModal, SyncPlay),
+        // all navigation and section switching MUST remain locked inside '__trap__'.
+        // Any attempt by background pages, asynchronous pipelines, or timers
+        // to switch the active section away from the trap is rejected here.
+        // Self-healing isTrapped() auto-purges orphaned traps if container is gone or modal closed.
+        // ====================================================================
+        if (name !== '__trap__' && this.isTrapped()) {
+            log.warn(
+                `setActiveSection: Blocked attempt to change section to "${name}" while focus is trapped in modal`
+            );
+            return;
+        }
+
+        if (this._activeSection && this._activeSection !== name) {
+            this._previousSection = this._activeSection;
+        }
+
+        this._activeSection = name;
+        eventBus.emit('focus:sectionChanged', name);
+
+        if (restoreFocus) {
+            this._restoreFocus(name, fromElement, options);
+        }
+    }
+
+    getPreviousSection() {
+        return this._previousSection;
+    }
+
+    getActionSection() {
+        return this._activeSection;
+    } // Alias if needed? No, getActiveSection exists.
+
+    /**
+     * Get the timestamp of the most recent directional move or user navigation.
+     * Used by NavigationState and active page controllers to detect if the user
+     * has already begun navigating manually during asynchronous page loading,
+     * preventing deferred focus restoration from hijacking active cursor position.
+     * @returns {number} Timestamp in milliseconds
+     */
+    getLastMoveTime() {
+        // Returns the epoch timestamp of the latest D-pad interaction
+        return this._lastMoveTime;
+    }
+
+    /**
+     * Get config for a section
+     * @param {string} name
+     */
+    getSectionConfig(name) {
+        return this._sections.get(name);
+    }
+
+    // Alias for getSectionConfig
+    getConfig(name) {
+        return this.getSectionConfig(name);
+    }
+
+    /**
+     * Get focusable elements in section (OPTIMIZED)
+     * Uses cache to avoid repeated expensive DOM queries.
+     * @param {string} sectionName
+     * @param {boolean} forceRefresh - Force cache refresh
+     */
+    _getFocusables(sectionName, forceRefresh = false) {
+        const config = this._sections.get(sectionName);
+        if (!config || !document.contains(config.container)) return [];
+
+        // Return cached if available and not forcing refresh
+        if (!forceRefresh && this._focusablesCache.has(sectionName)) {
+            const cached = this._focusablesCache.get(sectionName);
+            // Verify cached elements are non-empty and still connected to the DOM tree; discard if stale or empty
+            // This prevents sections temporarily hidden (e.g. sidebar during playback) from caching [] permanently.
+            if (cached && cached.length > 0 && document.contains(cached[0])) {
+                return cached;
+            }
+            this._focusablesCache.delete(sectionName);
+        }
+
+        // Query focusables and filter out hidden elements.
+        // TIZEN OPTIMIZATION: We ONLY check non-reflowing style properties
+        // to avoid synchronous layout thrashing loops which freeze TV hardware.
+        // Previously we checked offsetParent and getComputedStyle, which force recalcs.
+        const allElements = Array.from(config.container.querySelectorAll(config.selector));
+
+        const focusables = [];
+        for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i];
+
+            // Ensure the element is actually connected to the active DOM tree
+            if (!document.contains(el)) continue;
+
+            // Fast, non-reflowing checks to determine visibility.
+            // NOTE: We assume elements are visible rather than invisible natively,
+            // as virtualized elements manage visibility via their mount lifecycle.
+            if (el.style.display === 'none') continue;
+            if (el.classList.contains('hidden')) continue;
+            if (el.hasAttribute('hidden')) continue;
+
+            // Check if any parent element is marked as hidden (avoids offsetParent reflow)
+            // Tizen DOM allows fast closest() queries without layout thrashing
+            if (el.closest('.hidden') || el.closest('[hidden]')) continue;
+
+            // Inline styles for display: none on parents
+            if (el.closest('[style*="display: none"]') || el.closest('[style*="display:none"]')) continue;
+
+            focusables.push(el);
+        }
+
+        this._focusablesCache.set(sectionName, focusables);
+        return focusables;
+    }
+
+    /**
+     * Invalidate focusables cache for a section
+     * @param {string} sectionName
+     */
+    invalidateCache(sectionName) {
+        if (sectionName) {
+            this._focusablesCache.delete(sectionName);
+        } else {
+            this._focusablesCache.clear();
+        }
+    }
+
+    clearMemory(sectionName) {
+        if (sectionName) {
+            this._focusMemory.delete(sectionName);
+        } else {
+            this._focusMemory.clear();
+        }
+    }
+
+    /**
+     * Core movement logic
+     * @param {string} direction
+     */
+    _move(direction) {
+        // Self-healing: if activeSection is missing or unregistered, attempt to recover
+        // by finding the first registered section with valid focusable elements.
+        if (!this._activeSection || !this._sections.has(this._activeSection)) {
+            const candidateSections = Array.from(this._sections.keys()).filter(
+                (s) => s !== '__trap__' && !s.startsWith('__')
+            );
+            for (const candidate of candidateSections) {
+                const available = this._getFocusables(candidate, true);
+                if (available.length > 0) {
+                    this.setActiveSection(candidate, true);
+                    return;
+                }
+            }
+            return;
+        }
+
+        // log.debug(`_move(${direction}) Active: ${this._activeSection}`); // DEBUG LOG
+
+        const config = this._sections.get(this._activeSection);
+        if (!config) return;
+
+        // Custom Override Handler
+        if (config.onMove) {
+            // Pass the currently focused element as the second argument.
+            const handled = config.onMove(direction, this._focusedElement);
+            if (handled) return; // Handler took care of it (returned true or truthy)
+        }
+
+        const focusables = this._getFocusables(this._activeSection);
+
+        // If the section is completely empty, immediately try to leave it
+        if (!focusables.length) {
+            this._leaveSection(direction);
+            return;
+        }
+
+        // If nothing focused, element is detached, or element is outside container, focus first available
+        if (
+            !this._focusedElement ||
+            !document.contains(this._focusedElement) ||
+            !config.container.contains(this._focusedElement)
+        ) {
+            this.focusElement(focusables[0]);
+            return;
+        }
+
+        const currentIndex = focusables.indexOf(this._focusedElement);
+        this._currentFocusIndex = currentIndex;
+        let nextElement = null;
+        let nextIndex = -1;
+
+        // 1. Handling strict orientations
+        if (config.orientation === 'horizontal') {
+            const isRtl = document.documentElement.dir === 'rtl';
+            let logicalDirection = direction;
+            if (isRtl) {
+                if (direction === 'left') logicalDirection = 'right';
+                else if (direction === 'right') logicalDirection = 'left';
+            }
+
+            if (logicalDirection === 'left') {
+                if (currentIndex > 0) {
+                    nextElement = focusables[currentIndex - 1];
+                    nextIndex = currentIndex - 1;
+                }
+            } else if (logicalDirection === 'right') {
+                if (currentIndex < focusables.length - 1) {
+                    nextElement = focusables[currentIndex + 1];
+                    nextIndex = currentIndex + 1;
+                }
+            }
+        } else if (config.orientation === 'vertical') {
+            if (direction === 'up') {
+                if (currentIndex > 0) {
+                    nextElement = focusables[currentIndex - 1];
+                    nextIndex = currentIndex - 1;
+                }
+            } else if (direction === 'down') {
+                if (currentIndex < focusables.length - 1) {
+                    nextElement = focusables[currentIndex + 1];
+                    nextIndex = currentIndex + 1;
+                }
+            }
+        } else if (config.orientation === 'grid' && config.columns) {
+            // ================================================================
+            // PURE MATHEMATICAL GRID NAVIGATION
+            // ================================================================
+            // When columns are explicitly defined, we compute the next focusable
+            // index purely using index math. This completely bypasses calling
+            // SpatialNavigator.findNext(), avoiding its layout-thrashing loops
+            // (calling getBoundingClientRect() on 300+ elements per keypress).
+            // ================================================================
+            const columns = config.columns;
+            const isRtl = document.documentElement.dir === 'rtl';
+
+            // Map visual directions to logical layout directions
+            let logicalDirection = direction;
+            if (isRtl) {
+                if (direction === 'left') logicalDirection = 'right';
+                else if (direction === 'right') logicalDirection = 'left';
+            }
+
+            if (logicalDirection === 'left') {
+                // Navigate left only if not at the start of a grid row
+                if (currentIndex % columns !== 0 && currentIndex > 0) {
+                    nextElement = focusables[currentIndex - 1];
+                    nextIndex = currentIndex - 1;
+                }
+            } else if (logicalDirection === 'right') {
+                // Navigate right only if not at the end of a grid row
+                if ((currentIndex + 1) % columns !== 0 && currentIndex < focusables.length - 1) {
+                    nextElement = focusables[currentIndex + 1];
+                    nextIndex = currentIndex + 1;
+                }
+            } else if (direction === 'up') {
+                // Navigate up by jumping back one full row length
+                if (currentIndex >= columns) {
+                    nextElement = focusables[currentIndex - columns];
+                    nextIndex = currentIndex - columns;
+                }
+            } else if (direction === 'down') {
+                // Navigate down by jumping forward one full row length
+                if (currentIndex + columns < focusables.length) {
+                    nextElement = focusables[currentIndex + columns];
+                    nextIndex = currentIndex + columns;
+                } else {
+                    // Handover to last row's end item if columns are partially filled
+                    const lastRowStart = Math.floor((focusables.length - 1) / columns) * columns;
+                    const currentRow = Math.floor(currentIndex / columns);
+                    const targetRow = currentRow + 1;
+
+                    if (targetRow * columns < focusables.length || lastRowStart > currentIndex) {
+                        const lastElementIndex = focusables.length - 1;
+                        if (Math.floor(lastElementIndex / columns) === targetRow) {
+                            nextElement = focusables[lastElementIndex];
+                            nextIndex = lastElementIndex;
+                        }
+                    }
+                }
+            }
+        } else {
+            // 'grid' or default fallback — delegate to SpatialNavigator
+            nextElement = this._spatial.findNext(this._focusedElement, focusables, direction);
+        }
+
+        // 2. If we found a target, move to it
+        if (nextElement) {
+            // ----------------------------------------------------------------
+            // ADAPTIVE INTERACTION PHYSICS
+            // ----------------------------------------------------------------
+            // Normal browsing and deliberate fast taps (<5 items) stay silky smooth,
+            // tracking focus transitions with continuous ease-out deceleration.
+            // Fast snapping scroll only engages when the user deliberately holds
+            // the D-pad through RAPID_MOVE_STREAK_REQUIRED (5) consecutive items in
+            // the same direction (~625ms of sustained holding).
+            // ----------------------------------------------------------------
+            const isRapidNav = this._rapidMoveStreak >= RAPID_MOVE_STREAK_REQUIRED;
+            const moveOpts = { instantScroll: isRapidNav, sectionName: this._activeSection };
+            if (nextIndex >= 0) moveOpts.focusIndex = nextIndex;
+            // Horizontal moves in a grid stay on the same row — skip vertical scroll recalculation
+            if (config.orientation === 'grid' && config.columns && (direction === 'left' || direction === 'right')) {
+                moveOpts.skipVerticalScroll = true;
+            }
+            this.focusElement(nextElement, moveOpts);
+            return;
+        }
+
+        log.debug(`No valid target in section. Leaving section: ${direction}`);
+
+        // 3. If no target found inside, try to leave section
+        this._leaveSection(direction);
+    }
+
+    // _findSpatialNext → moved to SpatialNavigator
+    // _findSpatialClosest → moved to SpatialNavigator
+
+    /**
+     * Leave current section (OPTIMIZED)
+     * Uses instant scroll when changing sections vertically.
+     * @param {string} direction
+     */
+    _leaveSection(direction) {
+        const config = this._sections.get(this._activeSection);
+        if (!config) return;
+
+        const isRtl = document.documentElement.dir === 'rtl';
+        let leaveDirection = direction;
+        if (isRtl) {
+            if (direction === 'left') leaveDirection = 'right';
+            else if (direction === 'right') leaveDirection = 'left';
+        }
+
+        const key = `leave${leaveDirection.charAt(0).toUpperCase() + leaveDirection.slice(1)}`;
+        let nextSection = config[key];
+
+        log.debug(`_leaveSection: direction=${direction}, key=${key}, nextSection=${nextSection}`);
+
+        // ── Function callback support ─────────────────────────────────────────
+        // leaveDown (and other leave* directions) can be set to a function
+        // instead of a section-name string. When this happens, call it and treat
+        // a falsy return value as "navigation was fully handled by the callback"
+        // (return false convention). A truthy return value is treated as a
+        // section name to navigate to.  This powers the deferred row loader on
+        // the homepage — pressing ↓ past the last rendered row triggers the next
+        // lazy batch instead of freezing navigation.
+        if (typeof nextSection === 'function') {
+            const result = nextSection();
+            if (!result) return; // Handler took full control (returned false / undefined)
+            // If the handler returned a string, treat it as a section to navigate to
+            nextSection = result;
+        }
+
+        // Keep searching if target section exists but has no focusable elements
+        // This handles empty rows in library grids/lists
+        const maxSearchDepth = MAX_SECTION_SKIP_DEPTH;
+        let searchDepth = 0;
+
+        // PERFORMANCE: Track which sections we've already queried in this skip loop
+        // to avoid calling _getFocusables(forceRefresh=true) on the same section twice.
+        const checkedSections = new Set();
+
+        while (nextSection && this._sections.has(nextSection) && searchDepth < maxSearchDepth) {
+            const nextConfig = this._sections.get(nextSection);
+
+            // PERFORMANCE: Never force refresh during skip loops to avoid querySelectorAll
+            // and visibility check overhead per row. Caches are invalidated externally
+            // when needed (e.g. by VirtualCardRow).
+            checkedSections.add(nextSection);
+
+            const focusables = this._getFocusables(nextSection, false);
+
+            if (focusables && focusables.length > 0) {
+                // Found a valid section with focusable elements!
+                // log.debug(
+                //    `_leaveSection: Found valid section ${nextSection} with ${focusables.length} focusables`
+                // );
+                break;
+            }
+
+            // Section is empty, try to skip to the next one in the same direction
+            // log.debug(`_leaveSection: Section ${nextSection} is empty, skipping...`);
+            const skipToSection = nextConfig ? nextConfig[key] : null;
+
+            if (!skipToSection || !this._sections.has(skipToSection)) {
+                // No more sections to skip to
+                nextSection = null;
+                break;
+            }
+
+            nextSection = skipToSection;
+            searchDepth++;
+        }
+
+        // Flush pending memory update before leaving section
+        this._flushMemoryUpdate();
+
+        if (nextSection && this._sections.has(nextSection)) {
+            const originElement = this._focusedElement; // Capture for spatial handover
+
+            // Unfocus current
+            if (this._focusedElement) {
+                this._focusedElement.classList.remove('focused');
+
+                // Remove generic .focused-row from parent settings items
+                const oldSettingItem = this._focusedElement.closest('.setting-item');
+                if (oldSettingItem) {
+                    oldSettingItem.classList.remove('focused-row');
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // ADAPTIVE SECTION TRANSITION
+            // ----------------------------------------------------------------
+            // Seamlessly glide between sections vertically. Fast snap navigation is
+            // only engaged if a sustained held streak is currently active across rows.
+            // ----------------------------------------------------------------
+            const isRapidNav = this._rapidMoveStreak >= RAPID_MOVE_STREAK_REQUIRED;
+
+            // Pass originElement to allow selecting closest target in new section
+            this.setActiveSection(nextSection, true, originElement, { direction, instantScroll: isRapidNav });
+        } else if (direction === 'up') {
+            // No section to navigate to (at top of page)
+            // Still scroll to top to show full backdrop as visual feedback
+            const scrollContainer = this._scroll.getScrollContainer(this._focusedElement);
+            // ================================================================
+            // GPU SCROLL COMPATIBLE VERTICAL SCROLL CHECK
+            // ================================================================
+            // Direct reads of scrollContainer.scrollTop return 0 in GPU scroll mode.
+            // Using getVerticalScroll ensures we correctly identify if the page
+            // is scrolled down before animating back to top.
+            // ================================================================
+            if (scrollContainer && this._scroll.getVerticalScroll(scrollContainer) > 0) {
+                this._scroll.smoothScrollTo(scrollContainer, 0);
+            }
+        }
+    }
+
+    // _getScrollContainer → moved to ScrollController
+
+    /**
+     * Focus a specific element (OPTIMIZED per Samsung Tizen Guidelines)
+     * Coordinates cleanup, section switching, scroll delegation, and focus.
+     */
+    focusElement(element, options = {}) {
+        // Abort if element is invalid or no longer connected to the active DOM tree
+        if (!element || !document.contains(element)) return;
+
+        // ====================================================================
+        // MODAL FOCUS TRAP ENFORCEMENT
+        // ====================================================================
+        // When a focus trap is active, only elements strictly contained within
+        // the active trap container are eligible to receive focus.
+        // If an asynchronous page loader (e.g. HomePage rendering media cards in
+        // the background while ExitDialog is shown) attempts to focus an element
+        // outside the modal, reject the request immediately to prevent stealing focus.
+        // ====================================================================
+        if (this.isTrapped()) {
+            const trapConfig = this._sections.get('__trap__');
+            if (trapConfig && trapConfig.container && !trapConfig.container.contains(element)) {
+                log.warn('focusElement: Blocked attempt to focus element outside active modal trap', element);
+                return;
+            }
+        }
+
+        const defaults = { scroll: true, skipScroll: false, instantScroll: false };
+        options = { ...defaults, ...options };
+
+        // Cleanup old focus FIRST (lightweight)
+        // TIZEN FIX: Explicitly blur the old element to remove native :focus state
+        if (this._focusedElement && this._focusedElement !== element) {
+            this._focusedElement.classList.remove('focused');
+
+            // Remove generic .focused-row from parent settings items
+            const oldSettingItem = this._focusedElement.closest('.setting-item');
+            if (oldSettingItem) {
+                oldSettingItem.classList.remove('focused-row');
+            }
+
+            this._focusedElement.blur(); // Clear native :focus styling on Tizen
+        }
+
+        // PERFORMANCE: Use provided sectionName hint to skip DOM closest() traversal.
+        // _move() always knows the section and passes it via options.
+        const sectionName = options.sectionName || this.getSectionForElement(element);
+        const config = sectionName ? this._sections.get(sectionName) : null;
+
+        // Auto-switch active section if:
+        // 1. Element belongs to a section
+        // 2. We are not already in that section
+        // 3. We are NOT currently in a Trap (Traps manage their own focus)
+        if (sectionName && this._activeSection !== sectionName) {
+            // Check if we are in a trap (don't switch if we are, unless we're popping)
+            const isTrapped = this._trapStack.length > 0 && this._activeSection === '__trap__';
+
+            if (!isTrapped) {
+                log.debug(`focusElement: Switching active section from "${this._activeSection}" to "${sectionName}"`);
+                this.setActiveSection(sectionName, false); // false = Don't trigger restoreFocus (prevent loop)
+            } else {
+                log.debug(
+                    `focusElement: Staying in trap "${this._activeSection}" despite element belonging to "${sectionName}"`
+                );
+            }
+        }
+
+        // Delegate scroll positioning to ScrollController
+        // Passes section config for custom offsets (scrollOffsetTop, etc.)
+        this._scroll.scrollIntoView(element, config || {}, options);
+
+        // NOW set focus (after scroll is done)
+        this._focusedElement = element;
+
+        // NOW modify the DOM (Dirty the layout)
+        this._focusedElement.classList.add('focused');
+
+        // Add generic .focused-row to parent settings items to highlight the whole row
+        const newSettingItem = this._focusedElement.closest('.setting-item');
+        if (newSettingItem) {
+            newSettingItem.classList.add('focused-row');
+        }
+
+        // NATIVE FOCUS DISABLED: eliminates scroll rebounding/fighting on Tizen
+        // FocusManager handles all input internally via EventBus.
+        // this._focusedElement.focus({ preventScroll: true });
+
+        if (options.focusIndex !== undefined && options.focusIndex >= 0) {
+            this._currentFocusIndex = options.focusIndex;
+        }
+
+        // Defer memory update to RAF to batch rapid key moves
+        this._scheduleMemoryUpdate();
+        eventBus.emit('focus:changed', element);
+    }
+
+    _scheduleMemoryUpdate() {
+        if (this._pendingMemoryUpdate) return;
+        this._pendingMemoryUpdate = true;
+        requestAnimationFrame(() => {
+            this._pendingMemoryUpdate = false;
+            this._updateFocusMemory();
+        });
+    }
+
+    _flushMemoryUpdate() {
+        if (this._pendingMemoryUpdate) {
+            this._pendingMemoryUpdate = false;
+            this._updateFocusMemory();
+        }
+    }
+
+    _updateFocusMemory() {
+        if (storage.getItem('pref:disableFocusRestore') === 'true') return;
+        if (!this._activeSection || !this._focusedElement) return;
+        const config = this._sections.get(this._activeSection);
+        if (!config) return;
+
+        if (config.container.contains(this._focusedElement)) {
+            this._focusMemory.set(this._activeSection, {
+                element: this._focusedElement,
+                index: this._currentFocusIndex,
+                virtualIndex:
+                    this._focusedElement.dataset.virtualIndex !== undefined
+                        ? parseInt(this._focusedElement.dataset.virtualIndex, 10)
+                        : undefined
+            });
+        }
+    }
+
+    _restoreFocus(sectionName, fromElement = null, options = {}) {
+        // ====================================================================
+        // MODAL FOCUS TRAP ENFORCEMENT
+        // ====================================================================
+        // If focus is currently trapped within a modal, reject any external
+        // section focus restoration attempts triggered by background updates.
+        // ====================================================================
+        if (sectionName !== '__trap__' && this.isTrapped()) {
+            log.warn(`_restoreFocus: Blocked attempt to restore focus for "${sectionName}" while focus is trapped`);
+            return;
+        }
+
+        const config = this._sections.get(sectionName);
+        if (!config) return;
+
+        if (storage.getItem('pref:disableFocusRestore') === 'true') {
+            const focusables = this._getFocusables(sectionName);
+            if (focusables.length) {
+                this.focusElement(focusables[0], { instantScroll: !!options.instantScroll });
+            }
+            return;
+        }
+
+        // Query current focusable DOM elements registered within the active section
+        const focusables = this._getFocusables(sectionName);
+        const memory = this._focusMemory.get(sectionName);
+
+        if (!focusables.length) {
+            // Virtualized row support: if no DOM nodes are currently rendered in this section,
+            // check if the section provides onRestoreIndex to mount and focus the primary item.
+            if (typeof config.onRestoreIndex === 'function') {
+                const targetIndex = memory && memory.virtualIndex !== undefined ? memory.virtualIndex : 0;
+                const node = config.onRestoreIndex(targetIndex);
+                if (node && document.contains(node)) {
+                    this.focusElement(node, { instantScroll: !!options.instantScroll });
+                    return;
+                }
+            }
+
+            if (options.direction) {
+                // If we entered this empty section via a directional move, continue propagating
+                this._leaveSection(options.direction);
+            }
+            return;
+        }
+
+        if (config.defaultFocusSelector) {
+            const defaultEl = focusables.find((el) => el.matches(config.defaultFocusSelector));
+            const target = defaultEl || focusables[0];
+            // ================================================================
+            // FIX: Honor Scroll Configuration for Default Focus Selection
+            // ================================================================
+            // Previously, this forced { skipScroll: true }, which disabled all
+            // scrolling for elements focused via defaultFocusSelector. This caused
+            // sections like the action buttons on the Details page (which use a
+            // default selector to target Resume/Play on entry) to never scroll
+            // the page back to the top when entered from below.
+            // We now correctly forward instantScroll and preserve the ability to
+            // scroll the target into view.
+            // ================================================================
+            this.focusElement(target, { instantScroll: !!options.instantScroll });
+            return;
+        }
+
+        let target = null;
+
+        // 1. Forced Entry Logic (Highest Priority)
+        // Support 'first' or 'active-element' (finds .active or .selected)
+        const enterTo = options.enterTo || config.enterTo;
+
+        // VIRTUALIZED SUPPORT: Let sections intercept spatial entry directly
+        // Because DOM nodes are recycled, we cannot rely on scraping raw DOM
+        if (typeof config.onEnter === 'function') {
+            const hookTarget = config.onEnter(fromElement, options);
+            if (hookTarget) {
+                // Forward instantScroll so the scroll controller respects rapid-nav speed.
+                // Previously this wrongly converted instantScroll into skipScroll,
+                // which is a completely different option — that bug caused every row
+                // transition to always animate at full 200ms regardless of key-hold speed.
+                this.focusElement(hookTarget, { instantScroll: !!options.instantScroll });
+                return;
+            }
+        }
+
+        if (enterTo === 'first' && focusables.length > 0) {
+            target = focusables[0];
+            this.focusElement(target, { instantScroll: !!options.instantScroll });
+            return;
+        } else if (enterTo === 'active-element' && focusables.length > 0) {
+            target =
+                focusables.find((el) => el.classList.contains('active') || el.classList.contains('selected')) ||
+                focusables[0];
+            this.focusElement(target, { instantScroll: !!options.instantScroll });
+            return;
+        }
+
+        // 2. Spatial Entry
+        // If we came from another element (e.g. Button below grid), pick closest grid item
+        // Note: Handled above via onEnter hook for virtual rows
+        if (fromElement && document.contains(fromElement) && typeof config.onEnter !== 'function') {
+            target = this._spatial.findClosest(fromElement, focusables);
+        }
+
+        // 3. Memory (Fallback)
+        if (!target && memory) {
+            // Virtualized memory
+            if (memory.virtualIndex !== undefined && typeof config.onRestoreIndex === 'function') {
+                target = config.onRestoreIndex(memory.virtualIndex);
+            }
+            // Try exact element
+            else if (document.contains(memory.element) && focusables.includes(memory.element)) {
+                target = memory.element;
+            }
+            // Try index
+            else if (memory.index >= 0 && memory.index < focusables.length) {
+                target = focusables[memory.index];
+            }
+        }
+
+        // 4. Default (First Item)
+        if (!target) {
+            target = focusables[0];
+        }
+
+        // Forward instantScroll speed correctly to the scroll controller.
+        // 'skipScroll' was previously being computed here but was the wrong option —
+        // scrollIntoView uses 'instantScroll' for animation duration, not 'skipScroll'.
+        this.focusElement(target, { instantScroll: !!options.instantScroll });
+    }
+
+    _activate() {
+        if (this._suspended) return;
+        if (this._focusedElement) {
+            try {
+                // Keep local reference in case click handler clears or mutates focus state
+                const targetElement = this._focusedElement;
+
+                // Dispatch click on the focused target
+                targetElement.click();
+
+                // Native focus is required to invoke the TV OS virtual keyboard (IME) on text fields
+                if (targetElement.tagName === 'INPUT' || targetElement.tagName === 'TEXTAREA') {
+                    targetElement.focus();
+                }
+
+                // Emit activation event with original target
+                eventBus.emit('focus:activated', targetElement);
+            } catch (err) {
+                log.warn('FocusManager._activate error:', err);
+            }
+        }
+    }
+
+    // ========================================================================
+    // Suspend / Resume
+    // ========================================================================
+
+    /**
+     * Suspend all key event processing.
+     * Used by components that manage their own focus (e.g. PlayerOSD)
+     * to prevent FocusManager from double-handling key events.
+     */
+    suspend() {
+        this._suspended = true;
+        log.info('Key processing suspended');
+    }
+
+    /**
+     * Resume key event processing after a prior suspend() call.
+     */
+    resume() {
+        this._suspended = false;
+        log.info('Key processing resumed');
+    }
+
+    /**
+     * Check if a modal focus trap is currently active.
+     * Evaluates whether the trap stack has entries AND whether the trap container is
+     * still attached to the active DOM tree, visible, and actively trapping navigation.
+     * Auto-purges orphaned or detached traps left behind by ungraceful modal exits.
+     *
+     * @returns {boolean} True if navigation is actively trapped within a modal
+     */
+    isTrapped() {
+        // If the trap stack is empty, no trap is active
+        if (this._trapStack.length === 0) return false;
+
+        const trapConfig = this._sections.get('__trap__');
+        // If __trap__ section configuration is missing or container is detached from DOM tree,
+        // the trap was orphaned without a corresponding popTrap() call. Purge it immediately.
+        if (!trapConfig || !trapConfig.container || !document.contains(trapConfig.container)) {
+            log.warn('isTrapped: Purging orphaned focus trap whose container is detached from DOM');
+            this._trapStack = [];
+            this._sections.delete('__trap__');
+            return false;
+        }
+
+        // If the trap container belongs to a modal overlay that is no longer visible, auto-purge
+        const modalOverlay = trapConfig.container.closest('.modal-overlay');
+        if (modalOverlay && (!modalOverlay.classList.contains('visible') || modalOverlay.style.display === 'none')) {
+            log.warn('isTrapped: Purging orphaned focus trap inside non-visible modal overlay');
+            this._trapStack = [];
+            this._sections.delete('__trap__');
+            return false;
+        }
+
+        // If the trap container itself is styled as display: none or hidden, auto-purge
+        if (trapConfig.container.style.display === 'none' || trapConfig.container.classList.contains('hidden')) {
+            log.warn('isTrapped: Purging orphaned focus trap whose container is hidden');
+            this._trapStack = [];
+            this._sections.delete('__trap__');
+            return false;
+        }
+
+        // If active section is not '__trap__' AND active focus is outside the trap container,
+        // the application has already navigated or switched away from the trap.
+        // Keeping the trap alive would lock navigation permanently. Auto-purge it.
+        if (
+            this._activeSection !== '__trap__' &&
+            (!this._focusedElement || !trapConfig.container.contains(this._focusedElement))
+        ) {
+            log.warn('isTrapped: Purging orphaned focus trap because active focus has left the trap container');
+            this._trapStack = [];
+            this._sections.delete('__trap__');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Trap all directional navigation inside a specified container (e.g. for modal dialogs).
+     * Saves the currently focused element and section so they can be restored upon popTrap().
+     *
+     * @param {HTMLElement} container - DOM container element confining focus
+     * @param {Object} [options] - Configuration options (orientation, selector, enterTo, etc.)
+     */
+    pushTrap(container, options = {}) {
+        // Capture previous active section and focused element so we can restore them on close
+        this._trapStack.push({
+            section: this._activeSection,
+            element: this._focusedElement
+        });
+
+        // Register the modal container as the isolated '__trap__' section
+        this.register('__trap__', container, {
+            orientation: options.orientation || 'grid',
+            selector: options.selector || undefined,
+            enterTo: options.enterTo || 'first',
+            defaultFocusSelector: options.defaultFocusSelector || null,
+            // Explicitly block all directional escapes out of the container
+            leaveUp: null,
+            leaveDown: null,
+            leaveLeft: null,
+            leaveRight: null
+        });
+
+        // Switch to the trap section and focus the primary entry element
+        this.setActiveSection('__trap__', true, null, options);
+
+        // Ensure an element inside the trap receives focus immediately
+        const trapFocusables = this._getFocusables('__trap__', true);
+        if (trapFocusables.length > 0 && (!this._focusedElement || !container.contains(this._focusedElement))) {
+            const defaultEl = options.defaultFocusSelector
+                ? trapFocusables.find(
+                      (el) => typeof el.matches === 'function' && el.matches(options.defaultFocusSelector)
+                  )
+                : null;
+            this.focusElement(defaultEl || trapFocusables[0]);
+        }
+    }
+
+    /**
+     * Release the active modal focus trap and restore focus/section to their previous states.
+     */
+    popTrap() {
+        // Pop previous state BEFORE unregistering so that trap checks in setActiveSection pass
+        const prev = this._trapStack.pop();
+        this.unregister('__trap__');
+
+        // Restore previous section and element if available and still in document
+        if (prev) {
+            if (prev.section && this._sections.has(prev.section)) {
+                this.setActiveSection(prev.section, false);
+            }
+            if (prev.element && document.contains(prev.element)) {
+                this.focusElement(prev.element);
+            }
+        }
+
+        // Fallback: If no element is focused after releasing the trap (e.g. if the trap was entered
+        // while the page was still loading, or prev.element was recycled or unmounted), restore focus.
+        if (!this._focusedElement || !document.contains(this._focusedElement)) {
+            let restored = false;
+
+            // 1. Try restoring focus to the active section if valid
+            if (this._activeSection && this._sections.has(this._activeSection)) {
+                this._restoreFocus(this._activeSection);
+                if (this._focusedElement && document.contains(this._focusedElement)) {
+                    restored = true;
+                }
+            }
+
+            // 2. If active section had no focusables or failed, search registered sections for one with items
+            if (!restored) {
+                const registeredSections = Array.from(this._sections.keys()).filter(
+                    (s) => s !== '__trap__' && !s.startsWith('__')
+                );
+                for (const sec of registeredSections) {
+                    const focusables = this._getFocusables(sec, true);
+                    if (focusables.length > 0) {
+                        this.setActiveSection(sec, true);
+                        restored = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Notify components (e.g. HomePage) that the focus trap has been released
+        eventBus.emit('focus:trapPopped');
+    }
+
+    getActiveSection() {
+        return this._activeSection;
+    }
+    getFocused() {
+        return this._focusedElement;
+    }
+
+    /**
+     * Find the registered section name that contains the element.
+     *
+     * PERFORMANCE: Uses a two-stage lookup:
+     * 1. O(1) closest('[data-fm-section]') DOM traversal — sections tag their
+     *    containers with this attribute in register(). This is almost always
+     *    sufficient and avoids looping all sections on every focusin event.
+     * 2. O(n) linear fallback for edge cases where closest() can't find the tag
+     *    (e.g. __trap__ containers injected without going through register's tagging).
+     *
+     * @param {HTMLElement} element
+     */
+    getSectionForElement(element) {
+        if (!element) return null;
+
+        // Fast path: walk up the DOM to find the nearest section container.
+        // This replaces the old O(n) linear sections scan for the vast majority of calls.
+        const sectionContainer = element.closest('[data-fm-section]');
+        if (sectionContainer) {
+            const name = sectionContainer.dataset.fmSection;
+            // Verify the section is still registered (not just a stale attribute)
+            if (this._sections.has(name)) {
+                return name;
+            }
+        }
+
+        // Fallback: linear scan — only needed when closest() fails (e.g. portals,
+        // fixed position containers, or sections registered before the attribute patch).
+        for (const [name, config] of this._sections.entries()) {
+            if (config.container.contains(element)) {
+                return name;
+            }
+        }
+
+        return null;
+    }
+
+    destroy() {
+        // document.removeEventListener('keydown', this._onKeyDown);
+        this._sections.clear();
+        this._focusMemory.clear();
+    }
+}
+
+export const focusManager = new FocusManager();
+export default FocusManager;

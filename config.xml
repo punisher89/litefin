@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://jellyfin.org/jellyfin" version="2.0.150" viewmodes="maximized">
+   <tizen:application id="LitefinApp.Litefin" package="LitefinApp" required_version="2.3"></tizen:application>
+   <access origin="*" subdomains="true"></access>
+   <name>Litefin</name>
+   <icon src="assets/icon.png"></icon>
+   <content src="index.html"></content>
+   <tizen:privilege name="http://tizen.org/privilege/internet"/>
+   <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+   <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
+   <tizen:privilege name="http://tizen.org/privilege/fullscreen"/>
+   <tizen:privilege name="http://tizen.org/privilege/volume.set"/>
+   <tizen:privilege name="http://tizen.org/privilege/tv.audio"/>
+   <tizen:privilege name="http://tizen.org/privilege/display"/>
+   <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+   <tizen:privilege name="http://developer.samsung.com/privilege/network.public"/>
+   <tizen:privilege name="http://developer.samsung.com/privilege/avplay"/>
+   <tizen:privilege name="http://tizen.org/privilege/network"/>
+   <tizen:privilege name="http://developer.samsung.com/privilege/preview"/>
+   <tizen:privilege name="http://tizen.org/privilege/messageport"/>
+   <tizen:privilege name="http://tizen.org/privilege/power"/>
+   <tizen:privilege name="http://tizen.org/privilege/time"/>
+   <feature name="http://tizen.org/feature/screen.size.all"/>
+   <feature name="http://tizen.org/feature/network.internet"/>
+   <tizen:metadata key="http://samsung.com/tv/metadata/use.preview" value="bg_service"/>
+   <tizen:app-control>
+      <tizen:src name="index.html" reload="disable"/>
+      <tizen:operation name="http://samsung.com/appcontrol/operation/eden_resume"/>
+   </tizen:app-control>
+   <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"></tizen:setting>
+   <tizen:service id="LitefinApp.ytresolver" type="service">
+      <tizen:content src="services/service.js"></tizen:content>
+      <tizen:name>ytresolver</tizen:name>
+   </tizen:service>
+   <tizen:content-security-policy>default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' http://localhost:8123 https://www.youtube.com; frame-src * http://localhost:8123 https://www.youtube.com; connect-src * http://localhost:8123;</tizen:content-security-policy>
+   <tizen:allow-navigation>*</tizen:allow-navigation>
+   <tizen:allow-mixed-content>true</tizen:allow-mixed-content>
+   <tizen:profile name="tv-samsung"></tizen:profile>
+</widget>

@@ -1,0 +1,771 @@
+import { api } from '../api/index.js';
+import { focusManager } from '../ui/FocusManager.js';
+import { i18n } from '../utils/i18n.js';
+import { toast } from '../ui/Toast.js';
+import { logger } from '../utils/Logger.js';
+import { storage } from '../utils/StorageService.js';
+import { languageManager } from '../utils/LanguageManager.js';
+import { escapeHtml, parseSubtitleMetadata } from '../utils/Utils.js';
+
+const log = logger.create('SubtitleEditor');
+
+class SubtitleEditorModal {
+    /**
+     * Display the main subtitle editor modal (Panel A).
+     * @param {string} itemId           - Jellyfin item ID
+     * @param {Object} detailsPage      - Reference to the parent DetailsPage instance
+     * @param {Object} [transitionCtx]  - Back-navigation context from the caller modal
+     */
+    static async show(itemId, detailsPage, transitionCtx = null) {
+        const oldOnBack = transitionCtx?.oldOnBack || detailsPage.onBack;
+
+        // Preserve the focus state for final restoration when the entire modal chain closes.
+        const prevFocus = transitionCtx?.prevFocus || focusManager.getFocused();
+        const prevSection = transitionCtx?.prevSection || focusManager.getActiveSection();
+
+        // ── Create overlay ──────────────────────────────────────────────────
+        let overlay = document.getElementById('details-subtitle-editor');
+        if (overlay) overlay.remove();
+
+        overlay = document.createElement('div');
+        overlay.id = 'details-subtitle-editor';
+        overlay.className = 'modal-overlay visible';
+        document.body.appendChild(overlay);
+
+        // ── Fetch required data in parallel ──────────────────────────────────
+        let cultures = [];
+        try {
+            // Fetch cultures and refresh streams simultaneously to ensure newly downloaded subs appear
+            const [fetchedCultures] = await Promise.all([
+                api.getCultures(),
+                this._reloadSubtitleStreams(itemId, detailsPage)
+            ]);
+            cultures = fetchedCultures || [];
+            if (cultures.length > 0) {
+                languageManager.registerCultures(cultures);
+            }
+        } catch (e) {
+            log.warn('Failed to load cultures or refresh streams', e);
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+
+        /**
+         * Resolve the close function — cleans up the overlay and optionally
+         * restores focus back to the caller (e.g. the details page actions row).
+         */
+        const _close = (restoreFocus = true) => {
+            if (detailsPage.onBack === myOnBack) detailsPage.onBack = oldOnBack;
+
+            overlay.classList.remove('visible');
+            setTimeout(() => overlay.remove(), 300);
+
+            // Unregister all focus sections owned by this modal
+            focusManager.unregister('subtitle-editor-tracks');
+            focusManager.unregister('subtitle-editor-search');
+            focusManager.unregister('subtitle-editor-actions');
+
+            if (restoreFocus) {
+                detailsPage._prevFocus = null;
+                detailsPage._prevSection = null;
+                if (prevFocus) focusManager.focusElement(prevFocus);
+                if (prevSection) focusManager.setActiveSection(prevSection, false);
+            }
+        };
+
+        // ── Render ───────────────────────────────────────────────────────────
+
+        /**
+         * (Re)build the inner HTML of the overlay. Called on first render and
+         * again after a delete to refresh the track list without reopening.
+         */
+        const renderPanel = () => {
+            // Filter subtitle streams from the already-loaded item
+            const subtitleStreams = (detailsPage._item?.MediaSources?.[0]?.MediaStreams || []).filter(
+                (s) => s.Type === 'Subtitle'
+            );
+
+            // Build a row for each subtitle track.
+            const tracksHtml =
+                subtitleStreams.length > 0
+                    ? subtitleStreams
+                          .map((s) => {
+                              const label = s.DisplayTitle || s.Title || s.Language || `Track ${s.Index}`;
+                              const codec = (s.Codec || '').toUpperCase();
+                              const loc = s.IsExternal ? 'EXT' : 'INT';
+                              const canDel = !!s.Path; // Can only delete file-based external tracks
+
+                              return `
+                        <div class="subtitle-track-row" data-index="${s.Index}">
+                            <span class="subtitle-track-label">${label}</span>
+                            <div class="subtitle-track-meta">
+                                <span class="track-badge">${codec}</span>
+                                <span class="track-badge">${loc}</span>
+                            </div>
+                            ${
+                                canDel
+                                    ? `<button class="subtitle-delete-btn" data-index="${s.Index}" tabindex="0">${i18n.t('Delete')}</button>`
+                                    : `<span class="subtitle-track-locked" title="${i18n.t('CannotDeleteInternalSubtitle') || 'Internal track — cannot be deleted'}">🔒</span>`
+                            }
+                        </div>
+                    `;
+                          })
+                          .join('')
+                    : `<p class="subtitle-empty-notice">${i18n.t('LabelNoSubtitles') || 'No subtitle tracks found.'}</p>`;
+
+            // Build language options for the search dropdown.
+            const savedLang = storage.getItem('litefin:subtitle-language') || '';
+            let prefLang = storage.getItem('pref:subtitleLang') || '';
+            if (prefLang === 'none') prefLang = '';
+
+            const audioLang =
+                detailsPage._item?.MediaSources?.[0]?.MediaStreams?.find((s) => s.Type === 'Audio')?.Language || '';
+            let currentLang = savedLang || prefLang || audioLang || 'eng';
+
+            // Filter out regional dialects to retain only singular canonical languages
+            const singularCultures = languageManager.filterSingularCultures(cultures);
+            const langOptions = singularCultures
+                .filter((c) => c.ThreeLetterISOLanguageName) // Only include languages with a valid code
+                .sort((a, b) => (a.DisplayName || '').localeCompare(b.DisplayName || ''))
+                .map((c) => ({
+                    value: c.ThreeLetterISOLanguageName,
+                    label: c.DisplayName || c.ThreeLetterISOLanguageName
+                }));
+
+            // Find current label
+            const currentOption = langOptions.find((o) => o.value === currentLang) || langOptions[0];
+            const currentLabel = currentOption ? currentOption.label : 'English';
+
+            overlay.innerHTML = `
+                <div class="settings-modal" role="dialog" aria-modal="true">
+                    <div class="modal-header">
+                        <h2>${i18n.t('EditSubtitles') || 'Edit Subtitles'}</h2>
+                    </div>
+
+                    <!-- Current subtitle tracks -->
+                    <div class="modal-section-title">${i18n.t('HeaderMySubtitles') || 'My Subtitles'}</div>
+                    <div class="subtitle-tracks-list modal-options" id="subtitle-tracks-list">
+                        ${tracksHtml}
+                    </div>
+
+                    <!-- Remote subtitle search -->
+                    <div class="modal-section-title">${i18n.t('SearchSubtitles') || 'Search Subtitles'}</div>
+                    <div class="subtitle-search-row">
+                        <button id="subtitle-lang-select-btn" class="modal-select setting-action-btn select-btn" tabindex="0" data-value="${currentLang}">
+                            <span class="btn-label">${currentLabel}</span>
+                        </button>
+                        <button id="btn-subtitle-search" class="modal-action-btn" tabindex="0">${i18n.t('Search') || 'Search'}</button>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="modal-action-btn" id="btn-subtitle-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+                    </div>
+                </div>
+            `;
+
+            // ── Language Selection Modal ─────────────────────────────────────
+            const showLanguageModal = () => {
+                const langBtn = overlay.querySelector('#subtitle-lang-select-btn');
+                const prevFocus = focusManager.getFocused();
+                const prevSection = focusManager.getActiveSection();
+
+                let activeFilter = languageManager.hasFavorites() ? 'favorites' : 'all';
+
+                const subOverlay = document.createElement('div');
+                subOverlay.className = 'modal-overlay visible';
+                subOverlay.id = 'subtitle-lang-modal-overlay';
+                overlay.appendChild(subOverlay);
+
+                const closeLangModal = () => {
+                    subOverlay.remove();
+                    focusManager.unregister('lang-modal-filter-pills');
+                    focusManager.unregister('lang-modal-options');
+                    focusManager.unregister('lang-modal-actions');
+                    if (prevSection) focusManager.setActiveSection(prevSection, false);
+                    if (prevFocus) focusManager.focusElement(prevFocus);
+                };
+
+                const renderLanguageModalContent = () => {
+                    let displayOptions = langOptions;
+                    if (activeFilter === 'favorites' && languageManager.hasFavorites()) {
+                        displayOptions = languageManager.filterOptions(langOptions);
+                    }
+
+                    const favoritesCount = langOptions.filter((o) => languageManager.isFavorite(o)).length;
+
+                    let filterPillsHtml = '';
+                    if (languageManager.hasFavorites()) {
+                        filterPillsHtml = `
+                            <div class="modal-filter-pills" id="sub-modal-lang-filter-pills">
+                                <button class="modal-filter-pill ${activeFilter === 'favorites' ? 'active' : ''}" data-filter="favorites" tabindex="0">
+                                    ★ ${i18n.t('FavoritesOnly') || 'Favorites'} (${favoritesCount})
+                                </button>
+                                <button class="modal-filter-pill ${activeFilter === 'all' ? 'active' : ''}" data-filter="all" tabindex="0">
+                                    ${i18n.t('AllLanguages') || 'All Languages'} (${langOptions.length})
+                                </button>
+                            </div>
+                        `;
+                    }
+
+                    // Build options HTML
+                    const optionsHtml =
+                        displayOptions.length === 0
+                            ? `
+                            <div class="modal-empty-placeholder" style="padding: 24px 16px; text-align: center; opacity: 0.7; font-size: 1.1rem; pointer-events: none;" data-i18n="NoOptionsAvailable">
+                                ${i18n.t('NoOptionsAvailable') || 'No options available'}
+                            </div>
+                        `
+                            : displayOptions
+                                  .map((opt) => {
+                                      const isFav = languageManager.isFavorite(opt);
+                                      return `
+                                    <button class="modal-option-btn ${opt.value === currentLang ? 'selected' : ''}" 
+                                            data-value="${opt.value}"
+                                            tabindex="0">
+                                        <span class="modal-option-label">${opt.label}</span>
+                                        <span class="modal-star-btn ${isFav ? 'active' : ''}" data-value="${opt.value}" title="Toggle Favorite" role="button" aria-label="Toggle Favorite">
+                                            ${isFav ? '★' : '☆'}
+                                        </span>
+                                    </button>
+                                `;
+                                  })
+                                  .join('');
+
+                    subOverlay.innerHTML = `
+                        <div class="settings-modal" role="dialog" aria-modal="true">
+                            <div class="modal-header">
+                                <h2>${i18n.t('LabelLanguage') || 'Language'}</h2>
+                            </div>
+                            ${filterPillsHtml}
+                            <div class="modal-options">
+                                ${optionsHtml}
+                            </div>
+                            <div class="modal-actions">
+                                <button class="modal-action-btn" id="btn-lang-modal-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+                            </div>
+                        </div>
+                    `;
+
+                    // Bind events
+                    subOverlay.querySelectorAll('.modal-option-btn').forEach((btn) => {
+                        btn.addEventListener('click', (e) => {
+                            if (e.target.closest('.modal-star-btn')) {
+                                e.stopPropagation();
+                                const starBtn = e.target.closest('.modal-star-btn');
+                                const val = starBtn.dataset.value;
+                                const matchedOpt = langOptions.find((o) => o.value === val) || val;
+                                const isNowFav = languageManager.toggleFavorite(matchedOpt);
+
+                                if (activeFilter === 'all') {
+                                    // In "All Languages" view, update in-place without destroying DOM or losing scroll/focus
+                                    starBtn.classList.toggle('active', isNowFav);
+                                    starBtn.textContent = isNowFav ? '★' : '☆';
+
+                                    // Update the Favorites count badge on the pill
+                                    const favPill = subOverlay.querySelector(
+                                        '.modal-filter-pill[data-filter="favorites"]'
+                                    );
+                                    if (favPill) {
+                                        const newCount = langOptions.filter((o) =>
+                                            languageManager.isFavorite(o)
+                                        ).length;
+                                        favPill.textContent = `★ ${i18n.t('FavoritesOnly') || 'Favorites'} (${newCount})`;
+                                    }
+                                } else {
+                                    const currentIdx = Array.from(
+                                        subOverlay.querySelectorAll('.modal-option-btn')
+                                    ).indexOf(btn);
+                                    renderLanguageModalContent();
+                                    const remainingOptions = subOverlay.querySelectorAll('.modal-option-btn');
+                                    if (remainingOptions.length > 0) {
+                                        const targetIdx = Math.min(currentIdx, remainingOptions.length - 1);
+                                        focusManager.setActiveSection('lang-modal-options');
+                                        focusManager.focusElement(remainingOptions[targetIdx]);
+                                    }
+                                }
+                                return;
+                            }
+                            e.stopPropagation();
+                            currentLang = btn.dataset.value;
+                            const newLabel = langOptions.find((o) => o.value === currentLang)?.label || currentLang;
+                            if (langBtn) {
+                                langBtn.dataset.value = currentLang;
+                                langBtn.querySelector('.btn-label').textContent = newLabel;
+                            }
+                            closeLangModal();
+                        });
+                    });
+
+                    // Bind filter pills
+                    subOverlay.querySelectorAll('.modal-filter-pill').forEach((pill) => {
+                        pill.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            activeFilter = pill.dataset.filter;
+                            renderLanguageModalContent();
+                        });
+                    });
+
+                    subOverlay.querySelector('#btn-lang-modal-cancel').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        closeLangModal();
+                    });
+
+                    // Focus Registration with Left/Right tab switching
+                    if (subOverlay.querySelector('#sub-modal-lang-filter-pills')) {
+                        detailsPage.registerFocusSection(
+                            'lang-modal-filter-pills',
+                            subOverlay.querySelector('#sub-modal-lang-filter-pills'),
+                            {
+                                orientation: 'horizontal',
+                                leaveDown: 'lang-modal-options',
+                                onMove: (direction) => {
+                                    const isRtl = document.documentElement.getAttribute('dir') === 'rtl';
+                                    if (direction === 'left') {
+                                        const targetFilter = isRtl ? 'all' : 'favorites';
+                                        if (activeFilter !== targetFilter) {
+                                            activeFilter = targetFilter;
+                                            renderLanguageModalContent();
+                                            setTimeout(() => {
+                                                const pill = subOverlay.querySelector(
+                                                    `.modal-filter-pill[data-filter="${targetFilter}"]`
+                                                );
+                                                if (pill) focusManager.focusElement(pill);
+                                            }, 50);
+                                            return true;
+                                        }
+                                    } else if (direction === 'right') {
+                                        const targetFilter = isRtl ? 'favorites' : 'all';
+                                        if (activeFilter !== targetFilter) {
+                                            activeFilter = targetFilter;
+                                            renderLanguageModalContent();
+                                            setTimeout(() => {
+                                                const pill = subOverlay.querySelector(
+                                                    `.modal-filter-pill[data-filter="${targetFilter}"]`
+                                                );
+                                                if (pill) focusManager.focusElement(pill);
+                                            }, 50);
+                                            return true;
+                                        }
+                                    }
+                                    return false;
+                                }
+                            }
+                        );
+                    }
+
+                    detailsPage.registerFocusSection('lang-modal-options', subOverlay.querySelector('.modal-options'), {
+                        orientation: 'vertical',
+                        leaveDown: 'lang-modal-actions',
+                        leaveUp: subOverlay.querySelector('#sub-modal-lang-filter-pills')
+                            ? 'lang-modal-filter-pills'
+                            : 'lang-modal-actions',
+                        enterTo: 'last-focused',
+                        onMove: (direction) => {
+                            if (languageManager.hasFavorites()) {
+                                const isRtl = document.documentElement.getAttribute('dir') === 'rtl';
+                                if (direction === 'left') {
+                                    const targetFilter = isRtl ? 'all' : 'favorites';
+                                    if (activeFilter !== targetFilter) {
+                                        activeFilter = targetFilter;
+                                        renderLanguageModalContent();
+                                        return true;
+                                    }
+                                } else if (direction === 'right') {
+                                    const targetFilter = isRtl ? 'favorites' : 'all';
+                                    if (activeFilter !== targetFilter) {
+                                        activeFilter = targetFilter;
+                                        renderLanguageModalContent();
+                                        return true;
+                                    }
+                                }
+                            }
+                            return false;
+                        }
+                    });
+
+                    detailsPage.registerFocusSection('lang-modal-actions', subOverlay.querySelector('.modal-actions'), {
+                        orientation: 'horizontal',
+                        leaveUp: 'lang-modal-options',
+                        onMove: (direction) => {
+                            if (direction === 'down') {
+                                focusManager.setActiveSection('lang-modal-options', true, null, { enterTo: 'first' });
+                                return true;
+                            }
+                            return false;
+                        }
+                    });
+
+                    if (displayOptions.length === 0) {
+                        focusManager.setActiveSection('lang-modal-actions');
+                        setTimeout(() => {
+                            const cancelBtn = subOverlay.querySelector('#btn-lang-modal-cancel');
+                            if (cancelBtn) focusManager.focusElement(cancelBtn);
+                        }, 50);
+                    } else {
+                        focusManager.setActiveSection('lang-modal-options');
+                        setTimeout(() => {
+                            const selected =
+                                subOverlay.querySelector('.modal-option-btn.selected') ||
+                                subOverlay.querySelector('.modal-option-btn');
+                            if (selected) focusManager.focusElement(selected);
+                        }, 50);
+                    }
+                };
+
+                subOverlay.addEventListener('click', (e) => {
+                    if (e.target === subOverlay) closeLangModal();
+                });
+
+                renderLanguageModalContent();
+            };
+
+            // Bind lang select button
+            overlay.querySelector('#subtitle-lang-select-btn').onclick = (e) => {
+                e.stopPropagation();
+                showLanguageModal();
+            };
+
+            // ── Bind delete buttons ──────────────────────────────────────────
+            overlay.querySelectorAll('.subtitle-delete-btn').forEach((btn) => {
+                btn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const streamIndex = parseInt(btn.dataset.index, 10);
+
+                    // Disable the button immediately to prevent double-clicks
+                    btn.disabled = true;
+                    btn.textContent = '...';
+
+                    try {
+                        await api.deleteSubtitle(itemId, streamIndex);
+                        await this._reloadSubtitleStreams(itemId, detailsPage);
+                        renderPanel();
+                        _bindPanelFocus();
+                    } catch (err) {
+                        log.error('Failed to delete subtitle', err);
+                        toast.show(i18n.t('MessageErrorDeletingSubtitle') || 'Failed to delete subtitle.');
+                        btn.disabled = false;
+                        btn.textContent = i18n.t('Delete');
+                    }
+                };
+            });
+
+            // ── Bind search button ───────────────────────────────────────────
+            overlay.querySelector('#btn-subtitle-search').onclick = async (e) => {
+                e.stopPropagation();
+                // Persist the selection for next time
+                storage.setItem('litefin:subtitle-language', currentLang);
+
+                // Close Panel A (without full cleanup) and open results Panel B
+                focusManager.unregister('subtitle-editor-tracks');
+                focusManager.unregister('subtitle-editor-search');
+                focusManager.unregister('subtitle-editor-actions');
+
+                this._showSubtitleResultsModal(
+                    itemId,
+                    currentLang,
+                    overlay,
+                    renderPanel,
+                    _close,
+                    oldOnBack,
+                    prevFocus,
+                    prevSection,
+                    detailsPage
+                );
+            };
+
+            // ── Bind cancel button ───────────────────────────────────────────
+            overlay.querySelector('#btn-subtitle-cancel').onclick = (e) => {
+                e.stopPropagation();
+                _close();
+            };
+
+            // ── Click outside to close ───────────────────────────────────────
+            overlay.onclick = (e) => {
+                if (e.target === overlay) _close();
+            };
+        };
+
+        /**
+         * Register focus sections for the Panel A layout.
+         */
+        const _bindPanelFocus = () => {
+            const trackList = overlay.querySelector('#subtitle-tracks-list');
+            const searchRow = overlay.querySelector('.subtitle-search-row');
+            const actionsRow = overlay.querySelector('.modal-actions');
+
+            if (trackList) {
+                focusManager.register('subtitle-editor-tracks', trackList, {
+                    orientation: 'vertical',
+                    leaveDown: 'subtitle-editor-search',
+                    leaveUp: 'subtitle-editor-actions',
+                    circular: false
+                });
+            }
+
+            if (searchRow) {
+                focusManager.register('subtitle-editor-search', searchRow, {
+                    orientation: 'horizontal',
+                    leaveUp: trackList?.childElementCount > 0 ? 'subtitle-editor-tracks' : 'subtitle-editor-actions',
+                    leaveDown: 'subtitle-editor-actions'
+                });
+            }
+
+            if (actionsRow) {
+                focusManager.register('subtitle-editor-actions', actionsRow, {
+                    orientation: 'horizontal',
+                    leaveUp: 'subtitle-editor-search',
+                    leaveDown: trackList?.childElementCount > 0 ? 'subtitle-editor-tracks' : 'subtitle-editor-search'
+                });
+            }
+
+            focusManager.setActiveSection('subtitle-editor-search');
+        };
+
+        // ── First render ─────────────────────────────────────────────────────
+        renderPanel();
+        _bindPanelFocus();
+
+        // ── Back button ──────────────────────────────────────────────────────
+        const myOnBack = () => {
+            const subModal = document.getElementById('subtitle-lang-modal-overlay');
+            if (subModal) {
+                subModal.querySelector('#btn-lang-modal-cancel')?.click();
+                return true;
+            }
+
+            if (transitionCtx?.fromMoreOptions) {
+                detailsPage.onBack = oldOnBack;
+                _close(false);
+                detailsPage._showMoreOptionsModal(itemId);
+            } else {
+                _close();
+            }
+            return true;
+        };
+        detailsPage.onBack = myOnBack;
+    }
+
+    /**
+     * Display remote subtitle search results (Panel B).
+     */
+    static async _showSubtitleResultsModal(
+        itemId,
+        language,
+        overlay,
+        renderPanel,
+        closeAll,
+        oldOnBack,
+        prevFocus,
+        prevSection,
+        detailsPage
+    ) {
+        // Show a loading state inside the existing overlay while we fetch
+        overlay.querySelector('.settings-modal').innerHTML = `
+            <div class="modal-header"><h2>${i18n.t('SearchSubtitles') || 'Search Subtitles'}</h2></div>
+            <div class="modal-options"><p class="subtitle-empty-notice">${i18n.t('Searching') || 'Searching…'}</p></div>
+            <div class="modal-actions">
+                <button class="modal-action-btn" id="btn-results-back" tabindex="0">${i18n.t('ButtonBack') || 'Back'}</button>
+                <button class="modal-action-btn" id="btn-results-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+            </div>
+        `;
+
+        let results = [];
+        try {
+            results = await api.searchSubtitles(itemId, language);
+        } catch (err) {
+            log.error('Subtitle search failed', err);
+            toast.show(i18n.t('MessageErrorSubtitleSearch') || 'Subtitle search failed.');
+        }
+
+        // ── Build results HTML ───────────────────────────────────────────────
+        const resultsHtml =
+            results && results.length > 0
+                ? results
+                      .map((r) => {
+                          const meta = parseSubtitleMetadata(r);
+
+                          // Render in-progress or failed async background search status cards (e.g. Bazarr)
+                          if (meta.isPlaceholder) {
+                              return `
+                                  <div class="subtitle-placeholder-card">
+                                      <div class="subtitle-placeholder-header">
+                                          <div class="loading-spinner-small"></div>
+                                          <span>${escapeHtml(meta.name)}</span>
+                                      </div>
+                                      <div class="subtitle-placeholder-desc">
+                                          ${escapeHtml(meta.placeholderComment)}
+                                      </div>
+                                  </div>
+                              `;
+                          }
+
+                          return `
+                    <button class="modal-option-btn subtitle-result-btn" data-id="${meta.id}" tabindex="0">
+                        <div class="subtitle-result-info">
+                            <div class="track-label-text">${escapeHtml(meta.name)}</div>
+                            <div class="subtitle-result-meta">
+                                ${meta.matchBadge}
+                                ${meta.isHearingImpaired ? `<span class="track-badge badge-sdh" title="${i18n.t('HearingImpaired') || 'Hearing Impaired'}">SDH</span>` : ''}
+                                ${meta.isForced ? `<span class="track-badge badge-forced" title="${i18n.t('Forced') || 'Forced'}">Forced</span>` : ''}
+                                ${meta.isAiTranslated ? `<span class="track-badge badge-ai" title="${i18n.t('AITranslated') || 'AI / Machine Translated'}">${meta.isMachineTranslated ? 'MT' : 'AI'}</span>` : ''}
+                                ${meta.displayProvider ? `<span class="track-badge provider-badge">${escapeHtml(meta.displayProvider)}</span>` : ''}
+                                ${meta.format ? `<span class="track-badge">${escapeHtml(meta.format)}</span>` : ''}
+                                ${meta.frameRate ? `<span class="track-badge">${escapeHtml(meta.frameRate)}</span>` : ''}
+                                ${meta.downloads ? `<span class="track-badge">${meta.downloads}</span>` : ''}
+                                ${meta.uploader ? `<span class="track-badge uploader-badge">👤 ${escapeHtml(meta.uploader)}</span>` : ''}
+                            </div>
+                        </div>
+                    </button>
+                `;
+                      })
+                      .join('')
+                : `<p class="subtitle-empty-notice">${i18n.t('NoSubtitleSearchResultsFound') || 'No results found.'}</p>`;
+
+        // Re-render the overlay with final results
+        overlay.querySelector('.settings-modal').innerHTML = `
+            <div class="modal-header"><h2>${i18n.t('SearchSubtitles') || 'Search Subtitles'}</h2></div>
+            <div class="modal-options" id="subtitle-results-list">${resultsHtml}</div>
+            <div class="modal-actions">
+                <button class="modal-action-btn" id="btn-results-back" tabindex="0">${i18n.t('ButtonBack') || 'Back'}</button>
+                <button class="modal-action-btn" id="btn-results-cancel" tabindex="0">${i18n.t('ButtonCancel')}</button>
+            </div>
+        `;
+
+        // ── Bind download buttons ────────────────────────────────────────────
+        overlay.querySelectorAll('.subtitle-result-btn').forEach((btn) => {
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                const subtitleId = btn.dataset.id;
+                if (!subtitleId || subtitleId.startsWith('placeholder_')) return;
+
+                // Visual feedback — disable button immediately
+                btn.disabled = true;
+                const icon = btn.querySelector('.check-icon');
+                if (icon) icon.textContent = '…';
+
+                try {
+                    await api.downloadSubtitle(itemId, subtitleId);
+                    toast.show(i18n.t('MessageSubtitleDownloadQueued') || 'Subtitle queued for download.');
+                } catch (err) {
+                    log.error('Failed to queue subtitle download', err);
+                    toast.show(i18n.t('MessageSubtitleDownloadFailed') || 'Download failed.');
+                    btn.disabled = false;
+                    if (icon) icon.textContent = '⬇';
+                    return;
+                }
+
+                // Reload item streams and go back to Panel A
+                await this._reloadSubtitleStreams(itemId, detailsPage);
+
+                // Go back cleanly handles unregistering Panel B focus, re-rendering Panel A,
+                // and restoring Panel A's back handler.
+                goBack();
+            };
+        });
+
+        // ── Back button — return to Panel A ──────────────────────────────────
+        const goBack = () => {
+            focusManager.unregister('subtitle-results-list');
+            focusManager.unregister('subtitle-results-actions');
+
+            renderPanel();
+
+            // Re-bind Panel A focus after renderPanel rebuilt the DOM
+            const trackList = overlay.querySelector('#subtitle-tracks-list');
+            const searchRow = overlay.querySelector('.subtitle-search-row');
+            const actionsRow = overlay.querySelector('.modal-actions');
+
+            if (trackList)
+                detailsPage.registerFocusSection('subtitle-editor-tracks', trackList, {
+                    orientation: 'vertical',
+                    leaveDown: 'subtitle-editor-search',
+                    leaveUp: 'subtitle-editor-actions'
+                });
+            if (searchRow)
+                detailsPage.registerFocusSection('subtitle-editor-search', searchRow, {
+                    orientation: 'horizontal',
+                    leaveUp: 'subtitle-editor-tracks',
+                    leaveDown: 'subtitle-editor-actions'
+                });
+            if (actionsRow)
+                detailsPage.registerFocusSection('subtitle-editor-actions', actionsRow, {
+                    orientation: 'horizontal',
+                    leaveUp: 'subtitle-editor-search'
+                });
+            focusManager.setActiveSection('subtitle-editor-search');
+
+            // Restore Panel A's back handler
+            detailsPage.onBack = panelAOnBack;
+        };
+
+        overlay.querySelector('#btn-results-back').onclick = (e) => {
+            e.stopPropagation();
+            goBack();
+        };
+
+        overlay.querySelector('#btn-results-cancel').onclick = (e) => {
+            e.stopPropagation();
+            closeAll();
+        };
+
+        overlay.onclick = (e) => {
+            if (e.target === overlay) closeAll();
+        };
+
+        // ── Focus setup ──────────────────────────────────────────────────────
+        const resultsList = overlay.querySelector('#subtitle-results-list');
+        const actionsPanel = overlay.querySelector('.modal-actions');
+
+        if (resultsList) {
+            focusManager.register('subtitle-results-list', resultsList, {
+                orientation: 'vertical',
+                leaveDown: 'subtitle-results-actions',
+                leaveUp: 'subtitle-results-actions',
+                circular: false
+            });
+        }
+
+        if (actionsPanel) {
+            focusManager.register('subtitle-results-actions', actionsPanel, {
+                orientation: 'horizontal',
+                leaveUp: 'subtitle-results-list'
+            });
+        }
+
+        // Land focus on results list if there are results, otherwise on the Back button
+        if (results && results.length > 0) {
+            focusManager.setActiveSection('subtitle-results-list');
+        } else {
+            focusManager.setActiveSection('subtitle-results-actions');
+        }
+
+        // ── Back button handler for Panel B ──────────────────────────────────
+        const panelAOnBack = detailsPage.onBack; // capture current (Panel A) handler before overwriting
+        detailsPage.onBack = () => {
+            goBack();
+            return true;
+        };
+    }
+
+    /**
+     * Reload MediaStreams from the server after a delete/download action.
+     * Mutates `detailsPage._item` in-place so the track list re-render reflects the change.
+     */
+    static async _reloadSubtitleStreams(itemId, detailsPage) {
+        try {
+            // Fetch only the MediaStreams field to keep the request light
+            const fresh = await api.getItem(itemId, { Fields: 'MediaStreams' });
+
+            // Patch the existing MediaSources array rather than replacing the whole item
+            if (fresh?.MediaSources && detailsPage._item) {
+                detailsPage._item.MediaSources = fresh.MediaSources;
+                // Re-reconcile in-memory track selections against updated streams so indices never drift
+                detailsPage._restoreSavedTrackSelections?.();
+            }
+        } catch (err) {
+            log.warn('Failed to reload MediaStreams after subtitle change', err);
+        }
+    }
+}
+
+export default SubtitleEditorModal;

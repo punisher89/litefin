@@ -1,0 +1,26 @@
+{
+    "id": "org.litefin.app",
+    "version": "2.0.150",
+    "vendor": "Litefin",
+    "type": "web",
+    "main": "index.html",
+    "title": "Litefin",
+    "transparent": false,
+    "appDescription": "Native Jellyfin client for WebOS",
+    "disableBackHistoryAPI": true,
+    "icon": "assets/icon-80.png",
+    "largeIcon": "assets/icon-130.png",
+    "supportGIP": true,
+    "bgImage": "assets/splash.png",
+    "splashBackground": "assets/splash.png",
+    "bgColor": "#0f0a14",
+    "iconColor": "#0f0a14",
+    "supportTouchMode": "full",
+    "enablePigScreenSaver": false,
+    "screenSaverProperties": {
+        "preferredType": 2
+    },
+    "requiredPermissions": [
+        "time.query"
+    ]
+}
