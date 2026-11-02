@@ -1,0 +1,88 @@
+.awesome-plugin-catalog {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: 14px;
+    margin: 12px 0 28px;
+}
+.awesome-plugin-card {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border-color, rgba(255,255,255,.12));
+    border-radius: 12px;
+    background: var(--card-bg, rgba(255,255,255,.035));
+}
+.awesome-plugin-card__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+.awesome-plugin-card__name {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.awesome-plugin-card__category {
+    display: block;
+    margin-top: 4px;
+    opacity: .68;
+    font-size: .82rem;
+}
+.awesome-plugin-card__status {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: .75rem;
+    background: rgba(80, 170, 120, .16);
+}
+.awesome-plugin-card__status--native-adapter {
+    background: rgba(70, 145, 210, .17);
+}
+.awesome-plugin-card__status--native-reimplementation {
+    background: rgba(220, 165, 65, .17);
+}
+.awesome-plugin-card__summary {
+    margin: 12px 0;
+    line-height: 1.45;
+    opacity: .88;
+}
+.awesome-plugin-card__link {
+    display: inline-block;
+    color: var(--accent-color, #00a4dc);
+    text-decoration: none;
+}
+.awesome-plugin-card__client-state {
+    display: block;
+    margin-top: 8px;
+    opacity: .7;
+    font-size: .8rem;
+}
+.actor-profile-highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 10px;
+    background: rgba(255,255,255,.035);
+}
+.actor-profile-highlights h3 {
+    margin: 0;
+    font-size: .95rem;
+}
+.actor-profile-highlights p {
+    margin: 0;
+    opacity: .82;
+}
+.actor-profile-highlights__works {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.actor-profile-highlights__works span {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.09);
+    font-size: .82rem;
+}
