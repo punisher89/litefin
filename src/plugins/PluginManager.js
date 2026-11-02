@@ -499,11 +499,23 @@ class PluginManager {
 
             try {
                 await entry.plugin.init(entry.api);
+
+                // Re-enabled plugins need their current page callback replayed
+                // (page registration itself may have happened while disabled).
+                const currentPage = this._lastPageContext;
+                if (currentPage && typeof entry.plugin.onPageLoad === 'function') {
+                    entry.plugin.onPageLoad(currentPage.pageId, currentPage.pageEl, entry.api);
+                    entry._lastNotifiedPageId = currentPage.pageId;
+                    entry._lastNotifiedPageEl = currentPage.pageEl;
+                }
+
                 log.info(`Plugin '${pluginId}' re-enabled by user`);
                 eventBus.emit(`${pluginId}:enabled`);
             } catch (err) {
                 log.error(`Plugin '${pluginId}' init() threw during re-enable:`, err);
                 entry.enabled = false;
+                entry.api._clearExtensions();
+                if (this._widgetHost) this._widgetHost.removeAllWidgetsForPlugin(pluginId);
             }
         } else if (!enabled && entry.enabled) {
             // ------------------------------------------------------------------
