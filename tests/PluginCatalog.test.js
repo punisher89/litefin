@@ -19,15 +19,11 @@ test('priority Awesome Jellyfin integrations are listed', () => {
     }
 });
 
-test('Jellyfin Web injection projects are not marked as directly compatible', () => {
-    assert.equal(
-        getAwesomeJellyfinEntry('jellyfin-featured').status,
-        'native-reimplementation'
-    );
-    assert.equal(
-        getAwesomeJellyfinEntry('jellyfin-enhanced').status,
-        'native-reimplementation'
-    );
+test('Featured and Enhanced are reported as native adapters, not Web injectors', () => {
+    assert.equal(getAwesomeJellyfinEntry('jellyfin-featured').status, 'native-adapter');
+    assert.equal(getAwesomeJellyfinEntry('jellyfin-enhanced').status, 'native-adapter');
+    assert.equal(getAwesomeJellyfinEntry('jellyfin-featured').adapterId, 'jellyfin-featured');
+    assert.equal(getAwesomeJellyfinEntry('jellyfin-enhanced').adapterId, 'jellyfin-enhanced');
 });
 
 test('existing MDBList integration remains supported', () => {
