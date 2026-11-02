@@ -26,7 +26,7 @@ class PluginExtensionHost {
     constructor() {
         this._extensions = new Map();
         this._mounted = new Map();
-        // Map<extensionKey, activePageContext> for deferred mounts.
+        // Map<extensionKey, { entry, activePage }> for deferred mounts.
         this._pending = new Map();
         this._activePage = null;
     }
@@ -53,9 +53,13 @@ class PluginExtensionHost {
         this._mountEntry(entry);
 
         return () => {
-            if (!this._extensions.has(key)) return;
+            if (this._extensions.get(key) !== entry) return;
             this._unmountEntry(key);
             this._extensions.delete(key);
+
+            // A disposed extension must not mount after its page becomes ready.
+            const pending = this._pending.get(key);
+            if (pending && pending.entry === entry) this._pending.delete(key);
         };
     }
 
@@ -93,8 +97,8 @@ class PluginExtensionHost {
         for (const [key, mounted] of Array.from(this._mounted.entries())) {
             if (mounted.pageEl === activeEl) this._unmountEntry(key);
         }
-        for (const [key, pendingPage] of Array.from(this._pending.entries())) {
-            if (pendingPage === activePage) this._pending.delete(key);
+        for (const [key, pending] of Array.from(this._pending.entries())) {
+            if (pending.activePage === activePage) this._pending.delete(key);
         }
         this._activePage = null;
     }
@@ -104,11 +108,21 @@ class PluginExtensionHost {
         const slotConfig = PLUGIN_EXTENSION_SLOTS[entry.slot];
         if (!active || !slotConfig || slotConfig.page !== active.pageId) return;
         if (this._mounted.get(entry.key)?.pageEl === active.pageEl) return;
-        if (this._pending.get(entry.key) === active) return;
-        if (this._pending.has(entry.key)) this._pending.delete(entry.key);
+
+        const existingPending = this._pending.get(entry.key);
+        if (existingPending && existingPending.entry === entry && existingPending.activePage === active) {
+            return;
+        }
+        if (existingPending) this._pending.delete(entry.key);
+
+        // Use a per-attempt token so an older Promise cannot clear a newer mount.
+        const pendingToken = { entry, activePage: active };
 
         const mount = () => {
-            if (this._pending.get(entry.key) === active) this._pending.delete(entry.key);
+            if (this._pending.get(entry.key) === pendingToken) this._pending.delete(entry.key);
+
+            // The extension may have been disposed or replaced while waiting.
+            if (this._extensions.get(entry.key) !== entry) return;
             if (this._activePage !== active) return;
 
             const pageRoot = active.pageEl.matches?.('.page')
@@ -191,9 +205,9 @@ class PluginExtensionHost {
 
         const ready = active.page && active.page.ready;
         if (entry.extension.deferUntilReady === true && ready && typeof ready.then === 'function') {
-            this._pending.set(entry.key, active);
+            this._pending.set(entry.key, pendingToken);
             ready.then(mount).catch((err) => {
-                if (this._pending.get(entry.key) === active) this._pending.delete(entry.key);
+                if (this._pending.get(entry.key) === pendingToken) this._pending.delete(entry.key);
                 log.warn('Page readiness wait failed for extension:', entry.key, err);
             });
         } else {
