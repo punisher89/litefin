@@ -1,0 +1,38 @@
+.achievement-summary-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 10px 0 18px;
+    padding: 14px 18px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .045);
+}
+.achievement-summary-widget__title {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 700;
+}
+.achievement-summary-widget__summary {
+    margin: 0;
+    opacity: .82;
+}
+.achievement-summary-widget__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.achievement-summary-widget__badge,
+.achievement-summary-widget__empty {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .09);
+    font-size: .82rem;
+}
+.achievement-summary-widget__action {
+    align-self: flex-start;
+    min-height: 38px;
+}
+.achievement-summary-osd {
+    min-width: 88px;
+}
