@@ -51,6 +51,45 @@ function uniqueLabels(labels) {
     return Array.from(new Set(labels.filter(Boolean)));
 }
 
+function updateMediaFormat(root, page) {
+    if (!root || !page) return;
+
+    const item = page._item;
+    const mediaSource = item?.MediaSources?.find((source) =>
+        source.Id === page._selectedMediaSourceId
+    ) || item?.MediaSources?.[0] || item;
+    const streams = mediaSource?.MediaStreams || item?.MediaStreams || [];
+    const video = firstStream(streams, 'Video');
+    const audio = firstStream(streams, 'Audio');
+
+    const labels = uniqueLabels([
+        resolutionLabel(video),
+        hdrLabel(video),
+        video && video.Codec ? String(video.Codec).toUpperCase() : '',
+        audioLabel(audio)
+    ]);
+
+    root.textContent = '';
+    root.hidden = labels.length === 0;
+    if (!labels.length) return;
+
+    const title = document.createElement('h3');
+    title.textContent = 'Качество и звук';
+
+    const values = document.createElement('div');
+    values.className = 'enhanced-media-format__values';
+
+    labels.forEach((label) => {
+        const chip = document.createElement('span');
+        chip.className = 'enhanced-media-format__chip';
+        chip.textContent = label;
+        values.appendChild(chip);
+    });
+
+    root.appendChild(title);
+    root.appendChild(values);
+}
+
 export default {
     id: 'jellyfin-enhanced',
     name: 'Litefin Media Details+',
@@ -65,44 +104,18 @@ export default {
             order: 20,
             deferUntilReady: true,
             render: (context) => {
-                const page = context && context.page;
-                const item = page && page._item;
-                if (!item || !['Movie', 'Episode', 'Video'].includes(item.Type)) return null;
-
-                const mediaSource = item.MediaSources?.find((source) =>
-                    source.Id === page._selectedMediaSourceId
-                ) || item.MediaSources?.[0] || item;
-                const streams = mediaSource.MediaStreams || item.MediaStreams || [];
-                const video = firstStream(streams, 'Video');
-                const audio = firstStream(streams, 'Audio');
-
-                const labels = uniqueLabels([
-                    resolutionLabel(video),
-                    hdrLabel(video),
-                    video && video.Codec ? String(video.Codec).toUpperCase() : '',
-                    audioLabel(audio)
-                ]);
-                if (!labels.length) return null;
-
                 const root = document.createElement('section');
                 root.className = 'enhanced-media-format';
-
-                const title = document.createElement('h3');
-                title.textContent = 'Качество и звук';
-
-                const values = document.createElement('div');
-                values.className = 'enhanced-media-format__values';
-
-                labels.forEach((label) => {
-                    const chip = document.createElement('span');
-                    chip.className = 'enhanced-media-format__chip';
-                    chip.textContent = label;
-                    values.appendChild(chip);
-                });
-
-                root.appendChild(title);
-                root.appendChild(values);
+                updateMediaFormat(root, context && context.page);
                 return root;
+            },
+            onMount: (wrapper, context, extensionApi) => {
+                const root = wrapper.querySelector('.enhanced-media-format');
+                return extensionApi.on('details:media-source-changed', (payload) => {
+                    if (payload && payload.page === context.page) {
+                        updateMediaFormat(root, context.page);
+                    }
+                });
             }
         });
     }
