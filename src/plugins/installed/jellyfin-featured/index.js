@@ -23,6 +23,7 @@ export default {
     _items: [],
     _loadedAt: 0,
     _loading: null,
+    _itemsScopeKey: null,
     _wrapper: null,
 
     init(api) {
@@ -70,30 +71,56 @@ export default {
         return root;
     },
 
+    _getScopeKey(api) {
+        const userId = api.getCurrentUserId();
+        if (!userId) return null;
+        return String(api.serverUrl || '') + '|' + String(userId);
+    },
+
     async _load(api) {
-        if (this._loading) return this._loading;
+        const scopeKey = this._getScopeKey(api);
+        if (!scopeKey) return [];
+
+        if (this._loading && this._loading.scopeKey === scopeKey) {
+            return this._loading.promise;
+        }
+
+        if (this._itemsScopeKey !== scopeKey) {
+            // Featured is personalized; do not reuse another profile's feed.
+            this._items = [];
+            this._itemsScopeKey = scopeKey;
+            this._loadedAt = 0;
+            this._renderItems();
+        }
+
         if (Date.now() - this._loadedAt < CACHE_TTL) {
             this._renderItems();
             return this._items;
         }
 
-        this._loading = (async () => {
+        const request = { scopeKey, promise: null };
+        request.promise = (async () => {
             try {
                 const response = await api.serverPlugins.call('/featured/items');
+                if (this._loading !== request || this._getScopeKey(api) !== scopeKey) return [];
+
                 const items = response?.Items || response?.items;
                 this._items = Array.isArray(items) ? items : [];
                 this._loadedAt = Date.now();
                 this._renderItems();
                 return this._items;
             } catch (err) {
-                api.log.warn('Jellyfin Featured feed request failed:', err && err.message);
-                this._renderError();
+                if (this._loading === request && this._getScopeKey(api) === scopeKey) {
+                    api.log.warn('Jellyfin Featured feed request failed:', err && err.message);
+                    this._renderError();
+                }
                 return [];
             } finally {
-                this._loading = null;
+                if (this._loading === request) this._loading = null;
             }
         })();
-        return this._loading;
+        this._loading = request;
+        return request.promise;
     },
 
     _renderItems() {
