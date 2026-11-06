@@ -281,6 +281,10 @@ export default class AchievementsPage extends Page {
             if (active) active.focus();
         } else if (button.dataset.achAction === 'retry') {
             await this._loadData();
+        } else if (button.dataset.achAction === 'detail') {
+            const badge = this._data && this._data.badges.find((b) => String(b.Id || b.Key) === button.dataset.achId);
+            const note = this.$('.achievements-footer-note');
+            if (note && badge) note.textContent = (badge.Title || '') + ': ' + (badge.Description || '');
         } else if (button.dataset.achAction === 'toggle-equip' && !this._busy) {
             this._busy = true;
             try {
