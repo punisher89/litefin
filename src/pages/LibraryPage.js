@@ -18,7 +18,6 @@ import { layoutManager } from '../ui/LayoutManager.js';
 import { scrollController } from '../ui/ScrollController.js';
 import CardRenderer from '../utils/CardRenderer.js';
 import { prepareEnhancedPosterTags, attachEnhancedPosterTagsToCard } from '../utils/EnhancedPosterTags.js';
-import { prepareEnhancedPosterTags, attachEnhancedPosterTagsToCard } from '../utils/EnhancedPosterTags.js';
 import { imageService } from '../utils/ImageService.js';
 import { imageCache } from '../utils/ImageCache.js';
 import { VirtualCardRow } from '../components/VirtualCardRow.js';
