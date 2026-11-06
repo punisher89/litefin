@@ -72,6 +72,9 @@ class AchievementNotifications {
 
     async check() {
         if (!this._started || !this._user || !this._enabled || this._inflight || document.hidden) return;
+        // Never leak private notifications on user picker, login or PIN-gated screens.
+        const route = (window.location.hash || '').split('?')[0];
+        if (route === '#/profiles' || route === '#/login' || route === '#/offline') return;
         if (!auth.isAuthenticated() || api.userId !== this._user || api.isEmby()) return;
         const user = this._user;
         const since = this._since;
