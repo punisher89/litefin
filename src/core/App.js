@@ -653,6 +653,9 @@ const discoverChunk = createPageChunkLoader(
 const favoritesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "favorites" */ '../pages/FavoritesPage.js')
 );
+const achievementsChunk = createPageChunkLoader(
+    () => import(/* webpackChunkName: "achievements" */ '../pages/AchievementsPage.js')
+);
 const profilesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "profiles" */ '../pages/ProfilesPage.js')
 );
@@ -877,6 +880,12 @@ class FavoritesPage extends AsyncPageProxy {
 /**
  * Route proxy for the "Who's Watching" profile switcher view.
  */
+class AchievementsPage extends AsyncPageProxy {
+    constructor(options) {
+        super(options, achievementsChunk);
+    }
+}
+
 class ProfilesPage extends AsyncPageProxy {
     constructor(options) {
         super(options, profilesChunk);
@@ -2195,6 +2204,7 @@ class App {
         router.register('/search', SearchPage);
         router.register('/discover', DiscoverPage);
         router.register('/favorites', FavoritesPage);
+        router.register('/achievements', AchievementsPage);
         router.register('/settings', SettingsPage);
         router.register('/livetv', LiveTvPage);
         router.register('/offline', OfflinePage);
