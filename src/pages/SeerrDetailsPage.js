@@ -323,9 +323,7 @@ class SeerrDetailsPage extends Page {
             item.OfficialRating
                 ? `<span class="meta-item meta-badge seerr-content-rating">${escapeHtml(item.OfficialRating)}</span>`
                 : '',
-            item.CommunityRating
-                ? `<span class="meta-item seerr-rating-item seerr-tmdb-rating">${detailsIcons.tmdbRating} ${item.CommunityRating.toFixed(1)}</span>`
-                : ''
+            ''
         ]
             .filter(Boolean)
             .join('');
@@ -359,7 +357,12 @@ class SeerrDetailsPage extends Page {
             .join('');
 
         this.$('#hero-info').innerHTML = `
-            <h1 class="details-title" style="max-width: 100%;">${escapeHtml(i18n.ensureBiDi(item.Name))}</h1>
+            <div class="seerr-title-with-ratings">
+                <h1 class="details-title" style="max-width: 100%;">${escapeHtml(i18n.ensureBiDi(item.Name))}</h1>
+                <div class="seerr-title-ratings">
+                    ${item.CommunityRating ? `<span class="seerr-title-rating" title="TMDB">${detailsIcons.tmdbRating} ${item.CommunityRating.toFixed(1)}</span>` : ''}
+                </div>
+            </div>
             ${item.OriginalTitle ? `<h2 class="details-original-title">${escapeHtml(i18n.ensureBiDi(item.OriginalTitle))}</h2>` : ''}
             <div class="details-meta-row">${primaryMeta}</div>
             ${secondaryMeta ? `<div class="details-meta-row secondary-meta-row" style="margin-top: 6px;">${secondaryMeta}</div>` : ''}
@@ -1397,7 +1400,7 @@ class SeerrDetailsPage extends Page {
 
     _renderRatings(ratings) {
         if (!ratings) return;
-        const row = this.$('.details-meta-row');
+        const row = this.$('.seerr-title-ratings');
         if (!row) return;
 
         const oldContainer = row.querySelector('.seerr-ratings-container');
@@ -1432,15 +1435,10 @@ class SeerrDetailsPage extends Page {
             container.style.display = 'inline-flex';
             container.style.gap = '20px';
             container.style.alignItems = 'center';
-            container.style.marginLeft = '20px';
+            container.style.marginLeft = '0';
             container.innerHTML = ratingItems.join('');
 
-            const tmdbItem = row.querySelector('.seerr-tmdb-rating');
-            if (tmdbItem && tmdbItem.nextSibling) {
-                row.insertBefore(container, tmdbItem.nextSibling);
-            } else {
-                row.appendChild(container);
-            }
+            row.appendChild(container);
         }
     }
 
