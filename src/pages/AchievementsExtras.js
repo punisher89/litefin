@@ -75,6 +75,7 @@ export class AchievementExtras {
             this._data.catalog = catalog || {};
             this._data.cosmetics = cosmetics || {};
             this._data.powerups = powerups || {};
+            this._applyThemePreview();
             return;
         }
         if (tab === 'friends') {
@@ -89,6 +90,20 @@ export class AchievementExtras {
             const response = await client.getMessageThreads();
             this._data.threads = list(response?.Threads || response?.threads);
             return;
+        }
+    }
+
+    _applyThemePreview() {
+        // A static color preview is intentional on webOS Normal:
+        // do not load background videos or untrusted server-side CSS into Litefin.
+        const selected = this._data.cosmetics?.EquippedThemeId;
+        const theme = list(this._data.catalog?.Cosmetics).find((item) => item.Id === selected);
+        const color = value(theme?.PreviewColor);
+        if (!this.page.el) return;
+        if (/^#[0-9a-f]{6}$/i.test(color)) {
+            this.page.el.style.setProperty('--achievement-user-accent', color);
+        } else {
+            this.page.el.style.removeProperty('--achievement-user-accent');
         }
     }
 
@@ -161,8 +176,13 @@ export class AchievementExtras {
                 item.PreviewColor);
         }).join('');
         return '<div class="achievement-extra-heading"><h2>' + this.t('Оформление профиля', 'Profile cosmetics') + '</h2></div>' +
-            '<div class="achievement-extra-preview">✦ ' + html(own.EquippedCustomTitleId || this.page._data?.rank?.Tier?.Name || '') +
-            '<span>' + this.t('Темы · рамки · аватары · фоны · титулы', 'Themes · frames · avatars · backgrounds · titles') + '</span></div>' +
+            '<div class="achievement-extra-preview"><div>👑 ' +
+            html(list(catalog.Cosmetics).find((item) => item.Id === own.EquippedCustomTitleId)?.DisplayName ||
+                this.page._data?.rank?.Tier?.Name || '') + '</div><span>' +
+            html([own.EquippedThemeId, own.EquippedBadgeFrameId, own.EquippedAvatarId,
+                own.EquippedBackgroundId, own.EquippedProfileBorderId].filter(Boolean).join(' · ') ||
+                this.t('Стандартное оформление', 'Default appearance')) +
+            '</span></div>' +
             '<div class="achievement-extra-grid" id="achievement-extra-controls">' + (cards ||
             '<p>' + this.t('Косметика пока не открыта', 'No unlocked cosmetics') + '</p>') + '</div>' +
             this.renderPowerups();
