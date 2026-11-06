@@ -4,7 +4,10 @@
  */
 .lf-je-poster-tags {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 8;
     pointer-events: none;
 }
@@ -40,6 +43,7 @@
 }
 
 .lf-je-tag {
+    margin: 0 2px 2px 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
