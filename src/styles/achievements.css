@@ -110,3 +110,8 @@
 
 .achievements-page .achievements-hero { border-color: var(--achievement-user-accent, rgba(246,199,104,.24)); }
 .achievements-page .achievement-extra-preview { border-color: var(--achievement-user-accent, #78629a); }
+
+/* Badge icon is rendered from the server's Icon field via local SVG: no web font needed. */
+.achievement-badge-art { position: relative; }
+.achievement-badge-art .achievement-icon-svg { width: 66px; height: 66px; max-width: 70%; color: inherit; filter: drop-shadow(0 3px 6px rgba(0,0,0,.4)); }
+.achievement-badge-art .achievement-lock-mark { position: absolute; right: 12px; bottom: 8px; font-size: 21px; background: rgba(10,10,19,.84); padding: 3px 6px; border-radius: 8px; }
