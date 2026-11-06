@@ -238,3 +238,31 @@ test('poster labels are escaped and groups sharing a corner are stacked together
     assert.doesNotMatch(html, /<script>/);
     assert.equal((html.match(/lf-je-tag-group--top-right/g) || []).length, 1);
 });
+
+
+test('quality tags also use Width/Height directly from Jellyfin MediaSources', () => {
+    const data = {
+        Id: 'direct-jellyfin',
+        Type: 'Movie',
+        Name: 'Direct source',
+        MediaSources: [{ Width: 3840, Height: 2160, VideoRangeType: 'HDR10' }],
+        CommunityRating: 7.9
+    };
+    const groups = buildEnhancedPosterTagGroups(data, settings, { NativePosterTagsEnabled: false });
+    assert.ok(groups.quality);
+    assert.ok(groups.quality.items.includes('4K'));
+    assert.ok(groups.quality.items.includes('HDR10'));
+    assert.deepEqual(groups.rating.items, ['★ 7.9']);
+});
+
+test('quality tags support a source with video stream metadata even when item width is omitted', () => {
+    const data = {
+        Id: 'source-stream-only',
+        Type: 'Movie',
+        MediaSources: [{
+            MediaStreams: [{ Type: 'Video', Width: 1920, Height: 1080, VideoRangeType: 'SDR' }]
+        }]
+    };
+    const groups = buildEnhancedPosterTagGroups(data, settings, { NativePosterTagsEnabled: false });
+    assert.ok(groups.quality.items.includes('1080p'));
+});
