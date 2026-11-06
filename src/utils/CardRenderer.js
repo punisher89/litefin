@@ -15,6 +15,8 @@ import { storage } from './StorageService.js';
 import { shouldShowScore } from './visibility.js';
 import { detailsIcons, getStaticIcon } from './Icons.js';
 import { platformInfo } from './PlatformInfo.js';
+import { renderEnhancedPosterTags, hasNativePosterTagStamp } from './EnhancedPosterTags.js';
+import '../styles/enhanced-poster-tags.css';
 
 class CardRenderer {
     /**
@@ -429,7 +431,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${item._enhancedPersonInfo ? JSON.stringify(item._enhancedPersonInfo) : ''}|${item._enhancedPosterTags ? JSON.stringify(item._enhancedPosterTags) : ''}|${item.ImageTags?.Primary || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -1237,6 +1239,49 @@ class CardRenderer {
             subtitleText = ''; // Clear it so it doesn't stay on the left with the title
         }
 
+        // Jellyfin Enhanced cast facts: compact age chips and birthplace strip.
+        const enhancedPersonInfo = type === 'person' ? (item._enhancedPersonInfo || null) : null;
+        const personAge = enhancedPersonInfo
+            ? (enhancedPersonInfo.isDeceased || enhancedPersonInfo.IsDeceased
+                ? (enhancedPersonInfo.ageAtDeath ?? enhancedPersonInfo.AgeAtDeath)
+                : (enhancedPersonInfo.currentAge ?? enhancedPersonInfo.CurrentAge))
+            : null;
+        const personAgeAtRelease = enhancedPersonInfo
+            ? (enhancedPersonInfo.ageAtItemRelease ?? enhancedPersonInfo.AgeAtItemRelease)
+            : null;
+        const personBirthPlace = enhancedPersonInfo
+            ? (enhancedPersonInfo.birthPlace ?? enhancedPersonInfo.BirthPlace)
+            : '';
+        const isPersonDeceased = !!(enhancedPersonInfo && (enhancedPersonInfo.isDeceased ?? enhancedPersonInfo.IsDeceased));
+        const personAgeUnit = (value) => {
+            const amount = Math.abs(Number(value));
+            const lang = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
+            if (!lang.startsWith('ru')) return amount === 1 ? 'year' : 'years';
+            const mod100 = amount % 100;
+            const mod10 = amount % 10;
+            if (mod100 >= 11 && mod100 <= 14) return i18n.t('EnhancedPersonYearMany') || 'лет';
+            if (mod10 === 1) return i18n.t('EnhancedPersonYearOne') || 'год';
+            if (mod10 >= 2 && mod10 <= 4) return i18n.t('EnhancedPersonYearFew') || 'года';
+            return i18n.t('EnhancedPersonYearMany') || 'лет';
+        };
+        const personInfoHtml = enhancedPersonInfo ? `
+            <div class="lf-person-enhanced-info">
+                <div class="lf-person-age-stack">
+                    ${personAge !== null && personAge !== undefined ? `
+                        <span class="lf-person-age-chip ${isPersonDeceased ? 'is-deceased' : ''}">
+                            ${isPersonDeceased ? '✝' : '🎂'} ${Number(personAge)} ${escapeHtml(personAgeUnit(personAge))}
+                        </span>` : ''}
+                    ${personAgeAtRelease !== null && personAgeAtRelease !== undefined ? `
+                        <span class="lf-person-age-chip is-release">🎬 ${Number(personAgeAtRelease)} ${escapeHtml(personAgeUnit(personAgeAtRelease))} ${escapeHtml(i18n.t('EnhancedPersonAtRelease') || 'на момент выхода')}
+                        </span>` : ''}
+                </div>
+                ${personBirthPlace ? `
+                    <span class="lf-person-birthplace" title="${escapeHtml(personBirthPlace)}">
+                        <span aria-hidden="true">📍</span>
+                        <span>${escapeHtml(personBirthPlace)}</span>
+                    </span>` : ''}
+            </div>
+        ` : '';
         // --- 4. HTML Assembly ---
 
         let cssClass = isLandscape ? 'media-card landscape' : 'media-card';
@@ -1417,6 +1462,7 @@ class CardRenderer {
             blurHash && !isBlurHashDisabled
                 ? `<canvas class="blurhash-canvas" data-blurhash="${blurHash}"></canvas>`
                 : '';
+        const enhancedPosterTagsHtml = renderEnhancedPosterTags(item);
         const imagePart = imageUrl
             ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
             : `${CardRenderer.getFallbackHtml(item, isLandscape, { hideInitials, isLibrary: type === 'library' })}`;
@@ -1527,6 +1573,8 @@ class CardRenderer {
             <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
                 <div class="card-image">
                     ${imagePart}
+                    ${enhancedPosterTagsHtml}
+                    ${personInfoHtml}
                     ${progressHtml}
                     ${videoBadgeHtml}
                     ${!options.showMeta ? badgeContainer : ''}
