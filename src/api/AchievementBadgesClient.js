@@ -140,6 +140,10 @@ class AchievementBadgesClient {
         return api.get(this.userRoot + '/messages/unread-count');
     }
 
+    getPreferences() {
+        return api.get(this.userRoot + '/preferences');
+    }
+
     getUnlocksSince(since, deviceId) {
         const params = { since };
         if (deviceId) params.deviceId = deviceId;
