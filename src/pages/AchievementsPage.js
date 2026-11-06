@@ -5,6 +5,7 @@
 import '../styles/achievements.css';
 import Page from './Page.js';
 import { achievementBadges } from '../api/AchievementBadgesClient.js';
+import { renderAchievementIcon } from '../utils/AchievementIcons.js';
 import { AchievementExtras } from './AchievementsExtras.js';
 import { toast } from '../ui/Toast.js';
 import { focusManager } from '../ui/FocusManager.js';
@@ -50,7 +51,6 @@ const WORDS = {
         shop: 'Shop', cosmetics: 'Cosmetics', friends: 'Friends', messages: 'Messages'
     }
 };
-const RARITY_ICONS = { Common: '●', Uncommon: '◆', Rare: '✦', Epic: '✧', Legendary: '★', Mythic: '✹' };
 
 function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({
@@ -227,7 +227,7 @@ export default class AchievementsPage extends Page {
                     return `<button tabindex="0" class="achievement-badge ${b.Unlocked ? 'is-unlocked' : 'is-locked'}"
                         data-ach-action="${b.Unlocked ? 'toggle-equip' : 'detail'}" data-ach-id="${escapeHtml(id)}"
                         aria-label="${escapeHtml(b.Title || 'Badge')}">
-                        <div class="achievement-badge-art" data-rarity="${escapeHtml(rarity)}"><span>${b.Unlocked ? (RARITY_ICONS[rarity] || '★') : '🔒'}</span></div>
+                        <div class="achievement-badge-art" data-rarity="${escapeHtml(rarity)}">${renderAchievementIcon(b.Icon)}${b.Unlocked ? '' : '<span class="achievement-lock-mark" aria-hidden="true">🔒</span>'}</div>
                         <div class="achievement-badge-meta">
                             <span class="achievement-rarity">${escapeHtml(this.w[rarity.toLowerCase()] || rarity)}</span>
                             <strong>${escapeHtml(b.Title || 'Badge')}</strong>
