@@ -25,6 +25,8 @@
 @import './base.css';
 @import './layout.css';
 @import './components.css';
+@import './enhanced-poster-tags.css';
+@import './enhanced-person.css';
 
 /* Application shell and shared structural styles */
 @import './sidebar.css';
