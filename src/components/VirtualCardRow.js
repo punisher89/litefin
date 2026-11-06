@@ -559,10 +559,8 @@ export class VirtualCardRow {
         if (this.totalItems > 4) {
             this._injectScrollArrows();
         }
-    }
 
-        // overlays to the cards already in the virtual window. Future cards
-        // are rendered with the metadata now cached on their item objects.
+        // Load server-side quality and rating tags for this TV row.
         prepareEnhancedPosterTags(this.items, this.contextType)
             .then(() => {
                 if (!this.track || !this.track.isConnected) return;
@@ -570,9 +568,7 @@ export class VirtualCardRow {
                     attachEnhancedPosterTagsToCard(card, this.items[index]);
                 }
             })
-            .catch(() => {
-                // Poster metadata is optional; never let a plugin outage affect row navigation.
-            });
+            .catch(() => {});
     }
 
     /**
