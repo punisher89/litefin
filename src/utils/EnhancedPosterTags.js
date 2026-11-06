@@ -8,6 +8,7 @@
 import { api } from '../api/index.js';
 import { escapeHtml } from './Utils.js';
 import { logger } from './Logger.js';
+import { storage } from './StorageService.js';
 
 const log = logger.create('EnhancedPosterTags');
 const SETTINGS_TTL = 5 * 60 * 1000;
@@ -60,13 +61,19 @@ export function hasNativePosterTagStamp(item) {
 }
 
 function enabledSettings(settings) {
-    return !!settings && (
-        settings.QualityTagsEnabled === true ||
-        settings.GenreTagsEnabled === true ||
-        settings.LanguageTagsEnabled === true ||
-        settings.RatingTagsEnabled === true ||
-        settings.AgeRatingTagsEnabled === true
-    );
+    // The Litefin TV quality preference defaults ON. The server's native image
+    // stamping setting is unrelated to on-screen badges (and defaults OFF).
+    return !!settings;
+}
+
+function tvSettings(settings = {}) {
+    const showQuality = storage.getItem('pref:showQualityBadges') !== 'false';
+    return {
+        ...settings,
+        QualityTagsEnabled: showQuality,
+        RatingTagsEnabled: settings.RatingTagsEnabled !== false,
+        ShowResolutionTag: showQuality && settings.ShowResolutionTag !== false
+    };
 }
 
 async function getSettingsSnapshot(force = false) {
@@ -82,6 +89,7 @@ async function getSettingsSnapshot(force = false) {
     if (settingsUserId !== userId) {
         settingsLoaded = false;
         itemCache.clear(); // Tag data is filtered by user permissions and Spoiler Guard.
+        fallbackPosterCache.clear();
         endpointUnavailableUntil = 0;
     }
     settingsUserId = userId;
@@ -117,7 +125,7 @@ async function getSettingsSnapshot(force = false) {
 
             settingsSnapshot = {
                 userId,
-                settings,
+                settings: tvSettings(settings),
                 config
             };
             settingsFetchedAt = Date.now();
@@ -143,15 +151,18 @@ async function getSettingsSnapshot(force = false) {
 function extractQuality(data, settings) {
     const output = [];
     const itemName = String(data.Name || '');
-    const mediaStreams = Array.isArray(data.MediaStreams) ? data.MediaStreams : [];
+    const mediaStreams = Array.isArray(data.MediaStreams) && data.MediaStreams.length
+        ? data.MediaStreams
+        : (Array.isArray(data.MediaSources) ? data.MediaSources : [])
+            .reduce((all, source) => all.concat(source?.MediaStreams || []), []);
     const video = mediaStreams.find((stream) => stream && stream.Type === 'Video');
     const audio = mediaStreams.filter((stream) => stream && stream.Type === 'Audio');
 
-    if (!video && !audio.length) return output;
+    if (!video && !audio.length && !data.Width && !data.Height) return output;
 
-    if (settings.ShowResolutionTag !== false && video) {
-        const height = Number(video.Height || 0);
-        const title = lower(video.DisplayTitle);
+    if (settings.ShowResolutionTag !== false && (video || data.Height || data.Width)) {
+        const height = Number(video?.Height || data.Height || 0);
+        const title = lower(video?.DisplayTitle);
         let resolution = '';
         if (height >= 3000 || /\b8k\b/.test(title)) resolution = '8K';
         else if (height >= 2000 || /\b(2160p|4k)\b/.test(title)) resolution = '4K';
@@ -515,6 +526,44 @@ export function getEnhancedPosterTagLookupId(item) {
     return id && !/^tmdb-/i.test(id) ? id : '';
 }
 
+const fallbackPosterCache = new Map();
+async function fetchBasicJellyfinPosterData(items) {
+    const valid = items.filter(item => /^[0-9a-f-]{32,36}$/i.test(String(item.Id || '')));
+    const now = Date.now();
+    const pending = valid.filter(item => !fallbackPosterCache.has(String(item.Id)) ||
+        fallbackPosterCache.get(String(item.Id)).expiresAt < now);
+    // Jellyfin's user-scoped /Items query is a single batched request, not
+    // one network call for every tile. Respect library-level permissions.
+    for (let i = 0; i < pending.length; i += 100) {
+        const batch = pending.slice(i, i + 100);
+        try {
+            const response = await api.getItems({
+                Ids: batch.map(item => item.Id).join(','),
+                Limit: batch.length,
+                Fields: 'MediaSources,Width,Height,VideoRange,VideoRangeType,CommunityRating,CriticRating'
+            }, { silent: true, warnOnError: false, timeout: 6500 });
+            const rows = Array.isArray(response?.Items) ? response.Items : [];
+            const byId = new Map(rows.map(item => [String(item.Id), item]));
+            for (const item of batch) {
+                const media = byId.get(String(item.Id));
+                fallbackPosterCache.set(String(item.Id), {
+                    data: media ? { ...item, ...media } : item,
+                    expiresAt: Date.now() + (media ? ITEM_TTL : NEGATIVE_TTL)
+                });
+            }
+        } catch (err) {
+            log.debug('Jellyfin fallback poster metadata unavailable:', err?.message || err);
+            for (const item of batch) {
+                fallbackPosterCache.set(String(item.Id), {
+                    data: item, expiresAt: Date.now() + NEGATIVE_TTL
+                });
+            }
+        }
+    }
+    return new Map(valid.map(item => [String(item.Id),
+        fallbackPosterCache.get(String(item.Id))?.data || item]));
+}
+
 export async function prepareEnhancedPosterTags(items, contextType = '') {
     if (!Array.isArray(items) || !items.length) return items;
     const eligible = items.filter((item) =>
@@ -525,7 +574,24 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
     if (!eligible.length) return items;
 
     const snapshot = await getSettingsSnapshot();
-    if (!snapshot) return items;
+    if (!snapshot) {
+        // A Jellyfin server without Enhanced can still supply ordinary card
+        // rating and MediaSources data. Don't hide all quality labels.
+        const safeSettings = tvSettings({
+            RatingTagsEnabled: true,
+            ShowDynamicRangeTag: true,
+            ShowVideoCodecTag: true,
+            ShowAudioInfoTag: true
+        });
+        const metadata = await fetchBasicJellyfinPosterData(eligible);
+        for (const item of eligible) {
+            const data = metadata.get(String(item.Id)) || item;
+            item._enhancedPosterTags = buildEnhancedPosterTagGroups(
+                data, safeSettings, {}, contextType
+            );
+        }
+        return items;
+    }
     const userId = snapshot.userId;
 
     // Seerr cards use synthetic tmdb-* IDs. If their payload omitted the backing
