@@ -65,7 +65,7 @@ class CardRenderer {
             useSeasonBadges: storage.getItem('pref:useSeasonBadges') === 'true',
             swapEpisodeTitles: storage.getItem('pref:swapEpisodeTitles') === 'true',
             showFavoriteBadges: storage.getItem('pref:showFavoriteBadges') === 'true',
-            showQualityBadges: storage.getItem('pref:showQualityBadges') === 'true'
+            showQualityBadges: storage.getItem('pref:showQualityBadges') !== 'false'
         };
         // Each of these shapes the markup the HTML cache keeps, so all of them are
         // part of its key: a changed setting rebuilds the cards once
