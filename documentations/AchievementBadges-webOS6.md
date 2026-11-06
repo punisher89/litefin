@@ -22,7 +22,17 @@ This branch adds a **native Litefin TV screen** that consumes the server-side [A
 - Russian/English interface (other languages currently fall back to English). Badge titles use plugin `?lang=ru`/ `en` localization.
 - Optional endpoints fail independently; badges remain viewable if quests/bank/leaderboard are unavailable.
 
-**Not in this first iteration:** full shop, cosmetics, friend messaging, admin configuration, and in-player unlock toast. The mockup is a concept, not a claim that all these extended surfaces are already implemented.
+## Extended tabs added
+- **Shop / Магазин** — fetches the live score-shop catalog, shows the user's bank, owned cosmetics, prices and explicitly confirms purchases.
+- **Cosmetics / Оформление** — displays owned cosmetics, supports equip/unequip of themes, frames, rank titles, avatars, backgrounds and profile borders; includes the three server power-up types and their inventory/actions.
+- **Friends / Друзья** — lists friends and pending requests, discovers permitted server users, sends invitations, accepts requests, removes friends, and opens direct messages.
+- **Messages / Сообщения** — lists existing conversations, displays message history, and sends 1:1 or group chat text. Text entry uses a TV-focusable textarea and the platform keyboard.
+- **Quests / Задания** — daily/weekly quest reroll buttons honor server-reported remaining rerolls.
+- **Toasts / Уведомления** — deferred, background poll of `/unlocks-since` after player stop, foreground resume and at a 90-second cadence; device-scope is passed to the server. Previously earned badges never appear as brand-new on first connect.
+
+The client intentionally **does not load AchievementBadges' server HTML/JS** or put achievement overlays on movie or series detail cards. This keeps the TV UI lightweight.
+
+**Currently out of scope:** the full plugin admin configuration, file/image attachment uploads, shop cosmetics as animated MP4 backgrounds, advanced friends chat editing/attachments, and per-item badge injection. The cosmetic selection persists on the server; the TV's previews are simplified static representations for the Normal build.
 
 ## Build / installation
 
@@ -39,12 +49,17 @@ Use the generated webOS Normal `.ipk` for webOS 6. The package is produced by Li
 ## Manual verification matrix
 1. Without the server plugin: sidebar entry stays hidden, and visiting `#/achievements` directly shows a nonfatal unavailable message.
 2. With the plugin installed: sidebar entry becomes visible after user authentication; opening it loads badges and current rank.
-3. Navigate using only D-pad/OK/Back, including the sidebar, tabs, filters, and badge grid. Ensure no stranded focus.
+3. Navigate using only D-pad/OK/Back, including the sidebar, tabs, filters, shop cards, friends list, and chat input. Ensure no stranded focus.
 4. Equip an earned badge, return to the page, and verify it remains equipped; try to equip an unavailable or restricted badge to verify graceful error handling.
 5. Switch Jellyfin users, then verify that rank, score and badges always belong to the newly authenticated user.
 6. Verify Russian and English display, 1920×1080 and 3840×2160 TV scaling, and long badge descriptions.
 7. Disconnect network mid-request and reconnect; use Retry.
 8. Verify memory usage, focus visibility, back-navigation and no startup performance regression on real webOS 6.
+9. Purchase one low-cost cosmetic with confirmation; verify server balance and ownership, equip/unequip and reopen the app.
+10. Confirm a power-up requires a confirmation and the inventory decrements correctly; test daily/weekly quest rerolls.
+11. Use two Jellyfin accounts to send/accept friend requests, send a DM and group text, and verify permission boundaries.
+12. Earn a fresh badge by real playback; verify one notification, correct device filtering and no historical-notification flood.
+13. Repeat after profile switching, PIN lock, network loss, 429 rate limit, and on the webOS 6 Normal IPK.
 
 ## Security notes
 - Server-side ownership, authorization and rate limits remain authoritative.
