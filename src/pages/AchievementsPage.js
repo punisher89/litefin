@@ -151,6 +151,15 @@ export default class AchievementsPage extends Page {
                 if (typeof value === 'string' && value.trim() &&
                     !(this._language === 'ru' && !/[А-Яа-яЁё]/.test(value))) this.w[word] = value;
             }
+            const heading = this.$('.achievements-header h1');
+            if (heading) heading.textContent = this.w.title;
+            const subtitle = this.$('.achievements-header p');
+            if (subtitle) {
+                const translated = this._serverTranslations['achievements.profile_title'];
+                subtitle.textContent = typeof translated === 'string' && translated.trim() &&
+                    !(this._language === 'ru' && !/[А-Яа-яЁё]/.test(translated)) ?
+                    translated : this.w.subtitle;
+            }
             this._data = {
                 summary: root[0] || {}, rank: root[1] || {},
                 badges: safeList(root[2]).map(b => localizeAchievementBadge(b, serverLanguage, this._serverTranslations)),
