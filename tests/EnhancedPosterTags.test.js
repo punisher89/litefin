@@ -284,7 +284,7 @@ test('JE live endpoint with missing streams falls back to Jellyfin and displays 
             calls.push(path);
             if (path === '/JellyfinEnhanced/public-config') return { NativePosterTagsEnabled: false };
             if (path.includes('/user-settings/')) {
-                return { QualityTagsEnabled: false, RatingTagsEnabled: false };
+                return { QualityTagsEnabled: false, RatingTagsEnabled: true };
             }
             throw new Error('Unexpected GET: ' + path);
         };
