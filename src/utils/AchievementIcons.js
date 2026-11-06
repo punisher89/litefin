@@ -59,10 +59,33 @@ const ICON_GROUPS = [
 ];
 
 /** Safe server icon ID -> inline, locally rendered SVG, with a reliable fallback. */
-export function renderAchievementIcon(iconName) {
+const SUBJECT_ICONS = [
+    [/^(christmas|new-years|holiday)/, 'gift'],
+    [/^(halloween|horror|hidden-night|late-vampire)/, 'moon'],
+    [/^(rewatch|repeat|serial-rewatch)/, 'play'],
+    [/^(film|movie|cinema|double-feature|director|actor)/, 'film'],
+    [/^(series|episode|season|completionist-plus|seen-it-all)/, 'tv'],
+    [/^(night|midnight|three-am|insomniac|creature-of-the-night|late-)/, 'moon'],
+    [/^(early|morning|sunrise|dawn)/, 'sun'],
+    [/^(weekend|daily|routine|login-streak|consistent|fortnight|unbroken)/, 'calendar'],
+    [/^(time|ten-hours|hundred-hours|five-hundred-hours|thousand-hours|runtime)/, 'clock'],
+    [/^(globe|world|un-delegate|polyglot|bilingual|language)/, 'globe'],
+    [/^(artist|discography|music|album|track)/, 'music'],
+    [/^(library|lib-|collector|archivist)/, 'library'],
+    [/^(score|prestige|rank|badge|milestone)/, 'medal'],
+    [/^(genre|explorer|media-explorer|time-traveller)/, 'compass'],
+    [/^(binge|marathon|warmup|speedrunner|season-sprint)/, 'fire'],
+    [/^(streak|combo|momentum|consistent)/, 'bolt'],
+    [/^(pilot|tester|launch|millennium)/, 'rocket']
+];
+
+/** Render a distinct themed icon for each server badge subject without Material Fonts. */
+export function renderAchievementIcon(iconName, badge = null) {
     const icon = String(iconName || '').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
-    const match = ICON_GROUPS.find((entry) => entry[1].test(icon));
-    const key = match ? match[0] : 'trophy';
+    const subject = String(badge?.Id || badge?.Key || '').toLowerCase();
+    const sourceMatch = ICON_GROUPS.find((entry) => entry[1].test(icon));
+    const badgeMatch = SUBJECT_ICONS.find((entry) => entry[0].test(subject));
+    const key = badgeMatch ? badgeMatch[1] : sourceMatch ? sourceMatch[0] : 'trophy';
     return '<svg class="achievement-icon-svg" viewBox="0 0 24 24" width="60" height="60" ' +
         'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" ' +
         'aria-hidden="true" focusable="false">' + PATHS[key] + '</svg>';
