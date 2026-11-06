@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
       - name: Install exact dependencies
@@ -50,7 +50,7 @@ jobs:
 
       - name: Package Normal webOS IPK
         id: package
-        if: steps.build.outcome == 'success'
+        if: always() && steps.build.outcome == 'success'
         continue-on-error: true
         run: |
           mkdir -p .sign
@@ -58,7 +58,7 @@ jobs:
 
       - name: Verify Normal artifacts and checksums
         id: checksum
-        if: steps.package.outcome == 'success'
+        if: always() && steps.package.outcome == 'success'
         run: |
           set -eu
           find . -maxdepth 1 -iname '*webos*normal*.ipk' -print
