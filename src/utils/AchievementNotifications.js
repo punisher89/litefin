@@ -9,6 +9,7 @@ import { auth } from '../api/AuthManager.js';
 import { eventBus } from '../core/EventBus.js';
 import { storage } from '../utils/StorageService.js';
 import { toast } from '../ui/Toast.js';
+import { i18n } from './i18n.js';
 import { logger } from '../utils/Logger.js';
 
 const log = logger.create('AchievementNotifications');
@@ -27,7 +28,8 @@ class AchievementNotifications {
         this._playing = false;
         this._onPlay = () => { this._playing = true; };
         this._onAuth = () => this._syncUser();
-        this._onPlayback = () => this.check();
+        this._onPlayback = () => { this._playing = false; this.check(); };
+        this._onPause = () => { this._playing = false; };
         this._onVisibility = () => { if (!document.hidden) this.check(); };
     }
 
@@ -39,6 +41,7 @@ class AchievementNotifications {
         eventBus.on('auth:logout', this._onAuth);
         eventBus.on('player:stop', this._onPlayback);
         eventBus.on('player:play', this._onPlay);
+        eventBus.on('player:pause', this._onPause);
         document.addEventListener('visibilitychange', this._onVisibility);
         this._syncUser();
         this._interval = setInterval(() => this.check(), POLL_INTERVAL);
@@ -54,6 +57,7 @@ class AchievementNotifications {
         eventBus.off('auth:logout', this._onAuth);
         eventBus.off('player:stop', this._onPlayback);
         eventBus.off('player:play', this._onPlay);
+        eventBus.off('player:pause', this._onPause);
         document.removeEventListener('visibilitychange', this._onVisibility);
     }
 
@@ -119,7 +123,10 @@ class AchievementNotifications {
                     const count = Number(unread?.Count || 0);
                     if (this._lastUnread !== null && count > this._lastUnread &&
                         !(this._playing && preferences.MuteMessageNotificationsDuringPlayback)) {
-                        toast.show('✉ ' + (count === 1 ? 'Новое сообщение' : 'Новые сообщения: ' + count), 5000, {
+                        const russian = String(i18n.currentLang || '').toLowerCase().startsWith('ru');
+                        const notice = russian ? (count === 1 ? 'Новое сообщение' : 'Новые сообщения: ' + count) :
+                            (count === 1 ? 'New message' : 'New messages: ' + count);
+                        toast.show('✉ ' + notice, 5000, {
                             id: 'achievement-messages'
                         });
                     }
