@@ -16,8 +16,6 @@ import { shouldShowScore } from './visibility.js';
 import { detailsIcons, getStaticIcon } from './Icons.js';
 import { platformInfo } from './PlatformInfo.js';
 import { renderEnhancedPosterTags } from './EnhancedPosterTags.js';
-import '../styles/enhanced-poster-tags.css';
-import '../styles/enhanced-person.css';
 
 class CardRenderer {
     /**
