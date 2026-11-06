@@ -6,6 +6,8 @@ import '../styles/achievements.css';
 import Page from './Page.js';
 import { achievementBadges } from '../api/AchievementBadgesClient.js';
 import { renderAchievementIcon } from '../utils/AchievementIcons.js';
+import { localizeAchievementBadge, localizeAchievementRank, localizeAchievementQuest } from '../utils/AchievementBadgeLocalization.js';
+import { achievementCornerToasts } from '../utils/AchievementCornerToasts.js';
 import { AchievementExtras } from './AchievementsExtras.js';
 import { toast } from '../ui/Toast.js';
 import { focusManager } from '../ui/FocusManager.js';
@@ -74,7 +76,8 @@ export default class AchievementsPage extends Page {
         this._busy = false;
         this._loadId = 0;
         this._language = String(i18n.currentLang || 'en').toLowerCase().startsWith('ru') ? 'ru' : 'en';
-        this.w = WORDS[this._language];
+        this.w = { ...WORDS[this._language] };
+        this._serverTranslations = {};
         this.title = this.w.title;
         this._onClick = (e) => this._handleClick(e);
         this._extras = new AchievementExtras(this);
@@ -116,10 +119,12 @@ export default class AchievementsPage extends Page {
                 return;
             }
 
+            const serverLanguage = String(i18n.currentLang || this._language).toLowerCase().split(/[-_]/)[0];
             const root = await Promise.all([
                 achievementBadges.getSummary(), achievementBadges.getRank(),
-                achievementBadges.getBadges(this._language),
-                achievementBadges.getEquipped(this._language)
+                achievementBadges.getBadges(serverLanguage),
+                achievementBadges.getEquipped(serverLanguage),
+                achievementBadges.getTranslations(serverLanguage).catch(() => null)
             ]);
             if (generation !== this._loadId) return;
 
@@ -130,9 +135,26 @@ export default class AchievementsPage extends Page {
                 achievementBadges.getLeaderboard().catch(() => [])
             ]);
             if (generation !== this._loadId) return;
+            this._serverTranslations = (root[4] && typeof root[4] === 'object' && !Array.isArray(root[4])) ? root[4] : {};
+            const keyMap = {
+                title: 'achievements.title', unlocked: 'achievements.unlocked', locked: 'achievements.locked',
+                all: 'achievements.all', rank: 'achievements.rank', next: 'achievements.next_rank',
+                score: 'achievements.score', earned: 'achievements.total', streak: 'achievements.day_streak',
+                badges: 'tabs.my_badges', quests: 'tabs.quests', leaderboard: 'tabs.leaderboard',
+                collection: 'achievements.profile_title', noBadge: 'achievements.no_badges_match_filter',
+                loading: 'achievements.loading', shop: 'loadout.tab.shop', cosmetics: 'loadout.tab.cosmetics',
+                testNotifications: 'admin.section_test_toast'
+            };
+            this.w = { ...WORDS[this._language] };
+            for (const [word, key] of Object.entries(keyMap)) {
+                const value = this._serverTranslations[key];
+                if (typeof value === 'string' && value.trim() &&
+                    !(this._language === 'ru' && !/[А-Яа-яЁё]/.test(value))) this.w[word] = value;
+            }
             this._data = {
                 summary: root[0] || {}, rank: root[1] || {},
-                badges: safeList(root[2]), equipped: safeList(root[3]),
+                badges: safeList(root[2]).map(b => localizeAchievementBadge(b, serverLanguage, this._serverTranslations)),
+                equipped: safeList(root[3]),
                 quests: extras[0] || {}, bank: extras[1] || {},
                 leaders: safeList(extras[2])
             };
@@ -173,6 +195,8 @@ export default class AchievementsPage extends Page {
         if (!target) return;
         const { summary, rank, badges, bank } = this._data;
         const tier = rank.Tier || {};
+        const translatedTier = localizeAchievementRank(tier.Name || 'Rookie', this._language, this._serverTranslations);
+        const translatedNext = localizeAchievementRank((rank.NextTier || {}).Name || '', this._language, this._serverTranslations);
         const count = badges.filter((item) => item.Unlocked).length;
         const progress = clampPercent(rank.ProgressToNext);
         this._clearFocus();
@@ -181,9 +205,9 @@ export default class AchievementsPage extends Page {
                 <div class="achievements-rank-icon" aria-hidden="true">✦</div>
                 <div class="achievements-rank-info">
                     <span class="achievements-small">${escapeHtml(this.w.rank)}</span>
-                    <h2>${escapeHtml(tier.Name || 'Rookie')}</h2>
+                    <h2>${escapeHtml(translatedTier)}</h2>
                     <div class="achievements-rank-track"><span style="width:${progress}%"></span></div>
-                    <div class="achievements-rank-bottom"><span>${escapeHtml(this.w.next)}: ${escapeHtml((rank.NextTier || {}).Name || '—')}</span><b>${progress}%</b></div>
+                    <div class="achievements-rank-bottom"><span>${escapeHtml(this.w.next)}: ${escapeHtml(translatedNext || '—')}</span><b>${progress}%</b></div>
                 </div>
                 <div class="achievements-score"><span>${escapeHtml(this.w.score)}</span><strong>${Number(summary.Score || 0).toLocaleString()}</strong></div>
             </section>
@@ -194,6 +218,7 @@ export default class AchievementsPage extends Page {
             </div>
             <div class="achievements-tabs" id="achievements-tabs">
                 ${['badges','quests','leaderboard','shop','cosmetics','friends','messages'].map((name) => `<button tabindex="0" data-ach-tab="${name}" class="${this._tab === name ? 'is-active' : ''}">${escapeHtml(this.w[name])}</button>`).join('')}
+                <button tabindex="0" class="achievements-test-notification" data-ach-action="test-notification">🔔 ${escapeHtml(this.w.testNotifications || (this._language === 'ru' ? 'Проверить уведомления' : 'Test notification'))}</button>
             </div>
             <div id="achievements-tab-content">${this._renderTab()}</div>
             <p class="achievements-footer-note">${escapeHtml(this.w.readOnly)}</p>
@@ -227,9 +252,9 @@ export default class AchievementsPage extends Page {
                     return `<button tabindex="0" class="achievement-badge ${b.Unlocked ? 'is-unlocked' : 'is-locked'}"
                         data-ach-action="${b.Unlocked ? 'toggle-equip' : 'detail'}" data-ach-id="${escapeHtml(id)}"
                         aria-label="${escapeHtml(b.Title || 'Badge')}">
-                        <div class="achievement-badge-art" data-rarity="${escapeHtml(rarity)}">${renderAchievementIcon(b.Icon)}${b.Unlocked ? '' : '<span class="achievement-lock-mark" aria-hidden="true">🔒</span>'}</div>
+                        <div class="achievement-badge-art" data-rarity="${escapeHtml(rarity)}">${renderAchievementIcon(b.Icon, b)}${b.Unlocked ? '' : '<span class="achievement-lock-mark" aria-hidden="true">🔒</span>'}</div>
                         <div class="achievement-badge-meta">
-                            <span class="achievement-rarity">${escapeHtml(this.w[rarity.toLowerCase()] || rarity)}</span>
+                            <span class="achievement-rarity">${escapeHtml(this._serverTranslations['rarity.' + rarity.toLowerCase()] || this.w[rarity.toLowerCase()] || rarity)}</span>
                             <strong>${escapeHtml(b.Title || 'Badge')}</strong>
                             <p>${escapeHtml(b.Description || '')}</p>
                             <div class="achievement-progress"><span style="width:${pct}%"></span></div>
@@ -247,11 +272,12 @@ export default class AchievementsPage extends Page {
                     ${this._language === 'ru' ? 'Обновить задания' : 'Reroll quests'} (${rerolls})
                 </button></div>
             <div class="achievements-quest-list">${safeList(items).map((q) => {
+                const translatedQuest = localizeAchievementQuest(q, this._language, this._serverTranslations);
                 const target = Math.max(1, Number(q.Target || 1));
                 const current = Number(q.Current || 0);
                 const pct = q.Completed ? 100 : clampPercent(current / target * 100);
                 return `<div class="achievement-quest"><div class="achievement-quest-icon">🎯</div><div class="achievement-quest-info">
-                    <strong>${escapeHtml(q.Title || '')}</strong><p>${escapeHtml(q.Description || '')}</p>
+                    <strong>${escapeHtml(translatedQuest.Title || '')}</strong><p>${escapeHtml(translatedQuest.Description || '')}</p>
                     <div class="achievement-progress"><span style="width:${pct}%"></span></div>
                     <small>${q.Completed ? escapeHtml(this.w.completed) : (current + ' / ' + target)} · +${Number(q.Reward || 0)} XP</small>
                     </div></div>`;
@@ -298,6 +324,13 @@ export default class AchievementsPage extends Page {
             this._draw();
             const active = this.$('#achievements-filters .is-active');
             if (active) active.focus();
+        } else if (button.dataset.achAction === 'test-notification') {
+            // Preview only: no server write or real achievement unlock.
+            achievementCornerToasts.showBadge({
+                Icon: 'emoji_events', Rarity: 'Legendary',
+                Title: this.w.testNotifications || (this._language === 'ru' ? 'Тестовое уведомление' : 'Test notification'),
+                Description: this._language === 'ru' ? 'Проверка уведомлений AchievementBadges' : 'AchievementBadges notification preview'
+            }, this._language);
         } else if (button.dataset.achAction === 'retry') {
             await this._loadData();
         } else if (button.dataset.achAction === 'reroll' && !this._busy) {
