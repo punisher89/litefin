@@ -150,10 +150,6 @@ class MediaGrid extends Component {
     }
 
     destroy() {
-        }
-    }
-
-    destroy() {
         if (this._btn) {
             this._btn.onclick = null;
             this._btn.onkeydown = null;
