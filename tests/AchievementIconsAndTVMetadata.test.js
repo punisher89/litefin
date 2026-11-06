@@ -11,7 +11,7 @@ test('AchievementBadges uses server Icon rather than rarity-only placeholder', (
         assert.doesNotMatch(svg, /<script|onerror=|undefined/);
     }
     const page = readFileSync(new URL('../src/pages/AchievementsPage.js', import.meta.url), 'utf8');
-    assert.match(page, /renderAchievementIcon\(b\.Icon\)/);
+    assert.match(page, /renderAchievementIcon\(b\.Icon, b\)/);
     assert.doesNotMatch(page, /RARITY_ICONS\[rarity\]/);
 });
 
