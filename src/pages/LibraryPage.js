@@ -3194,7 +3194,7 @@ class LibraryPage extends Page {
         grid.style.display = ''; // Restore grid display
 
         // Apply Jellyfin Enhanced server tag overlays to the current library grid.
-        if (!isSeerrLibrary && Array.isArray(items) && items.length) {
+        if (this.state.libraryId !== 'seerr' && Array.isArray(items) && items.length) {
             const tagContext = this.state.viewType === 'Upcoming' ? 'upcoming' :
                 this.state.viewType === 'Albums' ? 'music' : 'library';
             prepareEnhancedPosterTags(items, tagContext)
