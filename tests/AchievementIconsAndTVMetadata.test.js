@@ -40,3 +40,34 @@ test('Actor cards show birth/death years and ages at release and now', () => {
     assert.match(details, /api\.getItem\(person\.Id/);
     assert.match(details, /api\.get\('\/JellyfinEnhanced\/people\/info'/);
 });
+
+test('different badge themes retain distinct imagery from the server Icon and badge ID', () => {
+    const examples = [
+        ['movie', 'film-fan'],
+        ['dark_mode', 'night-owl'],
+        ['music_note', 'artist-listener'],
+        ['library_books', 'library-complete'],
+        ['local_fire_department', 'binge-titan']
+    ];
+    const art = examples.map(([Icon, Id]) => renderAchievementIcon(Icon, { Icon, Id }));
+    assert.equal(new Set(art).size, examples.length);
+});
+
+test('server language pack is preferred, and test notifications use compact corner toasts', () => {
+    const page = readFileSync(new URL('../src/pages/AchievementsPage.js', import.meta.url), 'utf8');
+    const client = readFileSync(new URL('../src/api/AchievementBadgesClient.js', import.meta.url), 'utf8');
+    assert.match(client, /getTranslations\(language/);
+    assert.match(page, /achievementBadges\.getTranslations\(serverLanguage\)/);
+    assert.match(page, /this\._serverTranslations\['rarity\.'/);
+    assert.match(page, /data-ach-action="test-notification"/);
+    assert.match(page, /achievementCornerToasts\.showBadge\(/);
+    assert.match(page, /localizeAchievementBadge\(b, serverLanguage/);
+});
+
+test('poster quality queries use batch Jellyfin fallback and do not require native server image stamps', () => {
+    const helper = readFileSync(new URL('../src/utils/EnhancedPosterTags.js', import.meta.url), 'utf8');
+    assert.match(helper, /fetchBasicJellyfinPosterData\(eligible\)/);
+    assert.match(helper, /api\.getItems\(\{/);
+    assert.match(helper, /QualityTagsEnabled: showQuality/);
+    assert.doesNotMatch(helper, /config\.NativePosterTagsEnabled !== true/);
+});
