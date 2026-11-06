@@ -8,7 +8,7 @@ import { api } from '../api/ApiClient.js';
 import { auth } from '../api/AuthManager.js';
 import { eventBus } from '../core/EventBus.js';
 import { storage } from '../utils/StorageService.js';
-import { toast } from '../ui/Toast.js';
+import { achievementCornerToasts } from './AchievementCornerToasts.js';
 import { i18n } from './i18n.js';
 import { logger } from '../utils/Logger.js';
 
@@ -59,6 +59,7 @@ class AchievementNotifications {
         eventBus.off('player:play', this._onPlay);
         eventBus.off('player:pause', this._onPause);
         document.removeEventListener('visibilitychange', this._onVisibility);
+        achievementCornerToasts.clear();
     }
 
     _syncUser() {
@@ -70,6 +71,7 @@ class AchievementNotifications {
         this._preferences = null;
         this._lastUnread = null;
         this._playing = false;
+        achievementCornerToasts.clear();
         if (!user) return;
         const stored = storage.getItem('achievementBadges:seen:' + (api.serverUrl || '') + ':' + user);
         // On first connection, start at current time; historic unlocks must not appear as new.
@@ -94,7 +96,13 @@ class AchievementNotifications {
         this._inflight = true;
         try {
             if (!this._preferences) {
-                this._preferences = await achievementBadges.getPreferences();
+                const [prefs, server] = await Promise.all([
+                    achievementBadges.getPreferences(),
+                    achievementBadges.getPublicConfig().catch(() => ({}))
+                ]);
+                if (user !== this._user) return;
+                this._preferences = prefs || {};
+                achievementCornerToasts.configure(user, this._preferences, server || {});
             }
             const preferences = this._preferences || {};
             const response = await achievementBadges.getUnlocksSince(since, api.deviceId);
@@ -111,9 +119,8 @@ class AchievementNotifications {
                 !(this._playing && preferences.MuteToastsDuringPlayback)) {
                 list.filter((badge) => (order[String(badge.Rarity || 'common').toLowerCase()] ?? 0) >= rank)
                     .slice(0, 3).reverse().forEach((badge) => {
-                        toast.show('🏆 ' + (badge.Title || (badge.Key || 'Achievement')), 6500, {
-                            id: 'achievement-' + (badge.Id || badge.Key || '')
-                        });
+                        achievementCornerToasts.showBadge(badge,
+                            String(i18n.currentLang || '').toLowerCase().startsWith('ru') ? 'ru' : 'en');
                     });
             }
             if (preferences.MessageNotifications !== false) {
@@ -124,11 +131,7 @@ class AchievementNotifications {
                     if (this._lastUnread !== null && count > this._lastUnread &&
                         !(this._playing && preferences.MuteMessageNotificationsDuringPlayback)) {
                         const russian = String(i18n.currentLang || '').toLowerCase().startsWith('ru');
-                        const notice = russian ? (count === 1 ? 'Новое сообщение' : 'Новые сообщения: ' + count) :
-                            (count === 1 ? 'New message' : 'New messages: ' + count);
-                        toast.show('✉ ' + notice, 5000, {
-                            id: 'achievement-messages'
-                        });
+                        achievementCornerToasts.showMessage(count, russian ? 'ru' : 'en');
                     }
                     this._lastUnread = count;
                 } catch (error) { log.debug('Message count poll skipped', error); }
