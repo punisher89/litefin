@@ -61,6 +61,91 @@ class AchievementBadgesClient {
     unequip(badgeId) {
         return api.delete(this.userRoot + '/equipped/' + encodeURIComponent(badgeId));
     }
+    // Score Shop: catalog, purchases, and personal cosmetics.
+    getShopCatalog() {
+        return api.get(ROOT + '/shop/catalog');
+    }
+
+    getCosmetics() {
+        return api.get(this.userRoot + '/cosmetics');
+    }
+
+    buyShopItem(itemId) {
+        return api.post(this.userRoot + '/shop/purchase', { ItemId: itemId });
+    }
+
+    equipCosmetic(cosmeticId) {
+        return api.post(this.userRoot + '/cosmetics/equip', { CosmeticId: cosmeticId });
+    }
+
+    unequipCosmetic(kind) {
+        return api.post(this.userRoot + '/cosmetics/unequip?kind=' + encodeURIComponent(kind));
+    }
+
+    getPowerUps() {
+        return api.get(this.userRoot + '/powerups');
+    }
+
+    usePowerUp(type) {
+        return api.post(this.userRoot + '/powerups/use/' + encodeURIComponent(type));
+    }
+
+    rerollQuest(period) {
+        if (period !== 'daily' && period !== 'weekly') throw new Error('Invalid quest period');
+        return api.post(this.userRoot + '/quests/' + period + '/reroll');
+    }
+
+    // Friends and private conversations are scoped to the signed-in Jellyfin user.
+    getFriends() {
+        return api.get(this.userRoot + '/friends');
+    }
+
+    getDirectory() {
+        return api.get(this.userRoot + '/directory');
+    }
+
+    inviteFriend(id) {
+        return api.post(this.userRoot + '/friends/' + encodeURIComponent(id));
+    }
+
+    acceptFriend(id) {
+        return api.post(this.userRoot + '/friends/' + encodeURIComponent(id) + '/accept');
+    }
+
+    removeFriend(id) {
+        return api.delete(this.userRoot + '/friends/' + encodeURIComponent(id));
+    }
+
+    getMessageThreads() {
+        return api.get(this.userRoot + '/messages/threads');
+    }
+
+    getMessages(otherUserId, limit = 100) {
+        return api.get(this.userRoot + '/messages/' + encodeURIComponent(otherUserId), { limit });
+    }
+
+    getConversationMessages(conversationId, limit = 100) {
+        return api.get(this.userRoot + '/conversations/' + encodeURIComponent(conversationId) + '/messages', { limit });
+    }
+
+    sendMessage(otherUserId, text) {
+        return api.post(this.userRoot + '/messages/' + encodeURIComponent(otherUserId), { Text: text });
+    }
+
+    sendConversationMessage(conversationId, text) {
+        return api.post(this.userRoot + '/conversations/' + encodeURIComponent(conversationId) + '/messages', { Text: text });
+    }
+
+    getUnreadCount() {
+        return api.get(this.userRoot + '/messages/unread-count');
+    }
+
+    getUnlocksSince(since, deviceId) {
+        const params = { since };
+        if (deviceId) params.deviceId = deviceId;
+        return api.get(this.userRoot + '/unlocks-since', params);
+    }
+
 }
 
 export const achievementBadges = new AchievementBadgesClient();
