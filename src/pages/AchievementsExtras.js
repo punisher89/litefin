@@ -5,6 +5,7 @@
  */
 import { achievementBadges as client } from '../api/AchievementBadgesClient.js';
 import { toast } from '../ui/Toast.js';
+import { focusManager } from '../ui/FocusManager.js';
 import { logger } from '../utils/Logger.js';
 
 const log = logger.create('AchievementExtras');
@@ -29,6 +30,7 @@ export class AchievementExtras {
         this._busy = false;
         this._thread = null;
         this._filter = 'all';
+        this._modalTrapped = false;
     }
 
     get ru() {
@@ -42,6 +44,10 @@ export class AchievementExtras {
     destroy() {
         this._generation++;
         this._pending = null;
+        if (this._modalTrapped) {
+            focusManager.popTrap();
+            this._modalTrapped = false;
+        }
     }
 
     async open(tab) {
@@ -241,14 +247,18 @@ export class AchievementExtras {
             '</p><button tabindex="0" data-ach-extra="confirm">' + html(label || this.t('Подтвердить', 'Confirm')) +
             '</button><button tabindex="0" data-ach-extra="cancel">' + this.t('Отмена', 'Cancel') + '</button></div>';
         this._priorFocus = document.activeElement;
-        const first = modal.querySelector('button');
-        if (first) first.focus();
+        focusManager.pushTrap(modal, { orientation: 'horizontal', defaultFocusSelector: '[data-ach-extra="cancel"]' });
+        this._modalTrapped = true;
     }
 
     closeConfirm() {
         const modal = this.page.$('#achievement-extra-modal');
         if (modal) { modal.hidden = true; modal.innerHTML = ''; }
         this._pending = null;
+        if (this._modalTrapped) {
+            focusManager.popTrap();
+            this._modalTrapped = false;
+        }
         if (this._priorFocus?.isConnected) this._priorFocus.focus();
     }
 
