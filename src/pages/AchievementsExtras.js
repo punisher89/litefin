@@ -15,7 +15,8 @@ const html = (x) => value(x).replace(/[&<>"']/g, (c) => ({
 })[c]);
 const number = (x) => Number(x || 0).toLocaleString();
 const field = (obj, name) => obj?.[name] ?? obj?.[name.toLowerCase()];
-const locale = (ru, en) => ({ ru, en });
+const COSMETIC_KINDS = ['ProfileTheme', 'BadgeFrame', 'RankTitle', 'Avatar', 'Background', 'ProfileBorder'];
+const cosmeticKind = (kind) => typeof kind === 'number' ? (COSMETIC_KINDS[kind] || '') : value(kind);
 
 export class AchievementExtras {
     constructor(page) {
@@ -146,7 +147,7 @@ export class AchievementExtras {
             ProfileBorder: own.EquippedProfileBorderId
         };
         const cards = list(catalog.Cosmetics).filter((item) => owned.has(item.Id)).map((item) => {
-            const kind = value(item.Kind);
+            const kind = cosmeticKind(item.Kind);
             const selected = selection[kind] === item.Id;
             return this.card(item, selected ? 'unequip' : 'cosmetic-equip',
                 selected ? this.t('Убрать', 'Unequip') : this.t('Применить', 'Equip'),
@@ -162,11 +163,11 @@ export class AchievementExtras {
     }
 
     renderPowerups() {
-        const inventory = this._data.powerups?.Inventory || {};
-        const entries = Object.entries(inventory);
-        const rows = entries.map(([key, info]) => {
-            const qty = typeof info === 'number' ? info : Number(info?.Count || info?.Quantity || 0);
-            return '<div class="achievement-extra-row"><strong>' + html(key) + ' × ' + qty + '</strong>' +
+        const inventory = list(this._data.powerups?.Inventory);
+        const rows = inventory.map((info) => {
+            const key = value(info.Type);
+            const qty = Number(info.Count || 0);
+            return '<div class="achievement-extra-row"><strong>' + html(info.DisplayName || key) + ' × ' + qty + '</strong>' +
                 '<button tabindex="0" data-ach-extra="powerup" data-ach-item="' + html(key) + '" ' +
                 (qty <= 0 ? 'disabled' : '') + '>' + this.t('Использовать', 'Use') + '</button></div>';
         }).join('');
@@ -299,7 +300,7 @@ export class AchievementExtras {
         if (action === 'cosmetic-equip' || action === 'unequip') {
             const item = list(this._data.catalog?.Cosmetics).find((it) => it.Id === itemId);
             if (item) await this._mutate(() => action === 'unequip' ?
-                client.unequipCosmetic(item.Kind) : client.equipCosmetic(itemId), 'cosmetics');
+                client.unequipCosmetic(cosmeticKind(item.Kind)) : client.equipCosmetic(itemId), 'cosmetics');
             return true;
         }
         if (action === 'powerup') {
