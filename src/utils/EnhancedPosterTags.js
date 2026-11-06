@@ -151,6 +151,7 @@ async function getSettingsSnapshot(force = false) {
 function extractQuality(data, settings) {
     const output = [];
     const itemName = String(data.Name || '');
+    const firstSource = Array.isArray(data.MediaSources) ? (data.MediaSources[0] || {}) : {};
     const mediaStreams = Array.isArray(data.MediaStreams) && data.MediaStreams.length
         ? data.MediaStreams
         : (Array.isArray(data.MediaSources) ? data.MediaSources : [])
@@ -158,17 +159,19 @@ function extractQuality(data, settings) {
     const video = mediaStreams.find((stream) => stream && stream.Type === 'Video');
     const audio = mediaStreams.filter((stream) => stream && stream.Type === 'Audio');
 
-    if (!video && !audio.length && !data.Width && !data.Height) return output;
+    if (!video && !audio.length && !data.Width && !data.Height && !firstSource.Width && !firstSource.Height) return output;
 
-    if (settings.ShowResolutionTag !== false && (video || data.Height || data.Width)) {
-        const height = Number(video?.Height || data.Height || 0);
+    if (settings.ShowResolutionTag !== false && (video || data.Height || data.Width || firstSource.Width || firstSource.Height)) {
+        const height = Number(video?.Height || data.Height || firstSource.Height || 0);
+        const width = Number(video?.Width || data.Width || firstSource.Width || 0);
+        const dimension = Math.max(height, width);
         const title = lower(video?.DisplayTitle);
         let resolution = '';
-        if (height >= 3000 || /\b8k\b/.test(title)) resolution = '8K';
-        else if (height >= 2000 || /\b(2160p|4k)\b/.test(title)) resolution = '4K';
+        if (dimension >= 6000 || /\b8k\b/.test(title)) resolution = '8K';
+        else if (height >= 2000 || width >= 3000 || /\b(2160p|4k)\b/.test(title)) resolution = '4K';
         else if (height >= 1350 || /\b1440p\b/.test(title)) resolution = '1440p';
-        else if (height >= 1000 || /\b1080p\b/.test(title)) resolution = '1080p';
-        else if (height >= 650 || /\b720p\b/.test(title)) resolution = '720p';
+        else if (height >= 1000 || width >= 1600 || /\b1080p\b/.test(title)) resolution = '1080p';
+        else if (height >= 650 || width >= 1000 || /\b720p\b/.test(title)) resolution = '720p';
         else if (height >= 500 || /\b576p\b/.test(title)) resolution = '576p';
         else if (height >= 400 || /\b480p\b/.test(title)) resolution = '480p';
         if (resolution) output.push(resolution);
@@ -176,6 +179,9 @@ function extractQuality(data, settings) {
 
     const videoSignals = [
         video && video.VideoRangeType,
+        video && video.VideoRange,
+        firstSource.VideoRangeType,
+        firstSource.VideoRange,
         video && video.Profile,
         video && video.DisplayTitle,
         video && video.Codec,
@@ -655,7 +661,9 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
             }
         }
         sourceData.set(id, renderData);
-        if (!extractQuality(renderData, snapshot.settings).length) fallbackNeeded.push(item);
+        // Codec and audio labels alone do not mean the resolution was found.
+        const quality = extractQuality(renderData, snapshot.settings);
+        if (!quality.some(label => /^(?:8K|4K|1440p|1080p|720p|576p|480p)$/.test(label))) fallbackNeeded.push(item);
     }
     const fallbackData = fallbackNeeded.length
         ? await fetchBasicJellyfinPosterData(fallbackNeeded) : new Map();
@@ -672,7 +680,9 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
                 MediaSources: Array.isArray(server.MediaSources) && server.MediaSources.length
                     ? server.MediaSources : fallback.MediaSources,
                 MediaStreams: Array.isArray(server.MediaStreams) && server.MediaStreams.length
-                    ? server.MediaStreams : fallback.MediaStreams
+                    ? server.MediaStreams : fallback.MediaStreams,
+                CommunityRating: Number(server.CommunityRating) > 0 ? server.CommunityRating : fallback.CommunityRating,
+                CriticRating: Number(server.CriticRating) > 0 ? server.CriticRating : fallback.CriticRating
             }
             : server;
         item._enhancedPosterTags = buildEnhancedPosterTagGroups(
