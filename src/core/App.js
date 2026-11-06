@@ -1442,6 +1442,13 @@ class App {
 
         log.info('App initialized successfully');
         eventBus.emit('app:ready');
+        // Lazy background unlock polling, off the cold-boot critical path.
+        // The watcher itself checks authorization and respects the active user.
+        setTimeout(() => {
+            import('../utils/AchievementNotifications.js')
+                .then(({ achievementNotifications }) => achievementNotifications.start())
+                .catch((err) => log.warn('Achievement notification watcher unavailable', err));
+        }, 5000);
     }
 
     /**
