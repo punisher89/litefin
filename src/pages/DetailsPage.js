@@ -76,6 +76,7 @@ class DetailsPage extends Page {
         this._seasons = null;
         this._episodes = null;
         this._people = null;
+        this._enhancedPersonInfoCache = new Map();
 
         this._similar = null;
         this._seerrRecommendations = null;
@@ -887,6 +888,44 @@ class DetailsPage extends Page {
         }
     }
 
+    async _loadEnhancedPeopleInfo(people) {
+        if (!Array.isArray(people) || !people.length) return;
+        const ids = [...new Set(people
+            .map((person) => person?.Id)
+            .filter((id) => typeof id === 'string' && /^[0-9a-f-]{32,36}$/i.test(id)))];
+        if (!ids.length) return;
+
+        const normalizePersonId = (id) => String(id).replace(/-/g, '').toLowerCase();
+        const cacheKeyForPerson = (id) => `${this._itemId}:${normalizePersonId(id)}`;
+        const missing = ids.filter((id) => !this._enhancedPersonInfoCache.has(cacheKeyForPerson(id)));
+        for (let offset = 0; offset < missing.length; offset += 100) {
+            const batch = missing.slice(offset, offset + 100);
+            try {
+                const response = await api.get('/JellyfinEnhanced/people/info', {
+                    ids: batch.join(','),
+                    itemId: this._itemId
+                });
+                const result = response?.people || response?.People || {};
+                batch.forEach((id) => {
+                    const normalizedId = normalizePersonId(id);
+                    const key = Object.keys(result).find((candidate) => normalizePersonId(candidate) === normalizedId);
+                    const info = key ? result[key] : null;
+                    this._enhancedPersonInfoCache.set(cacheKeyForPerson(id), info && typeof info === 'object' ? info : null);
+                });
+            } catch (error) {
+                // This metadata is optional. Keep cards usable if the plugin is missing.
+                log.debug('Jellyfin Enhanced person information unavailable:', error?.message || error);
+                batch.forEach((id) => this._enhancedPersonInfoCache.set(cacheKeyForPerson(id), null));
+            }
+        }
+
+        people.forEach((person) => {
+            if (!person?.Id) return;
+            const info = this._enhancedPersonInfoCache.get(cacheKeyForPerson(person.Id));
+            if (info) person._enhancedPersonInfo = info;
+        });
+    }
+
     async _loadWatchProviders() {
         const container = this.$('#watch-providers-container');
         if (!container) return;
@@ -1659,6 +1698,7 @@ class DetailsPage extends Page {
         this._people = this._item.People || [];
         const hideCast = storage.getItem('pref:hideCastSection') === 'true';
         if (this._people.length > 0 && !hideCast) {
+            await this._loadEnhancedPeopleInfo(this._people);
             this._renderPeople();
         } else if (hideCast) {
             const peopleSection = this.$('#people-section');
@@ -4653,6 +4693,7 @@ class DetailsPage extends Page {
         const hideCast = storage.getItem('pref:hideCastSection') === 'true';
 
         if (guestStars.length > 0 && !hideCast) {
+            await this._loadEnhancedPeopleInfo(guestStars);
             this._renderGuestStars(guestStars);
         } else if (hideCast) {
             const guestStarsSection = this.$('#guest-stars-section');
