@@ -52,6 +52,7 @@ class Sidebar extends Component {
          * @type {boolean}
          */
         this._seerrAvailable = false;
+        this._achievementsAvailable = false;
     }
 
     render() {
@@ -101,6 +102,13 @@ class Sidebar extends Component {
                             ${sidebarIcons.favorites}
                         </div>
                         <span class="item-text" data-i18n="Favorites">Favorites</span>
+                    </button>
+
+                    <button class="sidebar-item" id="sidebar-achievements" tabindex="0" data-path="/achievements" style="display: none;">
+                        <div class="item-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="m8.5 12-2 9 5.5-3 5.5 3-2-9"/></svg>
+                        </div>
+                        <span class="item-text" data-i18n="Achievements">Достижения</span>
                     </button>
 
                     <button class="sidebar-item" id="sidebar-search" tabindex="0" data-path="/search">
@@ -175,6 +183,7 @@ class Sidebar extends Component {
     onMounted() {
         this._bindEvents();
         this._loadLibraries().then(() => this._updateSeerrVisibility());
+        this._updateAchievementsVisibility();
         this._updateActiveState();
 
         // Hydrate DOM with translations
@@ -456,6 +465,28 @@ class Sidebar extends Component {
         this._updateFloatingIslandGeometry();
     }
 
+    async _updateAchievementsVisibility() {
+        const button = this.$('#sidebar-achievements');
+        if (!button) return;
+        if (!auth.isAuthenticated()) {
+            this._achievementsAvailable = false;
+            button.style.display = 'none';
+            focusManager.invalidateCache('sidebar');
+            return;
+        }
+        try {
+            const { achievementBadges } = await import('../api/AchievementBadgesClient.js');
+            const available = await achievementBadges.isAvailable();
+            if (!this.el || !auth.isAuthenticated()) return;
+            this._achievementsAvailable = available;
+            this._applySidebarLayout();
+        } catch (err) {
+            log.warn('AchievementBadges availability probe failed', err);
+            this._achievementsAvailable = false;
+            this._applySidebarLayout();
+        }
+    }
+
     onDestroyed() {
         if (this._focusObserver) {
             this._focusObserver.disconnect();
@@ -566,7 +597,12 @@ class Sidebar extends Component {
             // Re-check seerr availability after auth change so the discover button
             // and any other seerr UI reflects the current session state correctly
             this._loadLibraries().then(() => this._updateSeerrVisibility());
+            this._updateAchievementsVisibility();
+        this._updateAchievementsVisibility();
         } else {
+            this._achievementsAvailable = false;
+            const achievementsButton = this.$('#sidebar-achievements');
+            if (achievementsButton) achievementsButton.style.display = 'none';
             // Clear loaded library items from the sub-libraries container on logout.
             // NOTE: Do NOT clear #sidebar-libraries (the toggle button itself) — that would wipe its
             // icon, label, and chevron, leaving it as an invisible-but-focusable empty element.
@@ -1876,7 +1912,8 @@ class Sidebar extends Component {
                 // confirmed availability yet, regardless of the saved layout preference
                 const isDiscover = id === 'discover';
                 const seerrHidden = isDiscover && !this._seerrAvailable;
-                const shouldHide = hidden || pluginHidden || seerrHidden;
+                const achievementsHidden = id === 'achievements' && !this._achievementsAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden || achievementsHidden;
 
                 el.style.display = shouldHide ? 'none' : '';
                 sidebarContent.appendChild(el);
@@ -1927,7 +1964,8 @@ class Sidebar extends Component {
                 // Same seerr-awareness as Modern mode — discover stays hidden until probed
                 const isDiscover = id === 'discover';
                 const seerrHidden = isDiscover && !this._seerrAvailable;
-                const shouldHide = hidden || pluginHidden || seerrHidden;
+                const achievementsHidden = id === 'achievements' && !this._achievementsAvailable;
+                const shouldHide = hidden || pluginHidden || seerrHidden || achievementsHidden;
 
                 el.style.display = shouldHide ? 'none' : '';
                 sidebarContent.appendChild(el);
