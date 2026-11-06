@@ -890,38 +890,95 @@ class DetailsPage extends Page {
 
     async _loadEnhancedPeopleInfo(people) {
         if (!Array.isArray(people) || !people.length) return;
-        const ids = [...new Set(people
-            .map((person) => person?.Id)
-            .filter((id) => typeof id === 'string' && /^[0-9a-f-]{32,36}$/i.test(id)))];
-        if (!ids.length) return;
+        const validPeople = people.filter((person) =>
+            person && typeof person.Id === 'string' && /^[0-9a-f-]{32,36}$/i.test(person.Id)
+        );
+        if (!validPeople.length) return;
 
-        const normalizePersonId = (id) => String(id).replace(/-/g, '').toLowerCase();
-        const cacheKeyForPerson = (id) => `${this._itemId}:${normalizePersonId(id)}`;
-        const missing = ids.filter((id) => !this._enhancedPersonInfoCache.has(cacheKeyForPerson(id)));
+        const normalizeId = (id) => String(id).replace(/-/g, '').toLowerCase();
+        const cacheKey = (id) => `${this._itemId}:${normalizeId(id)}`;
+        const originalItem = this._item;
+        const releaseDate = originalItem?.PremiereDate ||
+            (originalItem?.ProductionYear ? String(originalItem.ProductionYear) + '-07-01' : null);
+
+        // Dates and ages are calculated from real Jellyfin metadata, never guessed.
+        const ageAt = (born, when) => {
+            if (!born || !when) return null;
+            const birth = new Date(born);
+            const date = new Date(when);
+            if (isNaN(birth.getTime()) || isNaN(date.getTime()) || date < birth) return null;
+            let years = date.getUTCFullYear() - birth.getUTCFullYear();
+            if (date.getUTCMonth() < birth.getUTCMonth() ||
+                (date.getUTCMonth() === birth.getUTCMonth() && date.getUTCDate() < birth.getUTCDate())) years--;
+            return years >= 0 && years <= 120 ? years : null;
+        };
+        const fromJellyfin = (person, metadata) => {
+            const born = metadata?.PremiereDate || metadata?.BirthDate || person.PremiereDate || person.BirthDate;
+            const died = metadata?.EndDate || metadata?.DeathDate || person.EndDate || person.DeathDate;
+            const birthPlace = metadata?.ProductionLocations?.[0] || person.ProductionLocations?.[0] || '';
+            const deceased = !!(died && new Date(died) <= new Date());
+            return {
+                birthDate: born || null,
+                deathDate: died || null,
+                birthPlace,
+                isDeceased: deceased,
+                currentAge: !deceased ? ageAt(born, new Date()) : null,
+                ageAtDeath: deceased ? ageAt(born, died) : null,
+                ageAtItemRelease: ageAt(born, releaseDate)
+            };
+        };
+        const ids = [...new Set(validPeople.map((person) => person.Id))];
+        const missing = ids.filter((id) => !this._enhancedPersonInfoCache.has(cacheKey(id)));
+
+        // Fetch plugin enrichments in bounded batches. Missing/disabled plugins do
+        // not make the person cards disappear or prevent the fallback below.
         for (let offset = 0; offset < missing.length; offset += 100) {
             const batch = missing.slice(offset, offset + 100);
             try {
                 const response = await api.get('/JellyfinEnhanced/people/info', {
-                    ids: batch.join(','),
-                    itemId: this._itemId
-                });
-                const result = response?.people || response?.People || {};
+                    ids: batch.join(','), itemId: this._itemId
+                }, { silent: true, warnOnError: false, timeout: 6500 });
+                const records = response?.people || response?.People || {};
                 batch.forEach((id) => {
-                    const normalizedId = normalizePersonId(id);
-                    const key = Object.keys(result).find((candidate) => normalizePersonId(candidate) === normalizedId);
-                    const info = key ? result[key] : null;
-                    this._enhancedPersonInfoCache.set(cacheKeyForPerson(id), info && typeof info === 'object' ? info : null);
+                    const key = Object.keys(records).find((k) => normalizeId(k) === normalizeId(id));
+                    this._enhancedPersonInfoCache.set(cacheKey(id), key ? records[key] : null);
                 });
             } catch (error) {
-                // This metadata is optional. Keep cards usable if the plugin is missing.
-                log.debug('Jellyfin Enhanced person information unavailable:', error?.message || error);
-                batch.forEach((id) => this._enhancedPersonInfoCache.set(cacheKeyForPerson(id), null));
+                log.debug('Jellyfin Enhanced person ages unavailable:', error?.message || error);
+                batch.forEach((id) => this._enhancedPersonInfoCache.set(cacheKey(id), null));
             }
         }
 
-        people.forEach((person) => {
-            if (!person?.Id) return;
-            const info = this._enhancedPersonInfoCache.get(cacheKeyForPerson(person.Id));
+        // Jellyfin's Person entity exposes PremiereDate (birth), EndDate (death)
+        // and ProductionLocations. Fall back to it when Enhanced has no dates.
+        const needFallback = validPeople.filter((person) => {
+            const info = this._enhancedPersonInfoCache.get(cacheKey(person.Id));
+            return !(info?.birthDate || info?.BirthDate || person.PremiereDate);
+        }).slice(0, 40);
+        for (let i = 0; i < needFallback.length; i += 5) {
+            await Promise.all(needFallback.slice(i, i + 5).map(async (person) => {
+                try {
+                    const metadata = await api.getItem(person.Id, {}, {
+                        silent: true, warnOnError: false, timeout: 4500
+                    });
+                    const existing = this._enhancedPersonInfoCache.get(cacheKey(person.Id)) || {};
+                    const fallback = fromJellyfin(person, metadata);
+                    this._enhancedPersonInfoCache.set(cacheKey(person.Id), {
+                        ...fallback,
+                        ...Object.fromEntries(Object.entries(existing).filter(([, v]) => v !== null && v !== undefined && v !== ''))
+                    });
+                } catch (_) {
+                    const existing = this._enhancedPersonInfoCache.get(cacheKey(person.Id)) || {};
+                    this._enhancedPersonInfoCache.set(cacheKey(person.Id), {
+                        ...fromJellyfin(person), ...existing
+                    });
+                }
+            }));
+        }
+
+        if (this._itemId !== originalItem?.Id) return;
+        validPeople.forEach((person) => {
+            const info = this._enhancedPersonInfoCache.get(cacheKey(person.Id)) || fromJellyfin(person);
             if (info) person._enhancedPersonInfo = info;
         });
     }
