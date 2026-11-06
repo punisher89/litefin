@@ -15,7 +15,6 @@ const html = (x) => value(x).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[c]);
 const number = (x) => Number(x || 0).toLocaleString();
-const field = (obj, name) => obj?.[name] ?? obj?.[name.toLowerCase()];
 const COSMETIC_KINDS = ['ProfileTheme', 'BadgeFrame', 'RankTitle', 'Avatar', 'Background', 'ProfileBorder'];
 const cosmeticKind = (kind) => typeof kind === 'number' ? (COSMETIC_KINDS[kind] || '') : value(kind);
 
@@ -29,7 +28,6 @@ export class AchievementExtras {
         this._pending = null;
         this._busy = false;
         this._thread = null;
-        this._filter = 'all';
         this._modalTrapped = false;
     }
 
