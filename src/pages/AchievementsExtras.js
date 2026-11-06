@@ -7,6 +7,7 @@ import { achievementBadges as client } from '../api/AchievementBadgesClient.js';
 import { toast } from '../ui/Toast.js';
 import { focusManager } from '../ui/FocusManager.js';
 import { logger } from '../utils/Logger.js';
+import { localizeAchievementCatalogItem, localizeAchievementPowerUp } from '../utils/AchievementBadgeLocalization.js';
 
 const log = logger.create('AchievementExtras');
 const list = (x) => Array.isArray(x) ? x : [];
@@ -126,11 +127,12 @@ export class AchievementExtras {
 
     card(item, action, label, disabled, subtitle, swatch) {
         const id = html(item.Id);
+        const localized = localizeAchievementCatalogItem(item, this.page._language, this.page._serverTranslations);
         const preview = swatch && /^#[a-f0-9]{3,8}$/i.test(swatch) ? swatch : '#8a65c6';
         return '<div class="achievement-extra-card">' +
             '<span class="achievement-extra-swatch" style="background:' + preview + '">✦</span>' +
-            '<strong>' + html(item.DisplayName || item.Id) + '</strong>' +
-            '<p>' + html(item.Description) + '</p><small>' + html(subtitle) + '</small>' +
+            '<strong>' + html(localized.DisplayName || item.DisplayName || item.Id) + '</strong>' +
+            '<p>' + html(localized.Description || item.Description) + '</p><small>' + html(subtitle) + '</small>' +
             '<button tabindex="0" data-ach-extra="' + html(action) + '" data-ach-item="' + id + '" ' +
             (disabled ? 'disabled' : '') + '>' + html(label) + '</button></div>';
     }
@@ -191,7 +193,8 @@ export class AchievementExtras {
         const rows = inventory.map((info) => {
             const key = value(info.Type);
             const qty = Number(info.Count || 0);
-            return '<div class="achievement-extra-row"><strong>' + html(info.DisplayName || key) + ' × ' + qty + '</strong>' +
+            const translated = localizeAchievementPowerUp(info, this.page._language, this.page._serverTranslations);
+            return '<div class="achievement-extra-row"><strong>' + html(translated.DisplayName || info.DisplayName || key) + ' × ' + qty + '</strong>' +
                 '<button tabindex="0" data-ach-extra="powerup" data-ach-item="' + html(key) + '" ' +
                 (qty <= 0 ? 'disabled' : '') + '>' + this.t('Использовать', 'Use') + '</button></div>';
         }).join('');
