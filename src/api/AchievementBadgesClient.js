@@ -26,6 +26,12 @@ class AchievementBadgesClient {
         }
     }
 
+    // The plugin owns its own interface and catalog translations.
+    getTranslations(language = 'en') {
+        const lang = String(language || 'en').toLowerCase().split(/[-_]/)[0].replace(/[^a-z]/g, '') || 'en';
+        return api.get(ROOT + '/translations/' + encodeURIComponent(lang));
+    }
+
     getSummary() {
         return api.get(this.userRoot + '/summary');
     }
