@@ -528,25 +528,27 @@ export function getEnhancedPosterTagLookupId(item) {
 
 const fallbackPosterCache = new Map();
 async function fetchBasicJellyfinPosterData(items) {
-    const valid = items.filter(item => /^[0-9a-f-]{32,36}$/i.test(String(item.Id || '')));
+    const valid = items.filter(item =>
+        /^[0-9a-f-]{32,36}$/i.test(getEnhancedPosterTagLookupId(item)));
+    const idFor = item => getEnhancedPosterTagLookupId(item);
     const now = Date.now();
-    const pending = valid.filter(item => !fallbackPosterCache.has(String(item.Id)) ||
-        fallbackPosterCache.get(String(item.Id)).expiresAt < now);
+    const pending = valid.filter(item => !fallbackPosterCache.has(idFor(item)) ||
+        fallbackPosterCache.get(idFor(item)).expiresAt < now);
     // Jellyfin's user-scoped /Items query is a single batched request, not
     // one network call for every tile. Respect library-level permissions.
     for (let i = 0; i < pending.length; i += 100) {
         const batch = pending.slice(i, i + 100);
         try {
             const response = await api.getItems({
-                Ids: batch.map(item => item.Id).join(','),
+                Ids: batch.map(idFor).join(','),
                 Limit: batch.length,
-                Fields: 'MediaSources,Width,Height,VideoRange,VideoRangeType,CommunityRating,CriticRating'
+                Fields: 'MediaSources,MediaStreams'
             }, { silent: true, warnOnError: false, timeout: 6500 });
             const rows = Array.isArray(response?.Items) ? response.Items : [];
             const byId = new Map(rows.map(item => [String(item.Id), item]));
             for (const item of batch) {
-                const media = byId.get(String(item.Id));
-                fallbackPosterCache.set(String(item.Id), {
+                const media = byId.get(idFor(item));
+                fallbackPosterCache.set(idFor(item), {
                     data: media ? { ...item, ...media } : item,
                     expiresAt: Date.now() + (media ? ITEM_TTL : NEGATIVE_TTL)
                 });
@@ -554,14 +556,14 @@ async function fetchBasicJellyfinPosterData(items) {
         } catch (err) {
             log.debug('Jellyfin fallback poster metadata unavailable:', err?.message || err);
             for (const item of batch) {
-                fallbackPosterCache.set(String(item.Id), {
+                fallbackPosterCache.set(idFor(item), {
                     data: item, expiresAt: Date.now() + NEGATIVE_TTL
                 });
             }
         }
     }
-    return new Map(valid.map(item => [String(item.Id),
-        fallbackPosterCache.get(String(item.Id))?.data || item]));
+    return new Map(valid.map(item => [idFor(item),
+        fallbackPosterCache.get(idFor(item))?.data || item]));
 }
 
 export async function prepareEnhancedPosterTags(items, contextType = '') {
@@ -632,11 +634,17 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
         await loadMissingItems(firstEpisodeIds, userId);
     }
 
+    // JE may be installed and reachable while returning missing/null streams
+    // (older versions, empty cache, non-media library entries). Always permit
+    // a user-scoped Jellyfin fallback for the affected cards, not only when JE
+    // configuration is absent.
+    const sourceData = new Map();
+    const fallbackNeeded = [];
     for (const item of candidates) {
-        const cached = itemCache.get(getEnhancedPosterTagLookupId(item));
+        const id = getEnhancedPosterTagLookupId(item);
+        const cached = itemCache.get(id);
         const record = cached && cached.expiresAt > Date.now() ? cached.data : null;
-        if (!record) continue;
-        const renderData = { ...record };
+        const renderData = record ? { ...item, ...record } : { ...item };
         if (renderData.FirstEpisode && renderData.FirstEpisode.Id) {
             const episodeEntry = itemCache.get(String(renderData.FirstEpisode.Id));
             const episode = episodeEntry && episodeEntry.expiresAt > Date.now() ? episodeEntry.data : null;
@@ -646,7 +654,30 @@ export async function prepareEnhancedPosterTags(items, contextType = '') {
                 renderData._qualityName = episode.Name || '';
             }
         }
-        item._enhancedPosterTags = buildEnhancedPosterTagGroups(renderData, snapshot.settings, snapshot.config, contextType);
+        sourceData.set(id, renderData);
+        if (!extractQuality(renderData, snapshot.settings).length) fallbackNeeded.push(item);
+    }
+    const fallbackData = fallbackNeeded.length
+        ? await fetchBasicJellyfinPosterData(fallbackNeeded) : new Map();
+
+    for (const item of candidates) {
+        const id = getEnhancedPosterTagLookupId(item);
+        const server = sourceData.get(id) || item;
+        const fallback = fallbackData.get(id);
+        // Preserve JE's filtered data when it exists, only supplement missing
+        // stream or rating information from the same user's Jellyfin library.
+        const renderData = fallback
+            ? {
+                ...fallback, ...server,
+                MediaSources: Array.isArray(server.MediaSources) && server.MediaSources.length
+                    ? server.MediaSources : fallback.MediaSources,
+                MediaStreams: Array.isArray(server.MediaStreams) && server.MediaStreams.length
+                    ? server.MediaStreams : fallback.MediaStreams
+            }
+            : server;
+        item._enhancedPosterTags = buildEnhancedPosterTagGroups(
+            renderData, snapshot.settings, snapshot.config, contextType
+        );
     }
     return items;
 }
@@ -702,6 +733,7 @@ export function attachEnhancedPosterTagsToCard(card, item) {
 export function clearEnhancedPosterTagItemCache() {
     // A fresh homepage visit must see current Spoiler Guard and library-access filtering.
     itemCache.clear();
+    fallbackPosterCache.clear();
 }
 
 export function clearEnhancedPosterTagCache() {
@@ -716,4 +748,5 @@ export function clearEnhancedPosterTagCache() {
     tmdbIndexFetchedAt = 0;
     tmdbIndexPromise = null;
     itemCache.clear();
+    fallbackPosterCache.clear();
 }
