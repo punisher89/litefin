@@ -156,7 +156,7 @@ export default class AchievementsPage extends Page {
 
     _clearFocus() {
         ['achievements-error', 'achievements-tabs', 'achievements-filters',
-            'achievements-grid', 'achievements-quests', 'achievements-leaders'].forEach((name) => {
+            'achievements-grid', 'achievements-quests', 'achievements-leaders', 'achievements-extra'].forEach((name) => {
             this.unregisterFocusSection(name);
         });
     }
@@ -242,7 +242,10 @@ export default class AchievementsPage extends Page {
 
     _renderQuests() {
         const quests = this._data.quests;
-        const renderGroup = (title, items) => `<h2 class="achievements-quest-heading">${escapeHtml(title)}</h2>
+        const renderGroup = (title, items, period, rerolls) => `<div class="achievement-extra-heading"><h2 class="achievements-quest-heading">${escapeHtml(title)}</h2>
+                <button tabindex="0" data-ach-action="reroll" data-ach-period="${period}" ${rerolls <= 0 ? 'disabled' : ''}>
+                    ${this._language === 'ru' ? 'Обновить задания' : 'Reroll quests'} (${rerolls})
+                </button></div>
             <div class="achievements-quest-list">${safeList(items).map((q) => {
                 const target = Math.max(1, Number(q.Target || 1));
                 const current = Number(q.Current || 0);
@@ -256,7 +259,7 @@ export default class AchievementsPage extends Page {
         const daily = safeList(quests.Daily);
         const weekly = safeList(quests.Weekly);
         if (!daily.length && !weekly.length) return `<p class="achievements-empty">${escapeHtml(this.w.noQuests)}</p>`;
-        return renderGroup(this.w.daily, daily) + renderGroup(this.w.weekly, weekly);
+        return `<div id="achievements-quest-controls">` + renderGroup(this.w.daily, daily, 'daily', Number(quests.DailyRerollsRemaining || 0)) + renderGroup(this.w.weekly, weekly, 'weekly', Number(quests.WeeklyRerollsRemaining || 0)) + `</div>`;
     }
 
     _renderLeaderboard() {
@@ -270,6 +273,7 @@ export default class AchievementsPage extends Page {
     _registerTabFocus() {
         this._registerFocus('achievements-filters', this.$('#achievements-filters'), 'horizontal');
         this._registerFocus('achievements-grid', this.$('#achievements-grid'), 'grid');
+        this._registerFocus('achievements-quests', this.$('#achievements-quest-controls'), 'vertical');
         this._registerExtraFocus();
     }
 
@@ -296,6 +300,21 @@ export default class AchievementsPage extends Page {
             if (active) active.focus();
         } else if (button.dataset.achAction === 'retry') {
             await this._loadData();
+        } else if (button.dataset.achAction === 'reroll' && !this._busy) {
+            this._busy = true;
+            const period = button.dataset.achPeriod;
+            try {
+                if (period !== 'daily' && period !== 'weekly') return;
+                const result = await achievementBadges.rerollQuest(period);
+                if (result?.Success === false) throw new Error(result.Message || 'Quest reroll rejected');
+                this._data.quests = await achievementBadges.getQuests();
+                this._draw();
+            } catch (err) {
+                log.warn('Quest reroll failed', err);
+                toast.show(this._language === 'ru' ? 'Не удалось обновить задания' : 'Quest reroll failed', 4000);
+            } finally {
+                this._busy = false;
+            }
         } else if (button.dataset.achAction === 'detail') {
             const badge = this._data && this._data.badges.find((b) => String(b.Id || b.Key) === button.dataset.achId);
             const note = this.$('.achievements-footer-note');
