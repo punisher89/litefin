@@ -107,3 +107,6 @@
 .achievement-extra-confirm p { font-size: 23px; line-height: 1.5; margin-bottom: 24px; }
 .achievement-extra-confirm button { margin: 0 8px; padding: 16px 28px; }
 @media (max-width: 1250px) { .achievement-extra-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+.achievements-page .achievements-hero { border-color: var(--achievement-user-accent, rgba(246,199,104,.24)); }
+.achievements-page .achievement-extra-preview { border-color: var(--achievement-user-accent, #78629a); }
