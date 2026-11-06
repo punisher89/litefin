@@ -583,3 +583,17 @@ html[data-layout-media-rows="modern-posters"] .media-card.seerr-genre-card .card
     align-items: center;
     gap: 8px;
 }
+
+
+/* Seerr title ratings: show all available providers beside the title on TV. */
+.seerr-title-with-ratings { display: -webkit-box; display: flex; align-items: center; flex-wrap: wrap; gap: 14px 22px; margin-bottom: 6px; }
+.seerr-title-with-ratings .details-title { flex: 0 1 auto; min-width: 0; margin: 0; }
+.seerr-title-ratings { display: -webkit-inline-box; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.seerr-title-ratings .seerr-title-rating, .seerr-title-ratings .seerr-rating-item {
+    display: -webkit-inline-box; display: inline-flex; align-items: center; gap: 4px;
+    border-radius: 7px; padding: 6px 11px; font-size: 18px; font-weight: 700;
+    color: #fff; background: rgba(23,25,36,.84); border: 1px solid rgba(255,255,255,.14);
+}
+.seerr-title-ratings .seerr-ratings-container { display: -webkit-inline-box; display: inline-flex; flex-wrap: wrap; gap: 10px !important; margin: 0 !important; }
+.seerr-title-ratings svg { height: 19px; max-width: 28px; vertical-align: middle; }
+@media (max-width: 900px) { .seerr-title-ratings .seerr-title-rating, .seerr-title-ratings .seerr-rating-item { font-size: 14px; } }
