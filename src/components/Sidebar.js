@@ -598,7 +598,6 @@ class Sidebar extends Component {
             // and any other seerr UI reflects the current session state correctly
             this._loadLibraries().then(() => this._updateSeerrVisibility());
             this._updateAchievementsVisibility();
-        this._updateAchievementsVisibility();
         } else {
             this._achievementsAvailable = false;
             const achievementsButton = this.$('#sidebar-achievements');
