@@ -3,10 +3,15 @@
 This branch adds a **native Litefin TV screen** that consumes the server-side [Achievement Badges for Jellyfin](https://github.com/punisher89/AchievementBadges_for_Jellyfin) API. It does not bundle the .NET DLL in the TV application.
 
 ## Requirements
-- LG TV running **webOS 6.0** with Litefin's **Modern** build tier.
+- LG TV running **webOS 6.0** with Litefin's **Normal** build tier.
 - A **Jellyfin** server with the Achievement Badges server plugin installed and enabled (not Emby).
 - Logged-in Jellyfin user with permission to view their own achievements.
 - TV access to the same Jellyfin server used for media browsing.
+
+## UI policy
+- Achievements live **only on the separate `#/achievements` page**, accessible from the Litefin sidebar.
+- **No badge overlays or achievements integration on movie/series cards or detail pages.**
+- The included concept mockup is illustrative. The actual page uses the existing Litefin sidebar rather than replacing the TV shell.
 
 ## TV integration
 - `#/achievements`: TV-focused achievements page, lazy-loaded on demand.
@@ -25,8 +30,8 @@ This branch adds a **native Litefin TV screen** that consumes the server-side [A
 npm ci
 npm run lint
 npm test
-npm run build:modern
-npm run package:webos-modern
+npm run build:normal
+npm run package:webos-normal
 ```
 
 Use the generated webOS Modern `.ipk` for webOS 6. The package is produced by Litefin's Gulp/webOS packaging pipeline. Install and test it on a real LG webOS 6 television or the matching emulator.
