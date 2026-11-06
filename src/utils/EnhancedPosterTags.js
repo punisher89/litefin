@@ -60,7 +60,7 @@ export function hasNativePosterTagStamp(item) {
 }
 
 function enabledSettings(settings) {
-    return !!settings && settings.UseNativePosterTags !== false && (
+    return !!settings && (
         settings.QualityTagsEnabled === true ||
         settings.GenreTagsEnabled === true ||
         settings.LanguageTagsEnabled === true ||
@@ -91,7 +91,9 @@ async function getSettingsSnapshot(force = false) {
                 silent: true,
                 warnOnError: false
             });
-            if (!config || config.NativePosterTagsEnabled !== true) {
+            // NativePosterTagsEnabled controls server-rendered image overlays only.
+            // Litefin's client-side tags must still work when native image stamping is OFF.
+            if (!config) {
                 settingsSnapshot = null;
                 settingsFetchedAt = Date.now();
                 settingsLoaded = true;
