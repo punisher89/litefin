@@ -1,0 +1,71 @@
+/**
+ * Achievement Badges — lightweight TV styles (webOS 6 Modern tier).
+ * This stylesheet is loaded only when the achievements page is opened.
+ */
+.achievements-page { --achievement-gold: #f6c768; --achievement-muted: #a6a9b8; background: #101019; color: #f5f4fa; min-height: 100%; }
+.achievements-page .achievements-scroll { overflow-y: auto; height: 100%; transform: none; -webkit-transform: none; }
+.achievements-shell { padding: 42px 60px 90px; max-width: 1650px; margin: 0 auto; }
+.achievements-header { display: -webkit-box; display: flex; -webkit-box-pack: justify; justify-content: space-between; -webkit-box-align: center; align-items: center; margin-bottom: 28px; }
+.achievements-header h1 { font-size: 48px; line-height: 1.12; margin: 9px 0; font-weight: 750; }
+.achievements-header p, .achievements-small { color: var(--achievement-muted); margin: 0; font-size: 18px; }
+.achievements-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 3px; color: var(--achievement-gold); }
+.achievements-eyebrow span { margin: 0 6px; }
+.achievements-crown { font-size: 58px; }
+.achievements-hero { display: -webkit-box; display: flex; align-items: center; gap: 30px; background: linear-gradient(115deg, #302543, #22213a 56%, #161924); border: 1px solid rgba(246,199,104,.24); border-radius: 20px; padding: 28px 36px; margin-bottom: 18px; }
+.achievements-rank-icon { display: -webkit-box; display: flex; align-items: center; justify-content: center; flex: 0 0 108px; height: 108px; border-radius: 50%; background: radial-gradient(circle at 45% 30%, #f7dfa2, #be8135 65%, #694018); border: 5px solid #b98c50; color: #fff2ca; text-shadow: 0 3px 12px #78521e; font-size: 66px; box-shadow: 0 0 30px rgba(223,166,71,.15); }
+.achievements-rank-info { min-width: 0; -webkit-box-flex: 1; flex: 1; }
+.achievements-rank-info h2 { font-size: 37px; margin: 4px 0 19px; }
+.achievements-rank-track, .achievement-progress { overflow: hidden; border-radius: 12px; height: 10px; background: rgba(255,255,255,.12); }
+.achievements-rank-track > span, .achievement-progress > span { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg,#a47bec,#f7c765); }
+.achievements-rank-bottom { display: -webkit-box; display: flex; justify-content: space-between; margin-top: 10px; color: #d3cfdd; font-size: 14px; }
+.achievements-rank-bottom b { color: var(--achievement-gold); }
+.achievements-score { text-align: center; padding: 16px 12px 16px 32px; border-left: 1px solid rgba(255,255,255,.15); }
+.achievements-score span { color: var(--achievement-muted); font-size: 16px; display: block; }
+.achievements-score strong { font-size: 38px; color: var(--achievement-gold); display: block; margin-top: 8px; }
+.achievements-stats { display: -webkit-box; display: flex; gap: 14px; margin-bottom: 30px; }
+.achievements-stats > div { -webkit-box-flex: 1; flex: 1; padding: 18px 25px; border-radius: 14px; background: #21212f; border: 1px solid #393747; display: -webkit-box; display: flex; align-items: center; justify-content: space-between; }
+.achievements-stats span { color: #bab9cc; font-size: 17px; }
+.achievements-stats strong { font-size: 25px; }
+.achievements-stats small { color: #89899c; font-size: 17px; }
+.achievements-tabs, .achievements-filters { display: -webkit-box; display: flex; gap: 10px; flex-wrap: wrap; }
+.achievements-tabs { border-bottom: 1px solid #353343; margin-bottom: 25px; padding-bottom: 13px; }
+.achievements-tabs button, .achievements-filters button, .achievement-action { border: 1px solid transparent; border-radius: 10px; background: transparent; padding: 13px 23px; font-size: 18px; color: #bdbcc9; cursor: pointer; }
+.achievements-tabs button.is-active { color: white; background: #403453; }
+.achievements-filters button { border-radius: 22px; background: #222332; font-size: 15px; padding: 10px 18px; }
+.achievements-filters button.is-active { background: #8f6bc2; color: #fff; }
+.achievements-section-title { display: -webkit-box; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.achievements-section-title h2, .achievements-quest-heading { font-size: 25px; margin: 0; }
+.achievements-section-title span { color: var(--achievement-muted); }
+.achievements-filters { margin-bottom: 22px; }
+.achievements-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 17px; }
+.achievement-badge { min-width: 0; text-align: left; color: inherit; border: 2px solid #363344; background: #242330; border-radius: 16px; display: -webkit-box; display: flex; flex-direction: column; padding: 0; overflow: hidden; cursor: pointer; }
+.achievement-badge-art { min-height: 108px; background: radial-gradient(ellipse at 50% 20%, #5a3f68, #242131 75%); display: -webkit-box; display: flex; justify-content: center; align-items: center; color: #f4d78d; font-size: 70px; }
+.achievement-badge-art[data-rarity="Mythic"] { background: radial-gradient(ellipse,#7b344b,#251e37); color: #ff9fda; }
+.achievement-badge-art[data-rarity="Legendary"] { background: radial-gradient(ellipse,#73532c,#262032); color: #ffd469; }
+.achievement-badge-art[data-rarity="Epic"] { background: radial-gradient(ellipse,#523a86,#252035); color: #c9a7ff; }
+.achievement-badge-art[data-rarity="Rare"] { background: radial-gradient(ellipse,#2e507b,#222633); color: #a3caff; }
+.achievement-badge.is-locked .achievement-badge-art { filter: grayscale(.8); opacity: .72; }
+.achievement-badge-meta { padding: 18px; width: 100%; box-sizing: border-box; }
+.achievement-rarity { text-transform: uppercase; letter-spacing: 1px; color: #bf9bdb; font-size: 11px; }
+.achievement-badge-meta strong { display: block; font-size: 18px; margin: 8px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.achievement-badge-meta p { color: #aaa9ba; font-size: 14px; line-height: 1.4; margin: 0 0 18px; height: 38px; overflow: hidden; }
+.achievement-progress { height: 6px; }
+.achievement-badge-meta small { color: var(--achievement-gold); display: block; font-size: 13px; margin-top: 9px; }
+.achievements-message, .achievements-empty { text-align: center; padding: 70px 16px; color: #c1bccc; font-size: 20px; }
+.achievement-action { background: #6b4e96; color: white; margin-top: 10px; }
+.achievements-quest-heading { margin: 25px 0 14px; }
+.achievements-quest-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.achievement-quest { display: -webkit-box; display: flex; align-items: center; gap: 20px; padding: 24px; border-radius: 14px; background: #252332; border: 1px solid #3c384b; }
+.achievement-quest-icon { font-size: 34px; }
+.achievement-quest-info { flex: 1; min-width: 0; }
+.achievement-quest-info strong { font-size: 19px; }
+.achievement-quest-info p { color: #aaa9b8; font-size: 14px; }
+.achievement-quest-info small { color: var(--achievement-gold); margin-top: 9px; display: block; }
+.achievements-leader { display: -webkit-box; display: flex; align-items: center; gap: 22px; padding: 19px; background: #252333; border: 1px solid #393448; border-radius: 12px; margin-bottom: 12px; }
+.achievements-position { font-weight: 800; color: var(--achievement-gold); font-size: 26px; width: 38px; }
+.achievements-leader strong { flex: 1; }
+.achievements-leader > span:last-child { color: var(--achievement-gold); }
+.achievements-footer-note { color: #777788; font-size: 13px; margin-top: 25px; }
+.achievements-page button:focus, .achievements-page button.focused { outline: 3px solid #f7df9c; outline-offset: 3px; transform: scale(1.025); border-color: #f7df9c; box-shadow: 0 0 0 5px rgba(248,209,127,.14); z-index: 1; }
+@media (max-width: 1300px) { .achievements-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .achievements-shell { padding: 30px 38px 75px; } }
+@media (max-width: 850px) { .achievements-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .achievements-stats { flex-wrap: wrap; } .achievements-hero { gap: 15px; padding: 20px; } .achievements-score { padding-left: 16px; } }
