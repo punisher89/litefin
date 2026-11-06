@@ -530,7 +530,7 @@ export class ApiClient {
                 const targetKey = fieldsKey || 'Fields';
                 const fieldsList = (options.params[targetKey] || '').split(',').filter(Boolean);
 
-                if (storage.getItem('pref:showQualityBadges') === 'true') {
+                if (storage.getItem('pref:showQualityBadges') !== 'false') {
                     ['Width', 'Height', 'VideoRange', 'VideoRangeType', 'MediaSources'].forEach((f) => {
                         if (!fieldsList.includes(f)) {
                             fieldsList.push(f);

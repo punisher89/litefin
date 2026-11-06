@@ -5,6 +5,7 @@ import { platformInfo } from '../utils/PlatformInfo.js';
 import { storage } from '../utils/StorageService.js';
 import { scrollController } from '../ui/ScrollController.js';
 import { mouseRowScroller } from '../ui/MouseRowScroller.js';
+import { prepareEnhancedPosterTags, attachEnhancedPosterTagsToCard } from '../utils/EnhancedPosterTags.js';
 
 export class VirtualCardRow {
     /**
@@ -558,6 +559,16 @@ export class VirtualCardRow {
         if (this.totalItems > 4) {
             this._injectScrollArrows();
         }
+
+        // Load server-side quality and rating tags for this TV row.
+        prepareEnhancedPosterTags(this.items, this.contextType)
+            .then(() => {
+                if (!this.track || !this.track.isConnected) return;
+                for (const [index, card] of this.domNodes.entries()) {
+                    attachEnhancedPosterTagsToCard(card, this.items[index]);
+                }
+            })
+            .catch(() => {});
     }
 
     /**

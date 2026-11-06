@@ -1,0 +1,97 @@
+name: Validate webOS 6 Normal
+
+on:
+  push:
+    branches:
+      - feature/achievement-badges-webos6
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: normal-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: true
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run unit tests
+        id: unit_tests
+        continue-on-error: true
+        run: npm test
+
+      - name: Run ESLint
+        id: lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Compile Normal TV bundle
+        id: build
+        continue-on-error: true
+        run: npm run build:normal
+
+      - name: Package Normal webOS IPK
+        id: package
+        if: always() && steps.build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          mkdir -p .sign
+          npm run package:webos-normal
+
+      - name: Verify Normal artifacts and checksums
+        id: checksum
+        if: always() && steps.package.outcome == 'success'
+        run: |
+          set -eu
+          find . -maxdepth 1 -iname '*webos*normal*.ipk' -print
+          shopt -s nullglob nocaseglob
+          files=(./*webos*normal*.ipk)
+          test "${#files[@]}" -gt 0
+          sha256sum "${files[@]}" | tee SHA256SUMS-webOS-Normal.txt
+
+      - name: Upload Normal IPK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Litefin-webOS6-Normal-${{ github.run_number }}
+          path: |
+            ./*webOS*Normal*.ipk
+            ./*webos*normal*.ipk
+            ./SHA256SUMS-webOS-Normal.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Require unit tests, lint, build and package to pass
+        if: always()
+        env:
+          TESTS: ${{ steps.unit_tests.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          PACKAGE: ${{ steps.package.outcome }}
+        run: |
+          echo "Tests: $TESTS"
+          echo "Lint: $LINT"
+          echo "Normal bundle: $BUILD"
+          echo "Normal IPK: $PACKAGE"
+          test "$TESTS" = "success"
+          test "$LINT" = "success"
+          test "$BUILD" = "success"
+          test "$PACKAGE" = "success"

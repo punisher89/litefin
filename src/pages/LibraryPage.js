@@ -17,6 +17,7 @@ import { focusManager } from '../ui/FocusManager.js';
 import { layoutManager } from '../ui/LayoutManager.js';
 import { scrollController } from '../ui/ScrollController.js';
 import CardRenderer from '../utils/CardRenderer.js';
+import { prepareEnhancedPosterTags, attachEnhancedPosterTagsToCard } from '../utils/EnhancedPosterTags.js';
 import { imageService } from '../utils/ImageService.js';
 import { imageCache } from '../utils/ImageCache.js';
 import { VirtualCardRow } from '../components/VirtualCardRow.js';
@@ -3190,6 +3191,20 @@ class LibraryPage extends Page {
             rowsContainer.style.display = 'none';
         }
         grid.style.display = ''; // Restore grid display
+
+        // Apply Jellyfin Enhanced server tag overlays to the current library grid.
+        if (this.state.libraryId !== 'seerr' && Array.isArray(items) && items.length) {
+            const tagContext = this.state.viewType === 'Upcoming' ? 'upcoming' :
+                this.state.viewType === 'Albums' ? 'music' : 'library';
+            prepareEnhancedPosterTags(items, tagContext)
+                .then(() => {
+                    if (this.state.items !== items || !grid.isConnected) return;
+                    const byId = new Map(items.filter(item => item && item.Id).map(item => [String(item.Id), item]));
+                    grid.querySelectorAll('.media-card[data-item-id]').forEach(card =>
+                        attachEnhancedPosterTagsToCard(card, byId.get(card.getAttribute('data-item-id'))));
+                })
+                .catch(() => {});
+        }
 
         const pagination = this.$('#library-pagination');
         if (pagination) pagination.style.display = ''; // Restore pagination

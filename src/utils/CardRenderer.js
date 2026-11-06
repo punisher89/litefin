@@ -15,6 +15,7 @@ import { storage } from './StorageService.js';
 import { shouldShowScore } from './visibility.js';
 import { detailsIcons, getStaticIcon } from './Icons.js';
 import { platformInfo } from './PlatformInfo.js';
+import { renderEnhancedPosterTags } from './EnhancedPosterTags.js';
 
 class CardRenderer {
     /**
@@ -64,7 +65,7 @@ class CardRenderer {
             useSeasonBadges: storage.getItem('pref:useSeasonBadges') === 'true',
             swapEpisodeTitles: storage.getItem('pref:swapEpisodeTitles') === 'true',
             showFavoriteBadges: storage.getItem('pref:showFavoriteBadges') === 'true',
-            showQualityBadges: storage.getItem('pref:showQualityBadges') === 'true'
+            showQualityBadges: storage.getItem('pref:showQualityBadges') !== 'false'
         };
         // Each of these shapes the markup the HTML cache keeps, so all of them are
         // part of its key: a changed setting rebuilds the cards once
@@ -429,7 +430,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${item._enhancedPersonInfo ? JSON.stringify(item._enhancedPersonInfo) : ''}|${item._enhancedPosterTags ? JSON.stringify(item._enhancedPosterTags) : ''}|${item.ImageTags?.Primary || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -1237,6 +1238,59 @@ class CardRenderer {
             subtitleText = ''; // Clear it so it doesn't stay on the left with the title
         }
 
+        // Person ages and birth/death years from Jellyfin or Jellyfin Enhanced.
+        const enhancedPersonInfo = type === 'person' ? (item._enhancedPersonInfo || null) : null;
+        const isPersonDeceased = !!(enhancedPersonInfo && (enhancedPersonInfo.isDeceased ?? enhancedPersonInfo.IsDeceased));
+        const personAge = enhancedPersonInfo
+            ? (isPersonDeceased
+                ? (enhancedPersonInfo.ageAtDeath ?? enhancedPersonInfo.AgeAtDeath)
+                : (enhancedPersonInfo.currentAge ?? enhancedPersonInfo.CurrentAge))
+            : null;
+        const personAgeAtRelease = enhancedPersonInfo
+            ? (enhancedPersonInfo.ageAtItemRelease ?? enhancedPersonInfo.AgeAtItemRelease)
+            : null;
+        const personBirthDate = enhancedPersonInfo?.birthDate || enhancedPersonInfo?.BirthDate;
+        const personDeathDate = enhancedPersonInfo?.deathDate || enhancedPersonInfo?.DeathDate;
+        const personBirthPlace = enhancedPersonInfo?.birthPlace || enhancedPersonInfo?.BirthPlace || '';
+        const safeYear = (date) => {
+            if (!date) return '';
+            const value = new Date(date);
+            return !isNaN(value.getTime()) && value.getUTCFullYear() >= 1850
+                ? String(value.getUTCFullYear()) : '';
+        };
+        const birthYear = safeYear(personBirthDate);
+        const deathYear = safeYear(personDeathDate);
+        const personLang = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en')
+            .toLowerCase().startsWith('ru') ? 'ru' : 'en';
+        const personAgeUnit = (n) => {
+            const amount = Math.abs(Number(n));
+            if (personLang !== 'ru') return amount === 1 ? 'year' : 'years';
+            if (amount % 100 >= 11 && amount % 100 <= 14) return 'лет';
+            if (amount % 10 === 1) return 'год';
+            if (amount % 10 >= 2 && amount % 10 <= 4) return 'года';
+            return 'лет';
+        };
+        const personInfoHtml = enhancedPersonInfo ? `
+            <div class="lf-person-enhanced-info">
+                <div class="lf-person-age-stack">
+                    ${birthYear ? `<span class="lf-person-birthyear">📅 ${birthYear}${deathYear ? '–' + deathYear : ''}</span>` : ''}
+                    ${Number.isFinite(Number(personAge)) && personAge !== null ? `
+                        <span class="lf-person-age-chip ${isPersonDeceased ? 'is-deceased' : ''}">
+                            ${isPersonDeceased ? '✝' : '🎂'} ${Number(personAge)} ${escapeHtml(personAgeUnit(personAge))}
+                            ${personLang === 'ru' ? (isPersonDeceased ? 'на момент смерти' : 'сейчас') : (isPersonDeceased ? 'at death' : 'now')}
+                        </span>` : ''}
+                    ${Number.isFinite(Number(personAgeAtRelease)) && personAgeAtRelease !== null ? `
+                        <span class="lf-person-age-chip is-release">🎬 ${Number(personAgeAtRelease)}
+                            ${escapeHtml(personAgeUnit(personAgeAtRelease))}
+                            ${personLang === 'ru' ? 'при выходе' : 'at release'}
+                        </span>` : ''}
+                </div>
+                ${personBirthPlace ? `
+                    <span class="lf-person-birthplace" title="${escapeHtml(personBirthPlace)}">
+                        <span aria-hidden="true">📍</span><span>${escapeHtml(personBirthPlace)}</span>
+                    </span>` : ''}
+            </div>
+        ` : '';
         // --- 4. HTML Assembly ---
 
         let cssClass = isLandscape ? 'media-card landscape' : 'media-card';
@@ -1417,6 +1471,7 @@ class CardRenderer {
             blurHash && !isBlurHashDisabled
                 ? `<canvas class="blurhash-canvas" data-blurhash="${blurHash}"></canvas>`
                 : '';
+        const enhancedPosterTagsHtml = renderEnhancedPosterTags(item);
         const imagePart = imageUrl
             ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
             : `${CardRenderer.getFallbackHtml(item, isLandscape, { hideInitials, isLibrary: type === 'library' })}`;
@@ -1527,6 +1582,8 @@ class CardRenderer {
             <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
                 <div class="card-image">
                     ${imagePart}
+                    ${enhancedPosterTagsHtml}
+                    ${personInfoHtml}
                     ${progressHtml}
                     ${videoBadgeHtml}
                     ${!options.showMeta ? badgeContainer : ''}

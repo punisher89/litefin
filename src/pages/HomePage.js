@@ -46,6 +46,7 @@ import { logger } from '../utils/Logger.js';
 import { i18n } from '../utils/i18n.js';
 import { imageCache } from '../utils/ImageCache.js';
 import { imageService } from '../utils/ImageService.js';
+import { prepareEnhancedPosterTags, clearEnhancedPosterTagItemCache } from '../utils/EnhancedPosterTags.js';
 import CardRenderer from '../utils/CardRenderer.js';
 import { quickPlayItem } from '../utils/QuickPlay.js';
 import { homeLayoutManager } from '../utils/HomeLayoutManager.js';
@@ -1226,6 +1227,7 @@ class HomePage extends Page {
      * trickle in one by one as their API calls resolve.
      */
     async _startRenderPipeline() {
+        clearEnhancedPosterTagItemCache();
         this.setLoading(true);
         this.hideError();
 
@@ -1710,6 +1712,9 @@ class HomePage extends Page {
             // with whatever triggered this load instead of restarting from zero.
             const items = await (descriptor._prefetchPromise || descriptor.fetchFn());
 
+            if (!this._isMounted) return false;
+
+            await prepareEnhancedPosterTags(items, descriptor.contextType || descriptor.id);
             if (!this._isMounted) return false;
 
             // If the fetch returned no items, remove the skeleton placeholder

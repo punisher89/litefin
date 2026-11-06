@@ -182,6 +182,8 @@ test('CardRenderer: a card already in the HTML cache gets the badges a changed s
             'stale cached card'
         );
 
+        storage.setItem('pref:showQualityBadges', 'false');
+        await Promise.resolve();
         const withoutQuality = CardRenderer.createCardHtml(movie, { type: 'poster' });
         storage.setItem('pref:showQualityBadges', 'true');
         await Promise.resolve();
