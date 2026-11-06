@@ -147,6 +147,7 @@ class MediaGrid extends Component {
             .catch(() => {
                 // Optional poster metadata must never affect grid navigation.
             });
+        }
     }
 
     destroy() {
