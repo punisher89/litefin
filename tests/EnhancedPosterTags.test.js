@@ -36,8 +36,11 @@ const {
     getEnhancedPosterTagLookupId,
     hasNativePosterTagStamp,
     indexJellyfinItemsByTmdbId,
-    renderEnhancedPosterTags
+    renderEnhancedPosterTags,
+    prepareEnhancedPosterTags,
+    clearEnhancedPosterTagCache
 } = await import('../src/utils/EnhancedPosterTags.js');
+const { api } = await import('../src/api/ApiClient.js');
 
 const { normalizeSeerrItem } = await import('../src/api/seerrNormalize.js');
 
@@ -265,4 +268,59 @@ test('quality tags support a source with video stream metadata even when item wi
     };
     const groups = buildEnhancedPosterTagGroups(data, settings, { NativePosterTagsEnabled: false });
     assert.ok(groups.quality.items.includes('1080p'));
+});
+
+test('JE live endpoint with missing streams falls back to Jellyfin and displays quality', async () => {
+    clearEnhancedPosterTagCache();
+    const initial = {
+        userId: api._userId, get: api.get, post: api.post, getItems: api.getItems
+    };
+    const itemId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const userId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const calls = [];
+    api._userId = userId;
+    try {
+        api.get = async (path) => {
+            calls.push(path);
+            if (path === '/JellyfinEnhanced/public-config') return { NativePosterTagsEnabled: false };
+            if (path.includes('/user-settings/')) {
+                return { QualityTagsEnabled: false, RatingTagsEnabled: false };
+            }
+            throw new Error('Unexpected GET: ' + path);
+        };
+        api.post = async (path, body) => {
+            assert.match(path, /\/JellyfinEnhanced\/tag-data\//);
+            assert.deepEqual(body, [itemId]);
+            return { Items: [{
+                Id: itemId, Type: 'Movie', Name: 'Example',
+                MediaStreams: [], MediaSources: [],
+                CommunityRating: 8.1
+            }] };
+        };
+        api.getItems = async (params) => {
+            calls.push('Items:' + params.Ids);
+            return { Items: [{
+                Id: itemId, Type: 'Movie', Width: 3840, Height: 2160,
+                MediaSources: [{
+                    Width: 3840, Height: 2160,
+                    MediaStreams: [{
+                        Type: 'Video', Width: 3840, Height: 2160,
+                        VideoRangeType: 'HDR10'
+                    }]
+                }]
+            }] };
+        };
+        const card = { Id: itemId, Type: 'Movie', Name: 'Example' };
+        await prepareEnhancedPosterTags([card], 'library');
+        assert.match(renderEnhancedPosterTags(card), /4K/);
+        assert.match(renderEnhancedPosterTags(card), /HDR10/);
+        assert.match(renderEnhancedPosterTags(card), /8\.1/);
+        assert.ok(calls.some((value) => value.startsWith('Items:' + itemId)));
+    } finally {
+        api._userId = initial.userId;
+        api.get = initial.get;
+        api.post = initial.post;
+        api.getItems = initial.getItems;
+        clearEnhancedPosterTagCache();
+    }
 });
