@@ -5,6 +5,8 @@
 import '../styles/achievements.css';
 import Page from './Page.js';
 import { achievementBadges } from '../api/AchievementBadgesClient.js';
+import { AchievementExtras } from './AchievementsExtras.js';
+import { toast } from '../ui/Toast.js';
 import { focusManager } from '../ui/FocusManager.js';
 import { logger } from '../utils/Logger.js';
 import { i18n } from '../utils/i18n.js';
@@ -26,7 +28,8 @@ const WORDS = {
         common: 'Обычный', uncommon: 'Необычный', rare: 'Редкий',
         epic: 'Эпический', legendary: 'Легендарный', mythic: 'Мифический',
         actionError: 'Не удалось изменить выбранные значки',
-        readOnly: 'Данные загружаются с сервера Jellyfin'
+        readOnly: 'Данные загружаются с сервера Jellyfin',
+        shop: 'Магазин', cosmetics: 'Оформление', friends: 'Друзья', messages: 'Сообщения'
     },
     en: {
         title: 'Achievements', subtitle: 'Your cinema journey',
@@ -43,7 +46,8 @@ const WORDS = {
         common: 'Common', uncommon: 'Uncommon', rare: 'Rare',
         epic: 'Epic', legendary: 'Legendary', mythic: 'Mythic',
         actionError: 'Could not update equipped badges',
-        readOnly: 'Data comes from your Jellyfin server'
+        readOnly: 'Data comes from your Jellyfin server',
+        shop: 'Shop', cosmetics: 'Cosmetics', friends: 'Friends', messages: 'Messages'
     }
 };
 const RARITY_ICONS = { Common: '●', Uncommon: '◆', Rare: '✦', Epic: '✧', Legendary: '★', Mythic: '✹' };
@@ -73,6 +77,7 @@ export default class AchievementsPage extends Page {
         this.w = WORDS[this._language];
         this.title = this.w.title;
         this._onClick = (e) => this._handleClick(e);
+        this._extras = new AchievementExtras(this);
     }
 
     render() {
@@ -188,7 +193,7 @@ export default class AchievementsPage extends Page {
                 <div><span>✦ ${escapeHtml(this.w.bank)}</span><strong>${Number(bank.ScoreBank || 0)}</strong></div>
             </div>
             <div class="achievements-tabs" id="achievements-tabs">
-                ${['badges','quests','leaderboard'].map((name) => `<button tabindex="0" data-ach-tab="${name}" class="${this._tab === name ? 'is-active' : ''}">${escapeHtml(this.w[name])}</button>`).join('')}
+                ${['badges','quests','leaderboard','shop','cosmetics','friends','messages'].map((name) => `<button tabindex="0" data-ach-tab="${name}" class="${this._tab === name ? 'is-active' : ''}">${escapeHtml(this.w[name])}</button>`).join('')}
             </div>
             <div id="achievements-tab-content">${this._renderTab()}</div>
             <p class="achievements-footer-note">${escapeHtml(this.w.readOnly)}</p>
@@ -198,6 +203,7 @@ export default class AchievementsPage extends Page {
     }
 
     _renderTab() {
+        if (['shop', 'cosmetics', 'friends', 'messages'].includes(this._tab)) return '<div class="achievements-message">' + escapeHtml(this.w.loading) + '</div>';
         if (this._tab === 'quests') return this._renderQuests();
         if (this._tab === 'leaderboard') return this._renderLeaderboard();
         return this._renderBadges();
@@ -264,16 +270,25 @@ export default class AchievementsPage extends Page {
     _registerTabFocus() {
         this._registerFocus('achievements-filters', this.$('#achievements-filters'), 'horizontal');
         this._registerFocus('achievements-grid', this.$('#achievements-grid'), 'grid');
+        this._registerExtraFocus();
+    }
+
+    _registerExtraFocus() {
+        this.unregisterFocusSection('achievements-extra');
+        this._registerFocus('achievements-extra', this.$('#achievement-extra-controls'), 'grid');
     }
 
     async _handleClick(event) {
         const button = event.target.closest('button');
         if (!button || !this.el.contains(button)) return;
-        if (button.dataset.achTab) {
+        if (button.dataset.achExtra) {
+            await this._extras.handle(button);
+        } else if (button.dataset.achTab) {
             this._tab = button.dataset.achTab;
             this._draw();
             const active = this.$('#achievements-tabs .is-active');
             if (active) active.focus();
+            if (['shop', 'cosmetics', 'friends', 'messages'].includes(this._tab)) await this._extras.open(this._tab);
         } else if (button.dataset.achFilter) {
             this._filter = button.dataset.achFilter;
             this._draw();
@@ -304,6 +319,10 @@ export default class AchievementsPage extends Page {
         }
     }
 
+    onBack() {
+        return this._extras.onBack();
+    }
+
     _setActionError() {
         const note = this.$('.achievements-footer-note');
         if (note) note.textContent = this.w.actionError;
@@ -312,6 +331,7 @@ export default class AchievementsPage extends Page {
     onDestroyed() {
         this._loadId++;
         this._clearFocus();
+        this._extras.destroy();
         if (this.el) this.el.removeEventListener('click', this._onClick);
     }
 }
