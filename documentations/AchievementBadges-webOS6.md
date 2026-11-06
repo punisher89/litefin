@@ -28,7 +28,7 @@ This branch adds a **native Litefin TV screen** that consumes the server-side [A
 - **Friends / Друзья** — lists friends and pending requests, discovers permitted server users, sends invitations, accepts requests, removes friends, and opens direct messages.
 - **Messages / Сообщения** — lists existing conversations, displays message history, and sends 1:1 or group chat text. Text entry uses a TV-focusable textarea and the platform keyboard.
 - **Quests / Задания** — daily/weekly quest reroll buttons honor server-reported remaining rerolls.
-- **Toasts / Уведомления** — deferred, background poll of `/unlocks-since` after player stop, foreground resume and at a 90-second cadence; device-scope is passed to the server. Previously earned badges never appear as brand-new on first connect.
+- **Toasts / Уведомления** — deferred, background poll of `/unlocks-since` after player stop, foreground resume and at a 90-second cadence. Honors per-user enable toggle, minimum rarity, mute-during-playback and server device scope. New unread conversations are also announced using the user's message-notification preference. Previously earned badges never appear as brand-new on first connect.
 
 The client intentionally **does not load AchievementBadges' server HTML/JS** or put achievement overlays on movie or series detail cards. This keeps the TV UI lightweight.
 
