@@ -1238,46 +1238,56 @@ class CardRenderer {
             subtitleText = ''; // Clear it so it doesn't stay on the left with the title
         }
 
-        // Jellyfin Enhanced cast facts: compact age chips and birthplace strip.
+        // Person ages and birth/death years from Jellyfin or Jellyfin Enhanced.
         const enhancedPersonInfo = type === 'person' ? (item._enhancedPersonInfo || null) : null;
+        const isPersonDeceased = !!(enhancedPersonInfo && (enhancedPersonInfo.isDeceased ?? enhancedPersonInfo.IsDeceased));
         const personAge = enhancedPersonInfo
-            ? (enhancedPersonInfo.isDeceased || enhancedPersonInfo.IsDeceased
+            ? (isPersonDeceased
                 ? (enhancedPersonInfo.ageAtDeath ?? enhancedPersonInfo.AgeAtDeath)
                 : (enhancedPersonInfo.currentAge ?? enhancedPersonInfo.CurrentAge))
             : null;
         const personAgeAtRelease = enhancedPersonInfo
             ? (enhancedPersonInfo.ageAtItemRelease ?? enhancedPersonInfo.AgeAtItemRelease)
             : null;
-        const personBirthPlace = enhancedPersonInfo
-            ? (enhancedPersonInfo.birthPlace ?? enhancedPersonInfo.BirthPlace)
-            : '';
-        const isPersonDeceased = !!(enhancedPersonInfo && (enhancedPersonInfo.isDeceased ?? enhancedPersonInfo.IsDeceased));
-        const personAgeUnit = (value) => {
-            const amount = Math.abs(Number(value));
-            const lang = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en').toLowerCase();
-            if (!lang.startsWith('ru')) return amount === 1 ? 'year' : 'years';
-            const mod100 = amount % 100;
-            const mod10 = amount % 10;
-            if (mod100 >= 11 && mod100 <= 14) return i18n.t('EnhancedPersonYearMany') || 'лет';
-            if (mod10 === 1) return i18n.t('EnhancedPersonYearOne') || 'год';
-            if (mod10 >= 2 && mod10 <= 4) return i18n.t('EnhancedPersonYearFew') || 'года';
-            return i18n.t('EnhancedPersonYearMany') || 'лет';
+        const personBirthDate = enhancedPersonInfo?.birthDate || enhancedPersonInfo?.BirthDate;
+        const personDeathDate = enhancedPersonInfo?.deathDate || enhancedPersonInfo?.DeathDate;
+        const personBirthPlace = enhancedPersonInfo?.birthPlace || enhancedPersonInfo?.BirthPlace || '';
+        const safeYear = (date) => {
+            if (!date) return '';
+            const value = new Date(date);
+            return !isNaN(value.getTime()) && value.getUTCFullYear() >= 1850
+                ? String(value.getUTCFullYear()) : '';
+        };
+        const birthYear = safeYear(personBirthDate);
+        const deathYear = safeYear(personDeathDate);
+        const personLang = String((typeof document !== 'undefined' && document.documentElement.lang) || 'en')
+            .toLowerCase().startsWith('ru') ? 'ru' : 'en';
+        const personAgeUnit = (n) => {
+            const amount = Math.abs(Number(n));
+            if (personLang !== 'ru') return amount === 1 ? 'year' : 'years';
+            if (amount % 100 >= 11 && amount % 100 <= 14) return 'лет';
+            if (amount % 10 === 1) return 'год';
+            if (amount % 10 >= 2 && amount % 10 <= 4) return 'года';
+            return 'лет';
         };
         const personInfoHtml = enhancedPersonInfo ? `
             <div class="lf-person-enhanced-info">
                 <div class="lf-person-age-stack">
-                    ${personAge !== null && personAge !== undefined ? `
+                    ${birthYear ? `<span class="lf-person-birthyear">📅 ${birthYear}${deathYear ? '–' + deathYear : ''}</span>` : ''}
+                    ${Number.isFinite(Number(personAge)) && personAge !== null ? `
                         <span class="lf-person-age-chip ${isPersonDeceased ? 'is-deceased' : ''}">
                             ${isPersonDeceased ? '✝' : '🎂'} ${Number(personAge)} ${escapeHtml(personAgeUnit(personAge))}
+                            ${personLang === 'ru' ? (isPersonDeceased ? 'на момент смерти' : 'сейчас') : (isPersonDeceased ? 'at death' : 'now')}
                         </span>` : ''}
-                    ${personAgeAtRelease !== null && personAgeAtRelease !== undefined ? `
-                        <span class="lf-person-age-chip is-release">🎬 ${Number(personAgeAtRelease)} ${escapeHtml(personAgeUnit(personAgeAtRelease))} ${escapeHtml(i18n.t('EnhancedPersonAtRelease') || 'на момент выхода')}
+                    ${Number.isFinite(Number(personAgeAtRelease)) && personAgeAtRelease !== null ? `
+                        <span class="lf-person-age-chip is-release">🎬 ${Number(personAgeAtRelease)}
+                            ${escapeHtml(personAgeUnit(personAgeAtRelease))}
+                            ${personLang === 'ru' ? 'при выходе' : 'at release'}
                         </span>` : ''}
                 </div>
                 ${personBirthPlace ? `
                     <span class="lf-person-birthplace" title="${escapeHtml(personBirthPlace)}">
-                        <span aria-hidden="true">📍</span>
-                        <span>${escapeHtml(personBirthPlace)}</span>
+                        <span aria-hidden="true">📍</span><span>${escapeHtml(personBirthPlace)}</span>
                     </span>` : ''}
             </div>
         ` : '';
