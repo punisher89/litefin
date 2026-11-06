@@ -144,6 +144,10 @@ class AchievementBadgesClient {
         return api.get(this.userRoot + '/preferences');
     }
 
+    getPublicConfig() {
+        return api.get(ROOT + '/public-config');
+    }
+
     getUnlocksSince(since, deviceId) {
         const params = { since };
         if (deviceId) params.deviceId = deviceId;
