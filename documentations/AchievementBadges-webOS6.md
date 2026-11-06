@@ -34,7 +34,7 @@ npm run build:normal
 npm run package:webos-normal
 ```
 
-Use the generated webOS Modern `.ipk` for webOS 6. The package is produced by Litefin's Gulp/webOS packaging pipeline. Install and test it on a real LG webOS 6 television or the matching emulator.
+Use the generated webOS Normal `.ipk` for webOS 6. The package is produced by Litefin's Gulp/webOS packaging pipeline. Install and test it on a real LG webOS 6 television or the matching emulator.
 
 ## Manual verification matrix
 1. Without the server plugin: sidebar entry stays hidden, and visiting `#/achievements` directly shows a nonfatal unavailable message.
