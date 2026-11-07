@@ -1376,7 +1376,7 @@ class App {
                             toast: null // Toast component reference wired up once UI is ready
                         })
                         .catch((err) => log.error('pluginManager.init failed:', err));
-                    achievementNotifications.init();
+                    achievementNotifications.start();
                 }
 
                 timeManager.init();
@@ -1702,14 +1702,14 @@ class App {
             log.info('User logged out - resetting to login page');
             // Clear server plugin detection cache on logout (new server/user after login may differ)
             pluginManager.destroy();
-            achievementNotifications.destroy();
+            achievementNotifications.stop();
             router.reset('/login');
         });
 
         eventBus.on('auth:expired', () => {
             log.warn('Session expired - resetting to login page');
             pluginManager.destroy();
-            achievementNotifications.destroy();
+            achievementNotifications.stop();
             router.reset('/login');
         });
 
@@ -1726,7 +1726,7 @@ class App {
             // before redirecting to the user selection view, ensuring no background
             // plugins continue fetching endpoints during the profile select flow.
             pluginManager.destroy();
-            achievementNotifications.destroy();
+            achievementNotifications.stop();
 
             router.reset('/profiles');
         });
@@ -1750,7 +1750,7 @@ class App {
                     toast: null // Toast wired up once UI is ready
                 })
                 .catch((err) => log.error('pluginManager.init (post-login) failed:', err));
-            achievementNotifications.init();
+            achievementNotifications.start();
         });
 
         // Handle application exit
