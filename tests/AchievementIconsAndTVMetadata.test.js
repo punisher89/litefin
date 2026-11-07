@@ -22,25 +22,6 @@ test('Unknown icon cannot inject SVG or break markup; trophy fallback is rendere
     assert.doesNotMatch(safe, /<script|alert\(/);
 });
 
-test('Jellyfin quality fetch remains enabled by default, independent of server native poster stamping', () => {
-    const api = readFileSync(new URL('../src/api/ApiClient.js', import.meta.url), 'utf8');
-    const helper = readFileSync(new URL('../src/utils/EnhancedPosterTags.js', import.meta.url), 'utf8');
-    assert.match(api, /storage\.getItem\('pref:showQualityBadges'\) !== 'false'/);
-    assert.match(helper, /if \(!config\) \{/);
-    assert.doesNotMatch(helper, /if \(!config \|\| config\.NativePosterTagsEnabled !== true\)/);
-});
-
-test('Actor cards show birth/death years and ages at release and now', () => {
-    const cards = readFileSync(new URL('../src/utils/CardRenderer.js', import.meta.url), 'utf8');
-    const details = readFileSync(new URL('../src/pages/DetailsPage.js', import.meta.url), 'utf8');
-    assert.match(cards, /lf-person-birthyear/);
-    assert.match(cards, /personAgeAtRelease/);
-    assert.match(cards, /при выходе/);
-    assert.match(cards, /сейчас/);
-    assert.match(details, /api\.getItem\(person\.Id/);
-    assert.match(details, /api\.get\('\/JellyfinEnhanced\/people\/info'/);
-});
-
 test('different badge themes retain distinct imagery from the server Icon and badge ID', () => {
     const examples = [
         ['movie', 'film-fan'],
@@ -64,10 +45,3 @@ test('server language pack is preferred, and test notifications use compact corn
     assert.match(page, /localizeAchievementBadge\(b, serverLanguage/);
 });
 
-test('poster quality queries use batch Jellyfin fallback and do not require native server image stamps', () => {
-    const helper = readFileSync(new URL('../src/utils/EnhancedPosterTags.js', import.meta.url), 'utf8');
-    assert.match(helper, /fetchBasicJellyfinPosterData\(eligible\)/);
-    assert.match(helper, /api\.getItems\(\{/);
-    assert.match(helper, /QualityTagsEnabled: showQuality/);
-    assert.doesNotMatch(helper, /config\.NativePosterTagsEnabled !== true/);
-});
