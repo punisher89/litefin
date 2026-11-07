@@ -33,6 +33,10 @@ class AchievementNotifications {
         this._onVisibility = () => { if (!document.hidden) this.check(); };
     }
 
+    // Compatibility with the unchanged game-center App lifecycle.
+    init() { this.start(); }
+    destroy() { this.stop(); }
+
     start() {
         if (this._started) return;
         this._started = true;
