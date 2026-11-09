@@ -8,6 +8,7 @@ import { toast } from '../ui/Toast.js';
 import { focusManager } from '../ui/FocusManager.js';
 import { logger } from '../utils/Logger.js';
 import { localizeAchievementCatalogItem, localizeAchievementPowerUp } from '../utils/AchievementBadgeLocalization.js';
+import { renderAchievementIcon } from '../utils/AchievementIcons.js';
 
 const log = logger.create('AchievementExtras');
 const list = (x) => Array.isArray(x) ? x : [];
@@ -134,8 +135,14 @@ export class AchievementExtras {
         const id = html(item.Id);
         const localized = localizeAchievementCatalogItem(item, this.page._language, this.page._serverTranslations);
         const preview = swatch && /^#[a-f0-9]{3,8}$/i.test(swatch) ? swatch : '#8a65c6';
+        const glyph = value(item.PreviewIcon || item.Icon || '');
+        const art = /^[-_a-z0-9]+$/i.test(glyph)
+            ? renderAchievementIcon(glyph, item)
+            : glyph ? '<span class="achievement-extra-emoji">' + html(glyph.slice(0, 6)) + '</span>'
+                : renderAchievementIcon(cosmeticKind(item.Kind) === 'Background' ? 'stars' :
+                    cosmeticKind(item.Kind) === 'BadgeFrame' ? 'military_tech' : 'auto_awesome', item);
         return '<div class="achievement-extra-card">' +
-            '<span class="achievement-extra-swatch" style="background:' + preview + '">✦</span>' +
+            '<span class="achievement-extra-swatch" style="background:' + preview + '">' + art + '</span>' +
             '<strong>' + html(localized.DisplayName || item.DisplayName || item.Id) + '</strong>' +
             '<p>' + html(localized.Description || item.Description) + '</p><small>' + html(subtitle) + '</small>' +
             '<button tabindex="0" data-ach-extra="' + html(action) + '" data-ach-item="' + id + '" ' +
@@ -150,9 +157,15 @@ export class AchievementExtras {
         const cards = list(catalog.Cosmetics).concat(list(catalog.PowerUps)).map((item) => {
             const isOwned = owned.has(item.Id);
             const price = Number(item.PriceScore || 0);
-            const caption = this.t('Цена: ', 'Price: ') + number(price) + ' XP';
-            return this.card(item, 'buy', isOwned ? this.t('Куплено', 'Owned') :
-                this.t('Купить', 'Buy'), isOwned || price > balance, caption, item.PreviewColor);
+            const milestone = number(item.MilestoneScore);
+            const lifetime = number(this.page._data?.bank?.LifetimeScore || this._data.cosmetics?.LifetimeScore);
+            const caption = milestone > 0 ? this.t('Откроется при ', 'Auto unlock at ') +
+                number(milestone) + ' XP · ' + Math.min(100, Math.round(100 * lifetime / milestone)) + '%' :
+                this.t('Цена: ', 'Price: ') + number(price) + ' XP';
+            return this.card(item, 'buy',
+                isOwned ? this.t('Куплено', 'Owned') : milestone > 0 ?
+                    this.t('Награда за прогресс', 'Milestone reward') : this.t('Купить', 'Buy'),
+                isOwned || milestone > 0 || price > balance, caption, item.PreviewColor);
         }).join('');
         return '<div class="achievement-extra-heading"><h2>' + this.t('Магазин', 'Score Shop') +
             '</h2><strong>✦ ' + number(balance) + ' XP</strong></div>' +
