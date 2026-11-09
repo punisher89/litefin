@@ -137,6 +137,8 @@ export default class AchievementsPage extends Page {
             if (generation !== this._loadId) return;
             this._settings = userPrefs || {};
             this._publicConfig = publicConfig || {};
+            if (this.el) this.el.dataset.abTheme =
+                ['light', 'dark'].includes(userPrefs?.AchievementPageTheme) ? userPrefs.AchievementPageTheme : 'dark';
             const userLang = String(userPrefs?.Language || '').trim();
             const configured = userLang && userLang.toLowerCase() !== 'default'
                 ? userLang : String(publicConfig?.DefaultLanguage || '');
@@ -298,7 +300,7 @@ export default class AchievementsPage extends Page {
                     const pct = b.Unlocked ? 100 : clampPercent(100 * Number(b.CurrentValue || 0) / Math.max(1, Number(b.TargetValue || 1)));
                     const rarity = String(b.Rarity || 'Common');
                     const hidden = !b.Unlocked && (this._publicConfig.ForceExtremeSpoilerMode === true ||
-                        this._settings.HideLockedBadgeDescriptions === true);
+                        this._settings.SpoilerMode === true || this._settings.ExtremeSpoilerMode === true);
                     const hiddenName = this._publicConfig.ForceExtremeSpoilerMode === true && !b.Unlocked;
                     return `<button tabindex="0" class="achievement-badge ${b.Unlocked ? 'is-unlocked' : 'is-locked'}"
                         data-ach-action="${b.Unlocked ? 'toggle-equip' : 'detail'}" data-ach-id="${escapeHtml(id)}"
