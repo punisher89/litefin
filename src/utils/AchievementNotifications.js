@@ -13,7 +13,8 @@ import { i18n } from './i18n.js';
 import { logger } from '../utils/Logger.js';
 
 const log = logger.create('AchievementNotifications');
-const POLL_INTERVAL = 90000;
+// Match original AchievementBadges unlock polling. In-flight and logged-out gates prevent overlap.
+const POLL_INTERVAL = 5000;
 
 export class AchievementNotifications {
     constructor() {
