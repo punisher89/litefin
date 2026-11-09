@@ -232,13 +232,25 @@ export class AchievementsAdvanced {
             ['MuteToastsDuringPlayback', 'Скрывать во время просмотра', 'Hide while watching'],
             ['MuteToastSoundDuringPlayback', 'Выключать звук во время просмотра', 'Mute sound while watching'],
             ['MessageNotifications', 'Сообщения друзей', 'Friend message notifications'],
+            ['MessageNotificationSound', 'Звук сообщений', 'Message sound'],
+            ['MuteMessageNotificationsDuringPlayback', 'Отключать сообщения при просмотре', 'Mute messages while watching'],
+            ['EnableCoWatchBonus', 'Бонус за совместные просмотры', 'Co-watch bonus'],
+            ['AutoEquipNewUnlocks', 'Автоматически надевать новые награды', 'Auto-equip newly unlocked badges'],
+            ['ShowEquippedShowcase', 'Показывать витрину значков', 'Show badge showcase'],
+            ['SpoilerMode', 'Не показывать описания закрытых достижений', 'Hide locked badge descriptions'],
+            ['ExtremeSpoilerMode', 'Полностью скрывать закрытые достижения', 'Hide locked badge details entirely'],
+            ['HideFromLeaderboard', 'Скрыть меня в рейтинге', 'Hide me from leaderboard'],
+            ['HideFromCompare', 'Запретить сравнение моего профиля', 'Hide me from comparisons'],
+            ['AppearOffline', 'Отображаться офлайн для друзей', 'Appear offline to friends'],
+            ['HideNowPlaying', 'Скрывать текущий просмотр', 'Hide now playing'],
+            ['HideLastWatched', 'Скрывать последний просмотр', 'Hide last watched'],
             ['AppearInActivityFeed', 'Показывать меня в ленте', 'Show me in activity feed']
         ].filter(([k]) => k !== 'AppearInActivityFeed' ||
             !(publicConfig.ForcePrivacyMode || publicConfig.ActivityFeedEnabled === false));
         const toggleHtml = toggles.map(([key,ru,en]) => '<button type="button" tabindex="0" class="ab-setting-row" data-ach-advanced="toggle-pref" data-pref="' +
             key + '"><span>' + safe(this.t(ru,en)) + '</span><span class="ab-setting-switch ' +
-            ((typeof p[key] === 'boolean' ? p[key] : !key.startsWith('Mute')) ? 'is-on' : '') + '">' +
-            ((typeof p[key] === 'boolean' ? p[key] : !key.startsWith('Mute')) ? '●' : '○') + '</span></button>').join('');
+            ((typeof p[key] === 'boolean' ? p[key] : !/^(Mute|Hide|AppearOffline|Spoiler|Extreme)/.test(key)) ? 'is-on' : '') + '">' +
+            ((typeof p[key] === 'boolean' ? p[key] : !/^(Mute|Hide|AppearOffline|Spoiler|Extreme)/.test(key)) ? '●' : '○') + '</span></button>').join('');
         const select = (key, ru, en, opts, value) => '<div class="ab-setting-field"><label>' +
             safe(this.t(ru,en)) + '</label><div class="ab-setting-choices">' +
             opts.map(([v,l]) => '<button tabindex="0" data-ach-advanced="set-pref" data-pref="' + key +
@@ -262,6 +274,19 @@ export class AchievementsAdvanced {
             select('UnlockToastGrouping','Группировка уведомлений','Toast grouping',[
                 ['grouped',this.t('Группой','Grouped')],['individual',this.t('Отдельно','Individual')]
             ],p.UnlockToastGrouping || 'grouped') +
+            select('UnlockToastDeviceScope','На каких устройствах показывать','Toast device scope',[
+                ['all-devices',this.t('На всех устройствах','All devices')],
+                ['originating-device',this.t('Только на исходном устройстве','Originating device')]
+            ],p.UnlockToastDeviceScope || 'all-devices') +
+            select('AchievementPageTheme','Тема достижений','Achievement theme',[
+                ['default',this.t('Серверная','Server default')],['dark',this.t('Тёмная','Dark')],
+                ['light',this.t('Светлая','Light')]
+            ],p.AchievementPageTheme || 'default') +
+            select('Language','Язык AchievementBadges','Achievement language',[
+                ['default',this.t('По настройке сервера','Server default')],['en','English'],
+                ['de','Deutsch'],['es','Español'],['fr','Français'],['it','Italiano'],
+                ['pt','Português'],['ja','日本語'],['zh','中文']
+            ],p.Language || 'default') +
             '<button tabindex="0" class="ab-test-toast-button" data-ach-advanced="test-toast">' +
             safe(this.t('Проверить уведомление', 'Test notification')) + '</button></div>';
     }
@@ -328,7 +353,7 @@ export class AchievementsAdvanced {
         if (action === 'toggle-pref' || action === 'set-pref') {
             const key = button.dataset.pref;
             const current = typeof this._preferences[key] === 'boolean' ?
-                this._preferences[key] : !key.startsWith('Mute');
+                this._preferences[key] : !/^(Mute|Hide|AppearOffline|Spoiler|Extreme)/.test(key);
             const update = action === 'toggle-pref' ? !current : button.dataset.value;
             return this._mutate(async () => {
                 const payload = { ...this._preferences, [key]: update };
