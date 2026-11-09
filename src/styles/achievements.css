@@ -198,3 +198,28 @@
     .ab-advanced-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .ab-advanced-badges { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
+
+
+/* Rich cosmetic cards mirror AchievementBadges' glassmorphism and rarity glow. */
+.achievement-extra-card { position:relative; overflow:hidden; transition:border-color .18s, box-shadow .18s; }
+.achievement-extra-card:focus-within { border-color:#c795ff;box-shadow:0 0 0 2px #b478e8,0 0 23px #8b52d755; }
+.achievement-extra-card:before { content:"";position:absolute;left:-30%;top:-110px;width:160%;height:180px;
+    pointer-events:none;background:radial-gradient(ellipse,rgba(150,99,216,.15),transparent 68%); }
+.achievement-extra-swatch { margin:0 auto 18px;position:relative;width:92px;height:92px;
+    border-width:3px;box-shadow:0 0 0 5px #0d0b1740,0 0 25px #9b62df44; }
+.achievement-extra-swatch svg { width:56px;height:56px;color:#fff;filter:drop-shadow(0 0 12px #fff6); }
+.achievement-extra-emoji { font-size:48px;line-height:1; }
+.achievement-extra-card strong { text-align:center; font-size:20px; }
+.achievement-extra-card p { text-align:center;line-height:1.45; }
+.achievement-extra-card small { display:block;text-align:center; }
+.achievement-extra-card button { margin-top:auto; }
+.achievement-group-create { padding:23px 26px; border:1px solid #5d4978;
+    border-radius:15px; background:linear-gradient(135deg,#2b2440,#1c1b2b);margin-bottom:24px; }
+.achievement-group-create h3 { margin-top:0;color:#f0ddff; }
+.achievement-group-create input { background:#161724;color:#fff;border:2px solid #79609c;
+    border-radius:9px;padding:14px 17px;font:inherit;font-size:18px;width:100%;box-sizing:border-box; }
+.achievement-group-create input:focus { outline:3px solid #aa7bdc; }
+.achievement-group-members { display:flex;flex-wrap:wrap;gap:10px;margin:13px 0 18px; }
+.achievement-group-member { border:1px solid #605079;background:#35304c;color:#eee;
+    padding:12px 16px;border-radius:10px;font-size:16px; }
+.achievement-group-member.is-selected { border-color:#d2a9ff;background:#7146b0; }
