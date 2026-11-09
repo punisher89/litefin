@@ -115,3 +115,86 @@
 .achievement-badge-art { position: relative; }
 .achievement-badge-art .achievement-icon-svg { width: 66px; height: 66px; max-width: 70%; color: inherit; filter: drop-shadow(0 3px 6px rgba(0,0,0,.4)); }
 .achievement-badge-art .achievement-lock-mark { position: absolute; right: 12px; bottom: 8px; font-size: 21px; background: rgba(10,10,19,.84); padding: 3px 6px; border-radius: 8px; }
+
+
+/* AchievementBadges v2 — expanded TV panels and original-inspired visual hierarchy. */
+.achievements-page { --ab-violet:#a977ff; --ab-glass:#252137; --ab-border:#493b66; }
+.achievements-shell { max-width: 1700px; }
+.achievements-hero { background:linear-gradient(115deg,#35234f 0%,#1b1b2c 68%,#27263a 100%);
+    box-shadow:0 14px 45px rgba(0,0,0,.24); }
+.achievements-tabs { display:flex; flex-wrap:wrap; gap:9px; padding-bottom:8px; }
+.achievements-tabs button { min-width:105px; border-radius:10px; }
+.achievements-tabs .achievements-test-notification { border:1px solid #b68bef; color:#ebdbff; background:#403056; }
+.ab-advanced-panel { margin: 10px 0 40px; color:#e9e4f5; }
+.ab-advanced-heading { padding:12px 4px 22px; border-bottom:1px solid #514765; margin-bottom:24px; }
+.ab-advanced-heading h2 { font-size:29px; font-weight:760; margin:0 0 7px; color:#fff; }
+.ab-advanced-heading p { font-size:16px; color:#b8aecb; margin:0; }
+.ab-advanced-panel h3 { font-size:23px; margin:30px 0 16px; color:#e0c8ff; font-weight:720; }
+.ab-advanced-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:15px; }
+.ab-advanced-metric { padding:20px; border:1px solid #483b64; border-radius:13px;
+    background:linear-gradient(135deg,rgba(92,62,129,.4),rgba(31,30,49,.95)); min-width:0; }
+.ab-advanced-metric span { display:block; font-size:15px; color:#c9bfe0; margin-bottom:12px; }
+.ab-advanced-metric strong { display:block; font-size:30px; line-height:1.15; color:#fff; }
+.ab-advanced-bars { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; }
+.ab-advanced-bar { padding:17px 18px; border:1px solid #46395f; border-radius:12px; background:#242034; }
+.ab-advanced-bar>div:first-child { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.ab-advanced-bar strong { font-size:17px; }
+.ab-advanced-bar span { color:#d5b4ff; }
+.ab-advanced-calendar { display:grid; grid-template-columns:repeat(13,1fr); gap:7px;
+    padding:20px; border:1px solid #403852; border-radius:13px; background:#1c1c29; }
+.ab-calendar-day { display:block; height:20px; border-radius:4px; background:#2f2c3c; }
+.ab-calendar-day[data-level="1"] { background:#604a8e; }
+.ab-calendar-day[data-level="2"] { background:#8f65d1; }
+.ab-calendar-day[data-level="3"] { background:#b47aff; }
+.ab-calendar-day[data-level="4"] { background:#e0aaff; box-shadow:0 0 10px rgba(183,119,255,.35); }
+.ab-advanced-activity { display:flex; flex-direction:column; gap:11px; }
+.ab-advanced-event { display:flex; align-items:center; gap:14px; padding:14px 18px;
+    border:1px solid #403851; border-radius:11px; background:#242236; font-size:17px; }
+.ab-advanced-event>strong { flex:1; }
+.ab-advanced-event small { display:block; font-size:13px; color:#b5aacb; margin-top:6px; }
+.ab-event-icon { font-size:24px; color:#d6a2ff; }
+.ab-advanced-pager { display:flex; align-items:center; justify-content:center; gap:24px; margin-top:20px; }
+.ab-advanced-pager button { min-width:67px; }
+.ab-advanced-badges { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; }
+.ab-advanced-badge { background:linear-gradient(#2d2940,#211e32); border:1px solid #53466a;
+    border-radius:14px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; padding:18px 14px; min-height:190px; gap:11px; color:#fff; }
+.ab-advanced-badge-icon { width:76px; height:76px; display:flex; align-items:center; justify-content:center;
+    color:#e4b9ff; border:2px solid #a46dd7; border-radius:50%; background:#3c2852; }
+.ab-advanced-badge-icon svg { width:54px; height:54px; }
+.ab-advanced-badge strong { font-size:17px; }
+.ab-advanced-badge small { font-size:14px; color:#c9b2e4; }
+.ab-advanced-goals { display:flex; flex-direction:column; gap:13px; }
+.ab-advanced-goal { display:flex; gap:16px; padding:17px; border:1px solid #48365f;
+    border-radius:12px; background:#211f31; }
+.ab-advanced-goal-icon { flex:0 0 65px; width:65px; height:65px; color:#d2aff8; }
+.ab-advanced-goal-icon svg { width:60px; height:60px; }
+.ab-advanced-goal>div:last-child { flex:1; }
+.ab-advanced-goal strong { display:block; font-size:19px; }
+.ab-advanced-goal small { display:block; font-size:14px; color:#b4aac4; margin:9px 0; }
+.ab-prestige-panel { background:linear-gradient(135deg,#332b4f,#292336);
+    border:1px solid #9e72d7; border-radius:14px; padding:24px; margin-top:24px; }
+.ab-prestige-panel strong { font-size:25px; color:#ead5ff; }
+.ab-prestige-panel p { color:#c8b9dc; font-size:17px; }
+.ab-prestige-panel button { margin-top:21px; }
+.ab-advanced-settings { display:flex; flex-direction:column; gap:10px; }
+.ab-setting-row { display:flex; align-items:center; justify-content:space-between; gap:20px;
+    text-align:left; border:1px solid #483d5f; border-radius:11px; padding:17px 21px;
+    background:#242034; color:#f5efff; font-size:18px; }
+.ab-setting-switch { display:inline-flex; align-items:center; justify-content:center;
+    min-width:65px; height:31px; border-radius:20px; background:#363143; font-size:18px; }
+.ab-setting-switch.is-on { background:#744da5; box-shadow:0 0 18px #9355c655; }
+.ab-setting-field { background:#242034; border:1px solid #483d5f; padding:20px; border-radius:12px; margin-top:12px; }
+.ab-setting-field label { display:block; font-size:18px; font-weight:700; margin-bottom:15px; }
+.ab-setting-choices { display:flex; flex-wrap:wrap; gap:10px; }
+.ab-setting-choices button,.ab-advanced-pager button,.ab-prestige-panel button,.ab-test-toast-button {
+    padding:12px 21px; border:1px solid #694b91; border-radius:10px; background:#3e3155;
+    color:#f4ebff; font-size:17px; cursor:pointer; }
+.ab-setting-choices button.is-selected { background:#8253c5; border-color:#bb89fd; }
+.ab-advanced-panel button:focus { outline:3px solid #dfa8ff; outline-offset:4px; }
+.ab-advanced-panel button:disabled { opacity:.43; }
+.ab-test-toast-button { margin-top:15px; width:100%; background:#6948a1; }
+@media (max-width:1300px) {
+    .ab-advanced-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .ab-advanced-badges { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
