@@ -223,3 +223,23 @@
 .achievement-group-member { border:1px solid #605079;background:#35304c;color:#eee;
     padding:12px 16px;border-radius:10px;font-size:16px; }
 .achievement-group-member.is-selected { border-color:#d2a9ff;background:#7146b0; }
+
+
+/* Server-selected light/dark achievement theme; Normal keeps TV focus contrast. */
+.achievements-page[data-ab-theme="light"] {
+    background:#efebf9;color:#261e36;--achievement-muted:#554967;
+}
+.achievements-page[data-ab-theme="light"] .achievements-scroll { background:#efebf9; }
+.achievements-page[data-ab-theme="light"] .achievements-hero {
+    background:linear-gradient(120deg,#f5e7ff,#eee4fb);color:#32254a;
+    border-color:#b5a0d2;box-shadow:0 14px 32px #27163b22;
+}
+.achievements-page[data-ab-theme="light"] .achievements-header h1,
+.achievements-page[data-ab-theme="light"] .achievements-hero h2,
+.achievements-page[data-ab-theme="light"] .achievements-stats strong,
+.achievements-page[data-ab-theme="light"] .achievements-section-title h2 { color:#2b1c40; }
+.achievements-page[data-ab-theme="light"] .achievement-badge,
+.achievements-page[data-ab-theme="light"] .achievement-extra-card,
+.achievements-page[data-ab-theme="light"] .ab-advanced-panel {
+    color:#f6f0ff;
+}
