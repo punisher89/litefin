@@ -83,6 +83,9 @@ export default class AchievementsPage extends Page {
         this._language = String(i18n.currentLang || 'en').toLowerCase().startsWith('ru') ? 'ru' : 'en';
         this.w = { ...WORDS[this._language] };
         this._serverTranslations = {};
+        this._publicConfig = {};
+        this._settings = {};
+        this._serverLanguage = this._language;
         this.title = this.w.title;
         this._onClick = (e) => this._handleClick(e);
         this._extras = new AchievementExtras(this);
@@ -125,7 +128,21 @@ export default class AchievementsPage extends Page {
                 return;
             }
 
-            const serverLanguage = String(i18n.currentLang || this._language).toLowerCase().split(/[-_]/)[0];
+            // Match the plugin's own language precedence: user preference, admin
+            // default, then Litefin language. Avoid overriding translated titles.
+            const [userPrefs, publicConfig] = await Promise.all([
+                achievementBadges.getPreferences().catch(() => ({})),
+                achievementBadges.getPublicConfig().catch(() => ({}))
+            ]);
+            if (generation !== this._loadId) return;
+            this._settings = userPrefs || {};
+            this._publicConfig = publicConfig || {};
+            const userLang = String(userPrefs?.Language || '').trim();
+            const configured = userLang && userLang.toLowerCase() !== 'default'
+                ? userLang : String(publicConfig?.DefaultLanguage || '');
+            const serverLanguage = String(configured || i18n.currentLang || this._language)
+                .toLowerCase().split(/[-_]/)[0].replace(/[^a-z]/g, '') || 'en';
+            this._serverLanguage = serverLanguage;
             const root = await Promise.all([
                 achievementBadges.getSummary(), achievementBadges.getRank(),
                 achievementBadges.getBadges(serverLanguage),
@@ -215,6 +232,20 @@ export default class AchievementsPage extends Page {
         const translatedTier = localizeAchievementRank(tier.Name || 'Rookie', this._language, this._serverTranslations);
         const translatedNext = localizeAchievementRank((rank.NextTier || {}).Name || '', this._language, this._serverTranslations);
         const count = badges.filter((item) => item.Unlocked).length;
+        const config = this._publicConfig || {};
+        const privacy = config.ForcePrivacyMode === true;
+        const allTabs = ['badges','quests','leaderboard','shop','cosmetics','friends','messages',
+            'stats','activity','showcase','goals','prestige','settings'];
+        const availableTabs = allTabs.filter(tab => {
+            if (tab === 'leaderboard') return !privacy && config.LeaderboardEnabled !== false;
+            if (tab === 'quests') return config.QuestsEnabled !== false;
+            if (tab === 'activity') return config.ActivityFeedEnabled !== false;
+            if (tab === 'prestige') return !privacy && config.PrestigeEnabled !== false;
+            if (tab === 'friends' || tab === 'messages') return config.FriendsEnabled !== false;
+            if (tab === 'showcase') return config.ForceHideEquippedShowcase !== true;
+            return true;
+        });
+        if (!availableTabs.includes(this._tab)) this._tab = 'badges';
         const progress = clampPercent(rank.ProgressToNext);
         this._clearFocus();
         target.innerHTML = `
@@ -234,7 +265,7 @@ export default class AchievementsPage extends Page {
                 <div><span>✦ ${escapeHtml(this.w.bank)}</span><strong>${Number(bank.ScoreBank || 0)}</strong></div>
             </div>
             <div class="achievements-tabs" id="achievements-tabs">
-                ${['badges','quests','leaderboard','shop','cosmetics','friends','messages','stats','activity','showcase','goals','prestige','settings'].map((name) => `<button tabindex="0" data-ach-tab="${name}" class="${this._tab === name ? 'is-active' : ''}">${escapeHtml(this.w[name])}</button>`).join('')}
+                ${availableTabs.map((name) => `<button tabindex="0" data-ach-tab="${name}" class="${this._tab === name ? 'is-active' : ''}">${escapeHtml(this.w[name])}</button>`).join('')}
                 <button tabindex="0" class="achievements-test-notification" data-ach-action="test-notification">🔔 ${escapeHtml(this.w.testNotifications || (this._language === 'ru' ? 'Проверить уведомления' : 'Test notification'))}</button>
             </div>
             <div id="achievements-tab-content">${this._renderTab()}</div>
@@ -266,14 +297,17 @@ export default class AchievementsPage extends Page {
                     const isEquipped = equipped.has(id);
                     const pct = b.Unlocked ? 100 : clampPercent(100 * Number(b.CurrentValue || 0) / Math.max(1, Number(b.TargetValue || 1)));
                     const rarity = String(b.Rarity || 'Common');
+                    const hidden = !b.Unlocked && (this._publicConfig.ForceExtremeSpoilerMode === true ||
+                        this._settings.HideLockedBadgeDescriptions === true);
+                    const hiddenName = this._publicConfig.ForceExtremeSpoilerMode === true && !b.Unlocked;
                     return `<button tabindex="0" class="achievement-badge ${b.Unlocked ? 'is-unlocked' : 'is-locked'}"
                         data-ach-action="${b.Unlocked ? 'toggle-equip' : 'detail'}" data-ach-id="${escapeHtml(id)}"
-                        aria-label="${escapeHtml(b.Title || 'Badge')}">
+                        aria-label="${escapeHtml(hiddenName ? this.w.locked : (b.Title || 'Badge'))}">
                         <div class="achievement-badge-art" data-rarity="${escapeHtml(rarity)}">${renderAchievementIcon(b.Icon, b)}${b.Unlocked ? '' : '<span class="achievement-lock-mark" aria-hidden="true">🔒</span>'}</div>
                         <div class="achievement-badge-meta">
                             <span class="achievement-rarity">${escapeHtml(this._serverTranslations['rarity.' + rarity.toLowerCase()] || this.w[rarity.toLowerCase()] || rarity)}</span>
-                            <strong>${escapeHtml(b.Title || 'Badge')}</strong>
-                            <p>${escapeHtml(b.Description || '')}</p>
+                            <strong>${escapeHtml(hiddenName ? '???' : (b.Title || 'Badge'))}</strong>
+                            <p>${escapeHtml(hidden ? '???' : (b.Description || ''))}</p>
                             <div class="achievement-progress"><span style="width:${pct}%"></span></div>
                             <small>${b.Unlocked ? escapeHtml(isEquipped ? this.w.equipped : this.w.equip) : (Number(b.CurrentValue || 0) + ' / ' + Number(b.TargetValue || 0))}</small>
                         </div>
