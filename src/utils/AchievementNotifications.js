@@ -149,7 +149,7 @@ export class AchievementNotifications {
                     keys.slice(0, keys.length - 320).forEach(key => delete seen[key]);
                 }
                 storage.setItem(seenKey, JSON.stringify(seen));
-                achievementCornerToasts.showBatch(fresh.slice(0, 12), language);
+                if (fresh.length) achievementCornerToasts.showBatch(fresh.slice(0, 12), language);
             }
             if (this._features?.EnableMilestoneToasts !== false &&
                 preferences.EnableMilestoneToasts !== false) {
