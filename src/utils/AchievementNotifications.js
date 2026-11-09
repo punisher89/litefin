@@ -15,7 +15,7 @@ import { logger } from '../utils/Logger.js';
 const log = logger.create('AchievementNotifications');
 const POLL_INTERVAL = 90000;
 
-class AchievementNotifications {
+export class AchievementNotifications {
     constructor() {
         this._started = false;
         this._interval = null;
