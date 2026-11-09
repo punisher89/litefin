@@ -29,6 +29,8 @@ export class AchievementExtras {
         this._pending = null;
         this._busy = false;
         this._thread = null;
+        this._groupMembers = new Set();
+        this._groupTitle = '';
         this._modalTrapped = false;
     }
 
@@ -86,8 +88,11 @@ export class AchievementExtras {
             return;
         }
         if (tab === 'messages') {
-            const response = await client.getMessageThreads();
+            const [response, friends] = await Promise.all([
+                client.getMessageThreads(), client.getFriends().catch(() => ({}))
+            ]);
             this._data.threads = list(response?.Threads || response?.threads);
+            this._data.friends = friends || this._data.friends || {};
             return;
         }
     }
@@ -234,14 +239,33 @@ export class AchievementExtras {
 
     renderMessages() {
         if (this._thread) return this.renderThread();
+        const friends = list(this._data.friends?.Friends);
+        const memberButtons = friends.map(friend => {
+            const id = value(friend.UserId);
+            const isSelected = this._groupMembers.has(id);
+            return '<button tabindex="0" data-ach-extra="group-member" data-ach-item="' +
+                html(id) + '" class="achievement-group-member ' + (isSelected ? 'is-selected' : '') +
+                '">' + html(friend.UserName || id) + (isSelected ? ' ✓' : '') + '</button>';
+        }).join('');
+        const group = friends.length
+            ? '<div class="achievement-group-create"><h3>' +
+                this.t('Новая групповая беседа', 'New group conversation') +
+                '</h3><input id="achievement-group-title" tabindex="0" maxlength="100" placeholder="' +
+                this.t('Название группы', 'Group name') + '" value="' + html(this._groupTitle) +
+                '"/><p>' + this.t('Выберите участников', 'Select participants') +
+                '</p><div class="achievement-group-members">' + memberButtons +
+                '</div><button tabindex="0" data-ach-extra="create-group">' +
+                this.t('Создать группу', 'Create group') + '</button></div>'
+            : '';
         const rows = list(this._data.threads).map((thread) => '<button class="achievement-extra-thread" tabindex="0" ' +
             'data-ach-extra="thread" data-ach-item="' + html(thread.conversationId || thread.ConversationId) + '">' +
             '<strong>' + html(thread.title || thread.otherUserName || thread.OtherUserName || this.t('Беседа', 'Conversation')) +
             '</strong><small>' + html(thread.lastMessage || '') + '</small><span>' +
             number(thread.unreadCount || 0) + ' · →</span></button>').join('');
-        return '<h2 class="achievements-quest-heading">' + this.t('Сообщения', 'Messages') + '</h2>' +
-            '<div id="achievement-extra-controls" class="achievement-extra-rows">' + (rows ||
-            '<p>' + this.t('Сообщений пока нет', 'No messages yet') + '</p>') + '</div>';
+        return '<div id="achievement-extra-controls"><h2 class="achievements-quest-heading">' +
+            this.t('Сообщения', 'Messages') + '</h2>' + group +
+            '<div class="achievement-extra-rows">' + (rows ||
+            '<p>' + this.t('Сообщений пока нет', 'No messages yet') + '</p>') + '</div></div>';
     }
 
     renderThread() {
@@ -353,6 +377,37 @@ export class AchievementExtras {
                 this._thread = { userId: itemId, conversationId: response.ConversationId, title: itemId, messages: list(response.Messages) };
                 await this.open('messages');
             } catch (err) { toast.show(this.t('Не удалось открыть переписку', 'Cannot open chat'), 4500); }
+            return true;
+        }
+        if (action === 'group-member') {
+            this._groupTitle = this.page.$('#achievement-group-title')?.value || '';
+            if (this._groupMembers.has(itemId)) this._groupMembers.delete(itemId);
+            else this._groupMembers.add(itemId);
+            this.draw();
+            return true;
+        }
+        if (action === 'create-group') {
+            const title = String(this.page.$('#achievement-group-title')?.value || '').trim();
+            const members = Array.from(this._groupMembers);
+            if (!title || !members.length) {
+                toast.show(this.t('Введите название и выберите друзей', 'Enter a title and select friends'), 4200);
+                return true;
+            }
+            this.showConfirm(this.t('Создать групповую беседу?', 'Create group conversation?'),
+                async () => {
+                    try {
+                        const result = await client.createGroup(title, members);
+                        if (result?.Success === false) throw new Error(result.Message || 'Group rejected');
+                        this._groupMembers.clear();
+                        this._groupTitle = '';
+                        this._thread = null;
+                        delete this._loaded.messages;
+                        await this.open('messages');
+                    } catch (err) {
+                        log.warn('Create group failed', err);
+                        toast.show(this.t('Не удалось создать группу', 'Could not create group'), 4500);
+                    }
+                });
             return true;
         }
         if (action === 'thread') {
