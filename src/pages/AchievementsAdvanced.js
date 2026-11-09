@@ -361,7 +361,7 @@ export class AchievementsAdvanced {
                 this._preferences = value && typeof value === 'object' ? value : payload;
                 achievementCornerToasts.configure(api.userId, this._preferences,
                     this._data.settings?.[1]?.value || {});
-            }, 'settings', false);
+            }, 'settings', ['Language','AchievementPageTheme','SpoilerMode','ExtremeSpoilerMode'].includes(key));
         }
         if (action === 'prestige') {
             this._confirm(this.t('Достижения и прогресс будут сброшены. Продолжить?',
