@@ -237,7 +237,8 @@ export class AchievementsAdvanced {
             !(publicConfig.ForcePrivacyMode || publicConfig.ActivityFeedEnabled === false));
         const toggleHtml = toggles.map(([key,ru,en]) => '<button type="button" tabindex="0" class="ab-setting-row" data-ach-advanced="toggle-pref" data-pref="' +
             key + '"><span>' + safe(this.t(ru,en)) + '</span><span class="ab-setting-switch ' +
-            (p[key] !== false ? 'is-on' : '') + '">' + (p[key] !== false ? '●' : '○') + '</span></button>').join('');
+            ((typeof p[key] === 'boolean' ? p[key] : !key.startsWith('Mute')) ? 'is-on' : '') + '">' +
+            ((typeof p[key] === 'boolean' ? p[key] : !key.startsWith('Mute')) ? '●' : '○') + '</span></button>').join('');
         const select = (key, ru, en, opts, value) => '<div class="ab-setting-field"><label>' +
             safe(this.t(ru,en)) + '</label><div class="ab-setting-choices">' +
             opts.map(([v,l]) => '<button tabindex="0" data-ach-advanced="set-pref" data-pref="' + key +
@@ -326,7 +327,9 @@ export class AchievementsAdvanced {
         }
         if (action === 'toggle-pref' || action === 'set-pref') {
             const key = button.dataset.pref;
-            const update = action === 'toggle-pref' ? !(this._preferences[key] !== false) : button.dataset.value;
+            const current = typeof this._preferences[key] === 'boolean' ?
+                this._preferences[key] : !key.startsWith('Mute');
+            const update = action === 'toggle-pref' ? !current : button.dataset.value;
             return this._mutate(async () => {
                 const payload = { ...this._preferences, [key]: update };
                 const value = await api.savePreferences(payload);
