@@ -1,470 +1,188 @@
 /**
- * ============================================================================
- * Litefin - Achievement Badges Notifications
- * ============================================================================
- * Lightweight client-side polling for the Jellyfin Achievement Badges plugin.
- * Toasts are rendered in Litefin itself, including while the video player is
- * active. The plugin remains the source of truth for unlocks and preferences.
- * ============================================================================
+ * Lightweight achievements notification watcher.
+ * Uses the user's own Jellyfin server API, respects server device notification policy
+ * and never fetches badge history as new on first boot.
  */
-
+import { achievementBadges } from '../api/AchievementBadgesClient.js';
 import { api } from '../api/ApiClient.js';
-import { storage } from './StorageService.js';
-import { localizeAchievementBadge } from './AchievementBadgeLocalization.js';
+import { auth } from '../api/AuthManager.js';
+import { eventBus } from '../core/EventBus.js';
+import { storage } from '../utils/StorageService.js';
+import { achievementCornerToasts } from './AchievementCornerToasts.js';
 import { i18n } from './i18n.js';
-import { logger } from './Logger.js';
+import { logger } from '../utils/Logger.js';
 
 const log = logger.create('AchievementNotifications');
-const POLL_INTERVAL_MS = 5000;
-const PREFS_TTL_MS = 5 * 60 * 1000;
-const MAX_SEEN_IDS = 300;
-const RARITY_ORDER = {
-    common: 0,
-    uncommon: 1,
-    rare: 2,
-    epic: 3,
-    legendary: 4,
-    mythic: 5
-};
-const RARITY_COLORS = {
-    common: '#8293a7',
-    uncommon: '#279c72',
-    rare: '#367fce',
-    epic: '#8a68d7',
-    legendary: '#c18a16',
-    mythic: '#b72d49'
-};
+// Match original AchievementBadges unlock polling. In-flight and logged-out gates prevent overlap.
+const POLL_INTERVAL = 5000;
 
-class AchievementNotifications {
+export class AchievementNotifications {
     constructor() {
-        this._userId = null;
-        this._deviceId = '';
-        this._timer = null;
-        this._polling = false;
-        this._cursor = null;
-        this._firstPoll = false;
-        this._prefs = null;
-        this._prefsFetchedAt = 0;
-        this._defaultToastPosition = '';
-        this._publicConfig = null;
-        this._publicConfigFetchedAt = 0;
+        this._started = false;
+        this._interval = null;
+        this._inflight = false;
+        this._user = null;
+        this._since = '';
+        this._enabled = true;
+        this._preferences = null;
+        this._lastUnread = null;
         this._features = null;
-        this._featuresFetchedAt = 0;
-        this._seen = new Set();
-        this._queue = [];
-        this._visible = false;
-        this._toastTimer = null;
-        this._audioContext = null;
-        this._lastWarningAt = 0;
-    }
-
-    updatePreferences(prefs, defaultToastPosition = '') {
-        if (prefs && typeof prefs === 'object') {
-            this._prefs = { ...prefs };
-            this._prefsFetchedAt = Date.now();
-        }
-        this._defaultToastPosition = String(defaultToastPosition || this._defaultToastPosition || '').toLowerCase();
-        this._applyToastPosition(this._prefs || {});
-    }
-
-    init() {
-        const userId = api.userId;
-        if (!userId || !api.accessToken) return;
-
-        if (this._userId === userId && this._timer) return;
-
-        this.destroy();
-        this._userId = userId;
-        this._deviceId = api.deviceId || '';
-
-        const suffix = String(userId) + ':' + String(this._deviceId || 'default');
-        this._cursorKey = 'litefin:achievement-toast-cursor:' + suffix;
-        this._seenKey = 'litefin:achievement-toast-seen:' + suffix;
-
-        const savedCursor = storage.getItem(this._cursorKey);
-        this._cursor = savedCursor || new Date().toISOString();
-        this._firstPoll = !savedCursor;
-
-        try {
-            const savedSeen = JSON.parse(storage.getItem(this._seenKey) || '[]');
-            if (Array.isArray(savedSeen)) this._seen = new Set(savedSeen.slice(-MAX_SEEN_IDS));
-        } catch (_) {
-            this._seen = new Set();
-        }
-
-        this._ensureStyles();
-        this._timer = window.setInterval(() => this._poll(), POLL_INTERVAL_MS);
-        this._poll();
-        log.info('Achievement Badges notifications initialized');
-    }
-
-    /**
-     * Show a local demonstration toast without creating or unlocking a server badge.
-     * Called directly from a user-initiated button press so optional audio can play.
-     */
-    showTest() {
-        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || i18n.currentLang || '');
-        this._ensureStyles();
-        this._queue.unshift({
-            badges: [{
-                Id: 'litefin-local-notification-test',
-                Rarity: 'legendary',
-                Title: russian ? 'Тестовое уведомление' : 'Test notification',
-                Description: russian
-                    ? 'Проверка уведомлений Achievement Badges в Litefin.'
-                    : 'Achievement Badges notifications are working in Litefin.',
-                ScorePoints: 0
-            }]
-        });
-        this._drainQueue(this._prefs || {});
-    }
-
-    destroy() {
-        if (this._timer) {
-            window.clearInterval(this._timer);
-            this._timer = null;
-        }
-        if (this._toastTimer) {
-            window.clearTimeout(this._toastTimer);
-            this._toastTimer = null;
-        }
-        const container = document.getElementById('litefin-achievement-toast-container');
-        if (container && container.parentNode) container.parentNode.removeChild(container);
-
-        this._userId = null;
-        this._deviceId = '';
-        this._cursor = null;
-        this._firstPoll = false;
-        this._prefs = null;
         this._prefsFetchedAt = 0;
-        this._defaultToastPosition = '';
-        this._publicConfig = null;
-        this._publicConfigFetchedAt = 0;
-        this._features = null;
-        this._featuresFetchedAt = 0;
-        this._seen.clear();
-        this._queue = [];
-        this._visible = false;
-        this._polling = false;
+        this._playing = false;
+        this._onPlay = () => { this._playing = true; achievementCornerToasts.setPlaybackPlaying(true); };
+        this._onAuth = () => this._syncUser();
+        this._onPlayback = () => { this._playing = false; achievementCornerToasts.setPlaybackPlaying(false); this.check(); };
+        this._onPause = () => { this._playing = false; achievementCornerToasts.setPlaybackPlaying(false); };
+        this._onVisibility = () => { if (!document.hidden) this.check(); };
     }
 
-    async _poll() {
-        if (!this._userId || this._polling || api.userId !== this._userId) return;
+    // Compatibility with the unchanged game-center App lifecycle.
+    init() { this.start(); }
+    destroy() { this.stop(); }
 
-        // Like the Jellyfin web client, the first visit seeds the cursor instead
-        // of replaying achievements unlocked before this Litefin device started.
-        if (this._firstPoll) {
-            this._firstPoll = false;
-            storage.setItem(this._cursorKey, this._cursor);
-            return;
+    start() {
+        if (this._started) return;
+        this._started = true;
+        eventBus.on('auth:login', this._onAuth);
+        eventBus.on('auth:restored', this._onAuth);
+        eventBus.on('auth:logout', this._onAuth);
+        eventBus.on('player:stop', this._onPlayback);
+        eventBus.on('player:play', this._onPlay);
+        eventBus.on('player:pause', this._onPause);
+        document.addEventListener('visibilitychange', this._onVisibility);
+        this._syncUser();
+        this._interval = setInterval(() => this.check(), POLL_INTERVAL);
+    }
+
+    stop() {
+        if (!this._started) return;
+        this._started = false;
+        clearInterval(this._interval);
+        this._interval = null;
+        eventBus.off('auth:login', this._onAuth);
+        eventBus.off('auth:restored', this._onAuth);
+        eventBus.off('auth:logout', this._onAuth);
+        eventBus.off('player:stop', this._onPlayback);
+        eventBus.off('player:play', this._onPlay);
+        eventBus.off('player:pause', this._onPause);
+        document.removeEventListener('visibilitychange', this._onVisibility);
+        achievementCornerToasts.clear();
+    }
+
+    _syncUser() {
+        const user = auth.isAuthenticated() ? api.userId : null;
+        if (this._user === user) return;
+        this._user = user;
+        this._since = '';
+        this._enabled = true;
+        this._preferences = null;
+        this._lastUnread = null;
+        this._features = null;
+        this._prefsFetchedAt = 0;
+        this._playing = false;
+        achievementCornerToasts.setPlaybackPlaying(false);
+        achievementCornerToasts.clear();
+        if (!user) return;
+        const stored = storage.getItem('achievementBadges:seen:' + (api.serverUrl || '') + ':' + user);
+        // On first connection, start at current time; historic unlocks must not appear as new.
+        this._since = stored || new Date().toISOString();
+        this._store();
+    }
+
+    _store() {
+        if (this._user && this._since) {
+            storage.setItem('achievementBadges:seen:' + (api.serverUrl || '') + ':' + this._user, this._since);
         }
+    }
 
-        this._polling = true;
+    async check() {
+        if (!this._started || !this._user || !this._enabled || this._inflight || document.hidden) return;
+        // Never leak private notifications on user picker, login or PIN-gated screens.
+        const route = (window.location.hash || '').split('?')[0];
+        if (route === '#/profiles' || route === '#/login' || route === '#/offline') return;
+        if (!auth.isAuthenticated() || api.userId !== this._user || api.isEmby()) return;
+        const user = this._user;
+        const since = this._since;
+        this._inflight = true;
         try {
-            const now = Date.now();
-            if (!this._prefs || now - this._prefsFetchedAt > PREFS_TTL_MS) {
-                this._prefs = await api
-                    .get('Plugins/AchievementBadges/users/' + this._userId + '/preferences')
-                    .catch(() => null);
-                this._prefsFetchedAt = now;
-                this._applyToastPosition(this._prefs || {});
+            // Refresh preferences periodically, including changes saved on another device.
+            if (!this._preferences || Date.now() - this._prefsFetchedAt > 300000) {
+                const [prefs, server, flags] = await Promise.all([
+                    achievementBadges.getPreferences(),
+                    achievementBadges.getPublicConfig().catch(() => ({})),
+                    achievementBadges.getUiFeatures().catch(() => ({}))
+                ]);
+                if (user !== this._user) return;
+                this._preferences = prefs || {};
+                this._features = flags || {};
+                this._prefsFetchedAt = Date.now();
+                achievementCornerToasts.configure(user, this._preferences, server || {});
             }
-
-            if (!this._publicConfig || now - this._publicConfigFetchedAt > PREFS_TTL_MS) {
-                this._publicConfig = await api.get('Plugins/AchievementBadges/public-config').catch(() => null);
-                this._publicConfigFetchedAt = now;
-                this._defaultToastPosition = String(
-                    this._publicConfig && (this._publicConfig.DefaultToastPosition || this._publicConfig.defaultToastPosition) || ''
-                ).toLowerCase();
-                this._applyToastPosition(this._prefs || {});
-            }
-
-            if (!this._features || now - this._featuresFetchedAt > PREFS_TTL_MS) {
-                this._features = await api.get('Plugins/AchievementBadges/admin/ui-features').catch(() => null);
-                this._featuresFetchedAt = now;
-            }
-
-            const params = { since: this._cursor };
-            if (this._deviceId) params.deviceId = this._deviceId;
-
-            const response = await api.get(
-                'Plugins/AchievementBadges/users/' + this._userId + '/unlocks-since',
-                params
-            );
-
-            if (response && response.Now) {
-                this._cursor = response.Now;
-                storage.setItem(this._cursorKey, this._cursor);
-            }
-
-            const prefs = this._prefs || {};
-            const globalEnabled = !this._features || this._features.EnableUnlockToasts !== false;
-            const personalEnabled = prefs.EnableUnlockToasts !== false;
-
-            if (globalEnabled && personalEnabled && Array.isArray(response && response.Badges)) {
-                const minimum = String(prefs.MinimumToastRarity || prefs.minimumToastRarity || 'all').toLowerCase();
-                const minOrder = minimum === 'all' ? 0 : (RARITY_ORDER[minimum] || 0);
+            const preferences = this._preferences || {};
+            const response = await achievementBadges.getUnlocksSince(since, api.deviceId);
+            if (user !== this._user) return;
+            const list = Array.isArray(response?.Badges) ? response.Badges : [];
+            const now = response?.Now || new Date().toISOString();
+            this._since = String(now);
+            this._store();
+            // Cap notifications to avoid flooding user after offline periods.
+            const order = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
+            const minRarity = String(preferences.MinimumToastRarity || 'all').toLowerCase();
+            const rank = minRarity === 'all' ? 0 : (order[minRarity] ?? 0);
+            const language = String(i18n.currentLang || '').toLowerCase().startsWith('ru') ? 'ru' : 'en';
+            if (this._features?.EnableUnlockToasts !== false &&
+                preferences.EnableUnlockToasts !== false &&
+                !(this._playing && preferences.MuteToastsDuringPlayback)) {
+                const seenKey = 'achievementBadges:shown:' + (api.serverUrl || '') + ':' + user;
+                let seen = {};
+                try { seen = JSON.parse(storage.getItem(seenKey) || '{}'); } catch (_) { seen = {}; }
                 const fresh = [];
-
-                response.Badges.forEach((badge) => {
+                list.forEach(badge => {
                     if (!badge || !badge.Id) return;
                     const key = String(badge.Id) + '|' + String(badge.UnlockedAt || '');
-                    if (this._seen.has(key)) return;
-
-                    this._seen.add(key);
-                    const rarity = String(badge.Rarity || 'common').toLowerCase();
-                    if ((RARITY_ORDER[rarity] || 0) >= minOrder) fresh.push(badge);
+                    if (seen[key]) return;
+                    seen[key] = Date.now();
+                    if ((order[String(badge.Rarity || 'common').toLowerCase()] ?? 0) >= rank) fresh.push(badge);
                 });
-
-                this._persistSeen();
-                if (fresh.length) this._queueBadges(fresh, prefs);
+                const keys = Object.keys(seen);
+                if (keys.length > 400) {
+                    keys.sort((a, b) => seen[a] - seen[b]);
+                    keys.slice(0, keys.length - 320).forEach(key => delete seen[key]);
+                }
+                storage.setItem(seenKey, JSON.stringify(seen));
+                if (fresh.length) achievementCornerToasts.showBatch(fresh.slice(0, 12), language);
             }
-
-            if (prefs.EnableMilestoneToasts !== false) {
-                const milestones = await api
-                    .get('Plugins/AchievementBadges/users/' + this._userId + '/check-milestones')
-                    .catch(() => null);
-                if (milestones && Array.isArray(milestones.NewlyReached)) {
-                    milestones.NewlyReached.forEach((percentage) => {
-                        this._queue.push({ milestone: Number(percentage) || 0 });
-                    });
-                    this._drainQueue(prefs);
+            if (this._features?.EnableMilestoneToasts !== false &&
+                preferences.EnableMilestoneToasts !== false) {
+                try {
+                    const milestones = await achievementBadges.checkMilestones();
+                    if (user !== this._user) return;
+                    const newly = Array.isArray(milestones?.NewlyReached) ? milestones.NewlyReached : [];
+                    newly.slice(0, 4).forEach(pct => achievementCornerToasts.showMilestone(pct, language));
+                } catch (e) {
+                    log.debug('Milestone notifications unavailable', e);
                 }
             }
-        } catch (error) {
-            const now = Date.now();
-            if (now - this._lastWarningAt > 60000) {
-                this._lastWarningAt = now;
-                log.debug('Achievement Badges polling unavailable:', error && error.message ? error.message : error);
+            if (preferences.MessageNotifications !== false) {
+                try {
+                    const unread = await achievementBadges.getUnreadCount();
+                    if (user !== this._user) return;
+                    const count = Number(unread?.Count || 0);
+                    if (this._lastUnread !== null && count > this._lastUnread &&
+                        !(this._playing && preferences.MuteMessageNotificationsDuringPlayback)) {
+                        const russian = String(i18n.currentLang || '').toLowerCase().startsWith('ru');
+                        achievementCornerToasts.showMessage(count, russian ? 'ru' : 'en');
+                    }
+                    this._lastUnread = count;
+                } catch (error) { log.debug('Message count poll skipped', error); }
             }
+        } catch (err) {
+            if (err.status === 404) this._enabled = false;
+            log.debug('Achievement unlock poll skipped', err);
         } finally {
-            this._polling = false;
-        }
-    }
-
-    _persistSeen() {
-        const values = Array.from(this._seen).slice(-MAX_SEEN_IDS);
-        this._seen = new Set(values);
-        storage.setItem(this._seenKey, JSON.stringify(values));
-    }
-
-    _queueBadges(badges, prefs) {
-        const video = document.querySelector('video');
-        const watching = !!(video && !video.paused && !video.ended);
-        const muteVisualDuringPlayback = prefs.MuteToastsDuringPlayback === true
-            || prefs.muteToastsDuringPlayback === true;
-        if (watching && muteVisualDuringPlayback) return;
-
-        const grouping = String(prefs.UnlockToastGrouping || prefs.unlockToastGrouping || 'grouped').toLowerCase();
-        if (grouping === 'individual' || badges.length === 1) {
-            badges.forEach((badge) => this._queue.push({ badges: [badge] }));
-        } else {
-            this._queue.push({ badges });
-        }
-        this._drainQueue(prefs);
-    }
-
-    _drainQueue(prefs) {
-        if (this._visible || !this._queue.length) return;
-        const next = this._queue.shift();
-        this._visible = true;
-        this._renderToast(next, prefs || this._prefs || {});
-    }
-
-    _ensureStyles() {
-        if (document.getElementById('litefin-achievement-toast-style')) return;
-
-        const style = document.createElement('style');
-        style.id = 'litefin-achievement-toast-style';
-        style.textContent = [
-            '#litefin-achievement-toast-container{position:fixed;top:28px;right:28px;width:420px;max-width:calc(100vw - 36px);z-index:2147483647;pointer-events:none;display:flex;flex-direction:column;align-items:flex-end;font-family:Arial,sans-serif;}',
-            '.lf-ab-toast{width:100%;min-height:104px;box-sizing:border-box;display:flex;align-items:center;gap:16px;padding:13px 18px 13px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:linear-gradient(112deg,rgba(13,19,29,.98),rgba(34,43,57,.97));box-shadow:0 12px 34px rgba(0,0,0,.5);color:#fff;opacity:0;transform:translateX(38px) scale(.97);transition:opacity .32s ease,transform .42s cubic-bezier(.2,.8,.2,1);overflow:hidden;}',
-            '.lf-ab-toast.lf-ab-visible{opacity:1;transform:translateX(0) scale(1);}',
-            '.lf-ab-orb{width:70px;height:70px;min-width:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;background:radial-gradient(circle at 32% 26%,rgba(255,255,255,.42),transparent 54%),var(--lf-ab-rarity,#8293a7);box-shadow:0 0 24px var(--lf-ab-glow,rgba(130,147,167,.35)),inset 0 0 15px rgba(255,255,255,.15);}',
-            '.lf-ab-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px;}',
-            '.lf-ab-eyebrow{font-size:12px;line-height:1.2;letter-spacing:1.1px;text-transform:uppercase;font-weight:700;color:rgba(255,255,255,.78);}',
-            '.lf-ab-title{font-size:19px;line-height:1.2;font-weight:800;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}',
-            '.lf-ab-detail{font-size:13px;line-height:1.25;color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
-            '.lf-ab-points{font-size:13px;font-weight:800;color:#fff;margin-top:1px;}',
-            '.lf-ab-toast.lf-ab-exit{opacity:0;transform:translateX(28px) scale(.98);}',
-            '@media (prefers-reduced-motion:reduce){.lf-ab-toast{transition:none;transform:none}.lf-ab-toast.lf-ab-visible{transform:none}}',
-            /* Litefin Game Center notification skin */
-            '#litefin-achievement-toast-container{top:clamp(18px,3vh,34px);right:clamp(18px,2.5vw,38px);width:min(460px,calc(100vw - 36px));gap:12px;font-family:inherit;}',
-            '.lf-ab-toast{position:relative;min-height:116px;gap:17px;padding:17px 20px 17px 17px;border-radius:19px;border:1px solid rgba(166,143,255,.38);background:radial-gradient(ellipse at 0% 0%,rgba(115,82,190,.24),transparent 58%),linear-gradient(125deg,rgba(24,23,42,.99),rgba(27,32,49,.99) 70%,rgba(27,43,53,.98));box-shadow:0 16px 42px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.07);backdrop-filter:blur(14px);}',
-            '.lf-ab-toast:before{content:"";position:absolute;left:0;top:13px;bottom:13px;width:4px;border-radius:0 5px 5px 0;background:var(--lf-ab-rarity,#9875ff);box-shadow:0 0 15px var(--lf-ab-glow,rgba(152,117,255,.4));}',
-            '.lf-ab-orb{width:66px;height:66px;min-width:66px;border-radius:17px;font-size:32px;background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.25),transparent 52%),linear-gradient(145deg,rgba(104,78,170,.72),rgba(47,42,76,.96));border:1px solid var(--lf-ab-glow,rgba(152,117,255,.35));box-shadow:0 8px 22px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.12);}',
-            '.lf-ab-copy{gap:5px;padding:1px 0;}',
-            '.lf-ab-eyebrow{color:#c8b7ff;font-size:10px;letter-spacing:1.35px;font-weight:800;}',
-            '.lf-ab-title{font-size:18px;line-height:1.25;font-weight:850;color:#fff;}',
-            '.lf-ab-detail{color:#b9b5cb;font-size:12px;line-height:1.4;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}',
-            '.lf-ab-points{display:inline-flex;align-self:flex-start;margin-top:4px;padding:5px 9px;border-radius:8px;background:rgba(237,194,102,.12);border:1px solid rgba(237,194,102,.22);color:#f2cd7d;font-size:12px;}',
-            '.lf-ab-toast.lf-ab-visible{transform:translateX(0) scale(1);}',
-            '.lf-ab-toast.lf-ab-exit{opacity:0;transform:translateY(-8px) scale(.985);}',
-            '@media (max-width:600px){#litefin-achievement-toast-container{top:12px;right:12px;width:calc(100vw - 24px)}.lf-ab-toast{min-height:96px;padding:13px 14px;gap:12px}.lf-ab-orb{width:54px;height:54px;min-width:54px;border-radius:14px;font-size:27px}.lf-ab-title{font-size:16px}}',
-            '@media (min-width:1000px){.lf-ab-toast{min-height:124px;padding:19px 22px}.lf-ab-orb{width:72px;height:72px;min-width:72px;font-size:35px}.lf-ab-title{font-size:20px}}',
-            '@media (prefers-reduced-motion:reduce){.lf-ab-toast{transition:none;transform:none}.lf-ab-toast.lf-ab-visible{transform:none}}'
-        ].join('');
-        document.head.appendChild(style);
-    }
-
-    _getContainer() {
-        let container = document.getElementById('litefin-achievement-toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'litefin-achievement-toast-container';
-            container.setAttribute('role', 'status');
-            container.setAttribute('aria-live', 'polite');
-            (document.body || document.documentElement).appendChild(container);
-        }
-        this._applyToastPosition(this._prefs || {});
-        return container;
-    }
-
-    _applyToastPosition(prefs = {}) {
-        const container = document.getElementById('litefin-achievement-toast-container');
-        if (!container) return;
-        const position = String(prefs.ToastPosition || prefs.toastPosition || this._defaultToastPosition || '').toLowerCase();
-        container.style.top = '';
-        container.style.right = '';
-        container.style.bottom = '';
-        container.style.left = '';
-        container.style.transform = '';
-        container.style.alignItems = 'flex-end';
-        const positions = {
-            'top-right': { top: 'clamp(18px,3vh,34px)', right: 'clamp(18px,2.5vw,38px)', align: 'flex-end' },
-            'top-center': { top: 'clamp(18px,3vh,34px)', left: '50%', transform: 'translateX(-50%)', align: 'center' },
-            'top-left': { top: 'clamp(18px,3vh,34px)', left: 'clamp(18px,2.5vw,38px)', align: 'flex-start' },
-            'bottom-right': { bottom: 'clamp(18px,3vh,34px)', right: 'clamp(18px,2.5vw,38px)', align: 'flex-end' },
-            'bottom-center': { bottom: 'clamp(18px,3vh,34px)', left: '50%', transform: 'translateX(-50%)', align: 'center' },
-            'bottom-left': { bottom: 'clamp(18px,3vh,34px)', left: 'clamp(18px,2.5vw,38px)', align: 'flex-start' }
-        };
-        const selected = positions[position];
-        if (!selected) return; // Empty = follow the server's default placement.
-        if (selected.top) container.style.top = selected.top;
-        if (selected.bottom) container.style.bottom = selected.bottom;
-        if (selected.left) container.style.left = selected.left;
-        if (selected.right) container.style.right = selected.right;
-        if (selected.transform) container.style.transform = selected.transform;
-        container.style.alignItems = selected.align;
-    }
-
-    _renderToast(payload, prefs) {
-        const container = this._getContainer();
-        this._applyToastPosition(prefs || {});
-        const isMilestone = typeof payload.milestone === 'number';
-        const russian = /^ru(?:-|$)/i.test(document.documentElement.lang || i18n.currentLang || '');
-        const copyText = (ru, en) => russian ? ru : en;
-        const badges = payload.badges || [];
-        const badge = badges[0] || {};
-        const rarity = isMilestone ? 'legendary' : String(badge.Rarity || 'common').toLowerCase();
-        const color = RARITY_COLORS[rarity] || RARITY_COLORS.common;
-
-        const toast = document.createElement('div');
-        toast.className = 'lf-ab-toast';
-        toast.style.setProperty('--lf-ab-rarity', color);
-        toast.style.setProperty('--lf-ab-glow', color + '66');
-
-        const orb = document.createElement('div');
-        orb.className = 'lf-ab-orb';
-        orb.textContent = isMilestone ? '🎯' : '🏆';
-
-        const copy = document.createElement('div');
-        copy.className = 'lf-ab-copy';
-
-        const eyebrow = document.createElement('div');
-        eyebrow.className = 'lf-ab-eyebrow';
-        eyebrow.textContent = isMilestone ? copyText('Достигнут рубеж', 'Achievement milestone') : (rarity === 'common' || rarity === 'uncommon' ? copyText('Достижение получено', 'Achievement unlocked') : copyText('Редкое достижение получено', 'Rare achievement unlocked'));
-
-        const title = document.createElement('div');
-        title.className = 'lf-ab-title';
-
-        const detail = document.createElement('div');
-        detail.className = 'lf-ab-detail';
-
-        const points = document.createElement('div');
-        points.className = 'lf-ab-points';
-
-        if (isMilestone) {
-            title.textContent = copyText('Новый игровой рубеж', 'Library milestone reached');
-            detail.textContent = payload.milestone + copyText('% достижений выполнено', '% of achievements completed');
-        } else if (badges.length > 1) {
-            title.textContent = badges.length + copyText(' достижений получено', ' achievements unlocked');
-            detail.textContent = badges.slice(0, 3).map((entry) => {
-                const localized = localizeAchievementBadge(entry, document.documentElement.lang || i18n.currentLang || 'en');
-                return localized.Title || localized.title || copyText('Достижение', 'Achievement');
-            }).join(' · ');
-            if (badges.length > 3) detail.textContent += ' +' + (badges.length - 3);
-        } else {
-            const localized = localizeAchievementBadge(badge, document.documentElement.lang || i18n.currentLang || 'en');
-            title.textContent = localized.Title || localized.title || copyText('Достижение получено', 'Achievement unlocked');
-            detail.textContent = localized.Description || localized.description || copyText('Продолжай смотреть, чтобы открыть новые достижения.', 'Keep watching to unlock more achievements.');
-        }
-
-        const totalPoints = badges.reduce((sum, entry) => sum + (Number(entry.ScorePoints || entry.scorePoints) || 0), 0);
-        if (totalPoints > 0) {
-            points.textContent = '+' + totalPoints + copyText(' очков', ' points');
-            copy.appendChild(points);
-        }
-
-        copy.appendChild(eyebrow);
-        copy.appendChild(title);
-        copy.appendChild(detail);
-        toast.appendChild(orb);
-        toast.appendChild(copy);
-        container.appendChild(toast);
-
-        window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => toast.classList.add('lf-ab-visible'));
-        });
-
-        const video = document.querySelector('video');
-        const watching = !!(video && !video.paused && !video.ended);
-        const muteDuringPlayback = prefs.MuteToastSoundDuringPlayback !== false
-            && prefs.muteToastSoundDuringPlayback !== false;
-        if (prefs.EnableSound !== false && !(watching && muteDuringPlayback)) {
-            this._playChime(rarity);
-        }
-
-        this._toastTimer = window.setTimeout(() => {
-            toast.classList.add('lf-ab-exit');
-            window.setTimeout(() => {
-                if (toast.parentNode) toast.parentNode.removeChild(toast);
-                this._visible = false;
-                this._toastTimer = null;
-                this._drainQueue(this._prefs || {});
-            }, 450);
-        }, 8200);
-    }
-
-    _playChime(rarity) {
-        try {
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-            if (!this._audioContext) this._audioContext = new AudioContextClass();
-            const context = this._audioContext;
-            if (context.state === 'suspended') context.resume().catch(() => {});
-
-            const notes = (RARITY_ORDER[rarity] || 0) >= 2 ? [659.25, 783.99, 1046.5] : [523.25, 659.25, 783.99];
-            const start = context.currentTime;
-            notes.forEach((frequency, index) => {
-                const oscillator = context.createOscillator();
-                const gain = context.createGain();
-                const at = start + index * 0.11;
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(frequency, at);
-                gain.gain.setValueAtTime(0.0001, at);
-                gain.gain.linearRampToValueAtTime(0.13, at + 0.025);
-                gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.19);
-                oscillator.connect(gain);
-                gain.connect(context.destination);
-                oscillator.start(at);
-                oscillator.stop(at + 0.2);
-            });
-        } catch (_) {
-            // Audio can be blocked until the user interacts with the TV app.
+            this._inflight = false;
         }
     }
 }
 
 export const achievementNotifications = new AchievementNotifications();
-export default achievementNotifications;
