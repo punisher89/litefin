@@ -154,6 +154,139 @@ class AchievementBadgesClient {
         return api.get(ROOT + '/public-config');
     }
 
+    // Server-authoritative social, personal statistics, showcase and settings.
+    savePreferences(preferences) {
+        return api.post(this.userRoot + '/preferences', preferences);
+    }
+
+    getUiFeatures() {
+        return api.get(ROOT + '/admin/ui-features');
+    }
+
+    checkMilestones() {
+        return api.get(this.userRoot + '/check-milestones');
+    }
+
+    getActivityFeed(page = 1, pageSize = 20) {
+        return api.get(ROOT + '/activity-feed', { page, pageSize });
+    }
+
+    getRecentUnlocks(limit = 12) {
+        return api.get(this.userRoot + '/recent-unlocks-v2', { limit });
+    }
+
+    getNextBadges(limit = 6) {
+        return api.get(this.userRoot + '/next-badges', { limit });
+    }
+
+    getCategoryProgress() {
+        return api.get(this.userRoot + '/category-progress');
+    }
+
+    getRecords() {
+        return api.get(this.userRoot + '/records');
+    }
+
+    getStreakCalendar(weeks = 26) {
+        return api.get(this.userRoot + '/streak-calendar', { weeks });
+    }
+
+    getWatchCalendar(days = 90) {
+        return api.get(this.userRoot + '/watch-calendar', { days });
+    }
+
+    getRecap(period = 'week') {
+        return api.get(this.userRoot + '/recap', { period });
+    }
+
+    getWrapped(year) {
+        return api.get(this.userRoot + '/wrapped', year ? { year } : null);
+    }
+
+    getBadgeEta(limit = 12) {
+        return api.get(this.userRoot + '/badge-eta', { limit });
+    }
+
+    getPersonalRecommendations(limit = 10) {
+        return api.get(this.userRoot + '/recommendations', { limit });
+    }
+
+    getWatchClock() {
+        return api.get(this.userRoot + '/watch-clock');
+    }
+
+    getShowcase() {
+        return this.getEquipped();
+    }
+
+    getCompareHistory() {
+        return api.get(this.userRoot + '/compare-history');
+    }
+
+    getPrestigeLeaderboard(limit = 10) {
+        return api.get(ROOT + '/leaderboard-prestige', { limit });
+    }
+
+    prestige() {
+        return api.post(this.userRoot + '/prestige');
+    }
+
+    pinBadge(id, pinned = true) {
+        return api.post(this.userRoot + '/pin/' + encodeURIComponent(id), { Pinned: pinned });
+    }
+
+    getPublicProfile(userId) {
+        return api.get(ROOT + '/profiles/' + encodeURIComponent(userId) + '/summary');
+    }
+
+    compareUsers(otherUserId) {
+        return api.get(ROOT + '/compare/' + encodeURIComponent(this.userId) + '/' + encodeURIComponent(otherUserId));
+    }
+
+    getGroup(conversationId) {
+        return api.get(this.userRoot + '/conversations/' + encodeURIComponent(conversationId));
+    }
+
+    createGroup(name, memberIds = []) {
+        return api.post(this.userRoot + '/conversations', { Name: name, MemberIds: memberIds });
+    }
+
+    renameGroup(id, name) {
+        return api.post(this.userRoot + '/conversations/' + encodeURIComponent(id) + '/rename', { Name: name });
+    }
+
+    addGroupMember(id, memberId) {
+        return api.post(this.userRoot + '/conversations/' + encodeURIComponent(id) + '/members/' + encodeURIComponent(memberId));
+    }
+
+    removeGroupMember(id, memberId) {
+        return api.delete(this.userRoot + '/conversations/' + encodeURIComponent(id) + '/members/' + encodeURIComponent(memberId));
+    }
+
+    deleteMessage(id) {
+        return api.delete(this.userRoot + '/messages/by-id/' + encodeURIComponent(id));
+    }
+
+    clearConversation(id) {
+        return api.delete(this.userRoot + '/conversations/' + encodeURIComponent(id) + '/clear');
+    }
+
+    blockUser(id) {
+        return api.post(this.userRoot + '/block/' + encodeURIComponent(id));
+    }
+
+    unblockUser(id) {
+        return api.delete(this.userRoot + '/block/' + encodeURIComponent(id));
+    }
+
+    getBlockedUsers() {
+        return api.get(this.userRoot + '/blocked');
+    }
+
+    getProfileExport() {
+        return api.get(this.userRoot + '/export');
+    }
+
     getUnlocksSince(since, deviceId) {
         const params = { since };
         if (deviceId) params.deviceId = deviceId;
