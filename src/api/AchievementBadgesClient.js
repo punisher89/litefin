@@ -248,11 +248,11 @@ class AchievementBadgesClient {
     }
 
     createGroup(name, memberIds = []) {
-        return api.post(this.userRoot + '/conversations', { Name: name, MemberIds: memberIds });
+        return api.post(this.userRoot + '/conversations', { Title: name, ParticipantIds: memberIds });
     }
 
     renameGroup(id, name) {
-        return api.post(this.userRoot + '/conversations/' + encodeURIComponent(id) + '/rename', { Name: name });
+        return api.post(this.userRoot + '/conversations/' + encodeURIComponent(id) + '/rename', { Title: name });
     }
 
     addGroupMember(id, memberId) {
