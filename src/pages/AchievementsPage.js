@@ -9,6 +9,7 @@ import { renderAchievementIcon } from '../utils/AchievementIcons.js';
 import { localizeAchievementBadge, localizeAchievementRank, localizeAchievementQuest } from '../utils/AchievementBadgeLocalization.js';
 import { achievementCornerToasts } from '../utils/AchievementCornerToasts.js';
 import { AchievementExtras } from './AchievementsExtras.js';
+import { AchievementsAdvanced } from './AchievementsAdvanced.js';
 import { toast } from '../ui/Toast.js';
 import { focusManager } from '../ui/FocusManager.js';
 import { logger } from '../utils/Logger.js';
@@ -32,7 +33,9 @@ const WORDS = {
         epic: 'Эпический', legendary: 'Легендарный', mythic: 'Мифический',
         actionError: 'Не удалось изменить выбранные значки',
         readOnly: 'Данные загружаются с сервера Jellyfin',
-        shop: 'Магазин', cosmetics: 'Оформление', friends: 'Друзья', messages: 'Сообщения'
+        shop: 'Магазин', cosmetics: 'Оформление', friends: 'Друзья', messages: 'Сообщения',
+        stats: 'Статистика', activity: 'События', showcase: 'Витрина', goals: 'Цели',
+        prestige: 'Престиж', settings: 'Настройки'
     },
     en: {
         title: 'Achievements', subtitle: 'Your cinema journey',
@@ -50,7 +53,9 @@ const WORDS = {
         epic: 'Epic', legendary: 'Legendary', mythic: 'Mythic',
         actionError: 'Could not update equipped badges',
         readOnly: 'Data comes from your Jellyfin server',
-        shop: 'Shop', cosmetics: 'Cosmetics', friends: 'Friends', messages: 'Messages'
+        shop: 'Shop', cosmetics: 'Cosmetics', friends: 'Friends', messages: 'Messages',
+        stats: 'Statistics', activity: 'Activity', showcase: 'Showcase', goals: 'Goals',
+        prestige: 'Prestige', settings: 'Settings'
     }
 };
 
@@ -81,6 +86,7 @@ export default class AchievementsPage extends Page {
         this.title = this.w.title;
         this._onClick = (e) => this._handleClick(e);
         this._extras = new AchievementExtras(this);
+        this._advanced = new AchievementsAdvanced(this);
     }
 
     render() {
@@ -143,7 +149,9 @@ export default class AchievementsPage extends Page {
                 badges: 'tabs.my_badges', quests: 'tabs.quests', leaderboard: 'tabs.leaderboard',
                 collection: 'achievements.profile_title', noBadge: 'achievements.no_badges_match_filter',
                 loading: 'achievements.loading', shop: 'loadout.tab.shop', cosmetics: 'loadout.tab.cosmetics',
-                testNotifications: 'admin.section_test_toast'
+                testNotifications: 'admin.section_test_toast', stats: 'tabs.stats',
+                activity: 'tabs.activity', showcase: 'tabs.showcase',
+                goals: 'tabs.challenges', prestige: 'tabs.prestige', settings: 'tabs.settings'
             };
             this.w = { ...WORDS[this._language] };
             for (const [word, key] of Object.entries(keyMap)) {
@@ -226,7 +234,7 @@ export default class AchievementsPage extends Page {
                 <div><span>✦ ${escapeHtml(this.w.bank)}</span><strong>${Number(bank.ScoreBank || 0)}</strong></div>
             </div>
             <div class="achievements-tabs" id="achievements-tabs">
-                ${['badges','quests','leaderboard','shop','cosmetics','friends','messages'].map((name) => `<button tabindex="0" data-ach-tab="${name}" class="${this._tab === name ? 'is-active' : ''}">${escapeHtml(this.w[name])}</button>`).join('')}
+                ${['badges','quests','leaderboard','shop','cosmetics','friends','messages','stats','activity','showcase','goals','prestige','settings'].map((name) => `<button tabindex="0" data-ach-tab="${name}" class="${this._tab === name ? 'is-active' : ''}">${escapeHtml(this.w[name])}</button>`).join('')}
                 <button tabindex="0" class="achievements-test-notification" data-ach-action="test-notification">🔔 ${escapeHtml(this.w.testNotifications || (this._language === 'ru' ? 'Проверить уведомления' : 'Test notification'))}</button>
             </div>
             <div id="achievements-tab-content">${this._renderTab()}</div>
@@ -237,7 +245,7 @@ export default class AchievementsPage extends Page {
     }
 
     _renderTab() {
-        if (['shop', 'cosmetics', 'friends', 'messages'].includes(this._tab)) return '<div class="achievements-message">' + escapeHtml(this.w.loading) + '</div>';
+        if (['shop', 'cosmetics', 'friends', 'messages', 'stats', 'activity', 'showcase', 'goals', 'prestige', 'settings'].includes(this._tab)) return '<div class="achievements-message">' + escapeHtml(this.w.loading) + '</div>';
         if (this._tab === 'quests') return this._renderQuests();
         if (this._tab === 'leaderboard') return this._renderLeaderboard();
         return this._renderBadges();
@@ -320,7 +328,9 @@ export default class AchievementsPage extends Page {
     async _handleClick(event) {
         const button = event.target.closest('button');
         if (!button || !this.el.contains(button)) return;
-        if (button.dataset.achExtra) {
+        if (button.dataset.achAdvanced) {
+            await this._advanced.handle(button);
+        } else if (button.dataset.achExtra) {
             await this._extras.handle(button);
         } else if (button.dataset.achTab) {
             this._tab = button.dataset.achTab;
@@ -328,6 +338,7 @@ export default class AchievementsPage extends Page {
             const active = this.$('#achievements-tabs .is-active');
             if (active) active.focus();
             if (['shop', 'cosmetics', 'friends', 'messages'].includes(this._tab)) await this._extras.open(this._tab);
+            else if (['stats', 'activity', 'showcase', 'goals', 'prestige', 'settings'].includes(this._tab)) await this._advanced.open(this._tab);
         } else if (button.dataset.achFilter) {
             this._filter = button.dataset.achFilter;
             this._draw();
@@ -381,7 +392,7 @@ export default class AchievementsPage extends Page {
     }
 
     onBack() {
-        return this._extras.onBack();
+        return this._advanced.onBack() || this._extras.onBack();
     }
 
     _setActionError() {
@@ -393,6 +404,7 @@ export default class AchievementsPage extends Page {
         this._loadId++;
         this._clearFocus();
         this._extras.destroy();
+        this._advanced.destroy();
         if (this.el) this.el.removeEventListener('click', this._onClick);
     }
 }
