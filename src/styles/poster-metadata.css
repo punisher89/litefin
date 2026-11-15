@@ -18,3 +18,12 @@
 .details-award-row span { margin-top: 3px; font-size: 16px; color: var(--jf-text-secondary); }
 
 .details-award-row.focused { outline: 2px solid var(--jf-accent); border-radius: var(--jf-border-radius); }
+
+.resume-metadata-overlay { position: absolute; top: 7px; left: 7px; right: 7px; bottom: 34px; z-index: 5; pointer-events: none; overflow: hidden; }
+.resume-metadata-quality, .resume-metadata-ratings { position: absolute; top: 0; display: flex; flex-direction: column; align-items: flex-start; max-width: 54%; }
+.resume-metadata-quality { left: 0; }
+.resume-metadata-ratings { right: 0; align-items: flex-end; max-width: 43%; }
+.resume-metadata-chip { display: block; width: auto; padding: 2px 5px; margin-bottom: 2px; border-radius: 3px; font-size: 12px; font-weight: 700; line-height: 1.2; background: var(--jf-background); color: var(--jf-text-primary); }
+.resume-meta-resolution { background: var(--jf-info, var(--jf-accent)); color: var(--jf-accent-content-color, var(--jf-text-primary)); }
+.resume-meta-codec { background: var(--jf-success, var(--jf-background)); }
+.resume-meta-range, .resume-meta-certification { background: var(--jf-warning, var(--jf-background)); color: var(--jf-background); }

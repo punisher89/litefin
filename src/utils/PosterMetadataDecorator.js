@@ -1,4 +1,5 @@
 import { api } from '../api/index.js';
+import ResumeMetadataOverlay from '../components/ResumeMetadataOverlay.js';
 import CardRenderer from './CardRenderer.js';
 import { lazyLoader } from './LazyLoader.js';
 import { serverPosterArtwork, mergeServerArtwork } from './ServerPosterArtwork.js';
@@ -12,6 +13,7 @@ export default class PosterMetadataDecorator {
     constructor(container) {
         this.container = container;
         this._records = new Map();
+        this._overlays = new Map();
         this._seen = new WeakSet();
         this._queue = [];
         this._running = 0;
@@ -42,6 +44,12 @@ export default class PosterMetadataDecorator {
     }
 
     _scan() {
+        this._overlays.forEach((overlay, card) => {
+            if (!this.container.contains(card)) {
+                overlay.destroy();
+                this._overlays.delete(card);
+            }
+        });
         this.container.querySelectorAll('[data-poster-series-id]').forEach((card) => {
             if (this._seen.has(card)) return;
             this._seen.add(card);
@@ -58,6 +66,43 @@ export default class PosterMetadataDecorator {
                 time: Date.now(),
                 promise: api.getItem(id, { Fields: 'ImageBlurHashes,SeriesPrimaryImageTag' }).catch(() => null)
             };
+            cache.set(key, record);
+        }
+        return record.promise;
+    }
+
+    async _resumeData(id) {
+        const key = this._session + '/resume-metadata/' + id;
+        let record = cache.get(key);
+        if (!record || Date.now() - record.time > 600000) {
+            const promise = (async () => {
+                try {
+                    const response = await api.post('/JellyfinEnhanced/tag-data/' + api.userId, [id], {
+                        suppressUnauthorized: true
+                    });
+                    const items = response?.Items || response?.items;
+                    const data = items?.find(
+                        (entry) =>
+                            String(entry.Id || entry.id)
+                                .replace(/-/g, '')
+                                .toLowerCase() === String(id).replace(/-/g, '').toLowerCase()
+                    );
+                    if (data) return data;
+                    // A successful filtered response may intentionally hide tags for this title.
+                    if (Array.isArray(items)) return null;
+                } catch {
+                    /* Older servers can still provide their own media DTO. */
+                }
+                try {
+                    return await api.getItem(id, {
+                        Fields: 'MediaSources,MediaStreams,CommunityRating,CriticRating,OfficialRating'
+                    });
+                } catch {
+                    return null;
+                }
+            })();
+            record = { time: Date.now(), promise };
+            if (cache.size >= 300) cache.delete(cache.keys().next().value);
             cache.set(key, record);
         }
         return record.promise;
@@ -80,6 +125,17 @@ export default class PosterMetadataDecorator {
         const valid = () =>
             this._active && this.container.contains(card) && this._session === `${api.serverUrl}|${api.userId}`;
         if (!record || !valid()) return;
+        if (record.options.contextType === 'resume') {
+            // Do not refresh, replace, crop or resize the current resume image.
+            const wide =
+                record.options.isLandscape ||
+                document.documentElement.getAttribute('data-layout-media-rows') === 'expanded';
+            if (serverPosterArtwork(record.item, wide, CardRenderer._getPrefs().preferEpisodeImages)) return;
+            const data = await this._resumeData(card.dataset.itemId);
+            if (data && valid() && !this._overlays.has(card))
+                this._overlays.set(card, new ResumeMetadataOverlay(card, record.item, data));
+            return;
+        }
         const landscape =
             record.options.isLandscape ||
             document.documentElement.getAttribute('data-layout-media-rows') === 'expanded';
@@ -124,6 +180,8 @@ export default class PosterMetadataDecorator {
         this._active = false;
         this._queue.length = 0;
         this._records.clear();
+        this._overlays.forEach((overlay) => overlay.destroy());
+        this._overlays.clear();
         this._observer.disconnect();
         this._io.disconnect();
     }

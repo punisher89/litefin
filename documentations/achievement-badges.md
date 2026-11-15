@@ -42,8 +42,8 @@ translation fall back to English. The test button and metadata labels are locali
 
 ## Posters and details
 
-Home posters, Continue Watching and Next Up use the server's annotated artwork,
-without a separate Litefin rating star or technical chip stack. Signed native
+Home posters and Next Up use the server's annotated artwork without a separate
+Litefin rating star. Signed native
 Thumb/Primary variants take precedence over ordinary backdrops, including the
 wide image used during poster expansion. For companion batch/merged responses
 whose wrapper bypasses Enhanced's DTO filter, nearby cards refresh image tags
@@ -56,8 +56,19 @@ episode and season cards refresh their parent series artwork when necessary. The
 preserved, as are playback state, button focus and native lazy image loading.
 Requests are bounded to four concurrent cards with a server/user-scoped cache.
 
-Jellyfin-Enhanced must have **Native poster tags** enabled on the server/user;
-browser-only JS overlays cannot appear in Litefin. Existing library quality
+Continue Watching keeps its current image node, source, fit and dimensions. If
+the current image already has native server annotations, it is left alone.
+Otherwise a lightweight, noninteractive overlay displays technical format/audio,
+certification and source-labelled ratings from the read-only Enhanced tag-data
+API. Older servers fall back to their actual Jellyfin media DTO, without invented
+provider scores. Metadata rendering does not request or replace poster artwork;
+labels do not intercept input or cover the progress bar. Removed virtual cards
+and page teardown release their overlay components. The app's score visibility
+preference remains respected.
+
+For annotations baked into server images, Jellyfin-Enhanced must have **Native
+poster tags** enabled on the server/user. The resume metadata overlay uses
+tag-data independently of that image option. Browser-only JS overlays cannot appear in Litefin. Existing library quality
 preferences and details technical text remain available.
 
 Movie/series details (including Discover details) have a native **Awards**
