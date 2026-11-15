@@ -5,7 +5,7 @@
 - App ID: `org.litefin.app`
 - Internal version: `2.0.300`; build revision: `r3`
 - Build tier: Normal, intended for webOS 6
-- Source: [`f10a03dbabd71841090dcbf5323ce2a7fcd4b967`](https://github.com/punisher89/litefin/commit/f10a03dbabd71841090dcbf5323ce2a7fcd4b967)
+- Source: [`2f921ba1e1b70ad47976dabc3858b56192b1436b`](https://github.com/punisher89/litefin/commit/2f921ba1e1b70ad47976dabc3858b56192b1436b)
 - Changes: [PR #4](https://github.com/punisher89/litefin/pull/4)
 - Build: `npm run package:webos-normal`
 
@@ -31,7 +31,7 @@ standard Jellyfin/Seerr metadata is used when available. Unknown dates are omitt
 Validation: 1,133 tests passed, ESLint passed, and actual compiled components
 were exercised in Chromium 79 against a mock API, including all ten tabs,
 zero iframes, native directional/Enter/modal navigation, synthetic notification,
-poster metadata, actor ages, release dates surviving hero refresh, and teardown.
+poster metadata, actor ages, release dates surviving hero refresh, and teardown including temporary attachment URL cleanup.
 LG hardware, virtual keyboard and live server operations still need device validation.
 Global achievement overlays over the video player are not part of the page integration.
 
