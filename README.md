@@ -1,12 +1,12 @@
-# Litefin — webOS 6 Normal, r8
+# Litefin — webOS 6 Normal, r9
 
-[Download the ready-to-install r8 IPK](https://github.com/punisher89/litefin/raw/refs/heads/builds/achievement-badges-webos6-normal/Litefin-2.0.300-webOS-Normal-r8.ipk)
+[Download the ready-to-install r9 IPK](https://github.com/punisher99/litefin/raw/refs/heads/builds/achievement-badges-webos6-normal/Litefin-2.0.300-webOS-Normal-r9.ipk)
 
 - App ID: `org.litefin.app`
-- Internal version: `2.0.300`; build revision: `r8`
+- Internal version: `2.0.300`; build revision: `r9`
 - Target: webOS 6 Normal
-- Source: [`56eeb64b3794beb51f37ecb848ecfda1d95b5ea3`](https://github.com/punisher89/litefin/commit/56eeb64b3794beb51f37ecb848ecfda1d95b5ea3)
-- Changes: [PR #4](https://github.com/punisher89/litefin/pull/4)
+- Source: [`48154ac39a65c94a7f43cc30c74e2ab980f8340a`](https://github.com/punisher99/litefin/commit/48154ac39a65c94a7f43cc30c74e2ab980f8340a)
+- Changes: [PR #4](https://github.com/punisher99/litefin/pull/4)
 - Build: `npm run package:webos-normal`
 
 ## Home poster artwork
@@ -27,6 +27,14 @@ field is explicitly requested. The complete server tag and user marker are retai
 The separate Litefin score star is removed. For Continue Watching, the lightweight overlay uses the read-only Enhanced
 `tag-data/{userId}` API: resolution, source, HDR/Dolby Vision, codec, audio/channels,
 certification and source-labelled ratings. Pascal/camel-case DTOs are supported.
+Resume badges now use the installed plugin's own rating-source PNG logos
+(IMDb, TMDB, Rotten Tomatoes, etc.), numeric scores on dark pills, and its quality
+palette read as color data from the public quality resource. No downloaded
+JavaScript is executed and no Enhanced script/logo assets are bundled. Composite
+audio badges keep matching source labels/colors; rating logos have fixed inline
+sizing and opacity independent of card-artwork CSS. Existing episode-code badges
+keep their space.
+
 The exact existing image node, source, fit, dimensions and card geometry stay
 unchanged. Existing native annotations are not duplicated. Score privacy applies;
 missing fields are omitted. Older plugin versions fall back to actual Jellyfin
@@ -56,10 +64,11 @@ Browser-only Jellyfin Web overlays cannot run in Litefin.
 The AchievementBadges server plugin remains required for its backend API.
 Global achievement overlays over the video player are outside this page work.
 
-Validation: 1,148 Node tests and ESLint pass. Actual compiled components checked
+Validation: 1,151 Node tests and ESLint pass. Actual compiled components checked
 in Chromium 79: ten tabs, native focus and modal trapping, synthetic notification,
 six translated rarities, hydration of signed movie and series Thumb URLs from
 plain batch-row data, resume overlay with image node, URL, inline style and dimensions unchanged,
+server palette extraction, actual plugin PNG loading, visible 14px rating logos,
 horizontal fallback without portrait substitution,
 latest-season/episode parent poster hydration, absence of the separate rating star, awards expansion and
 D-pad row navigation, age/date rendering, refresh persistence and teardown.
@@ -67,4 +76,4 @@ The IPK was inspected for production component/API/locale markers. Physical LG
 hardware and live server operations still require device validation.
 
 Bundled MIT AchievementBadges and Apache Material Icons notices are included.
-SHA-256 hashes are in `SHA256SUMS`; previous r1–r7 packages are retained.
+SHA-256 hashes are in `SHA256SUMS`; previous r1–r8 packages are retained.
