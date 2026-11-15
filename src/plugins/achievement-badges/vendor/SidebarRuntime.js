@@ -163,6 +163,10 @@ export default function startRuntime(environment) {
         }
         return fallback != null ? fallback : key;
     }
+    function trRarity(value){
+        var raw = value == null ? '' : String(value).trim();
+        return tr('rarity.' + raw.toLowerCase(), raw);
+    }
     function loadSidebarTranslations(){
         var uid = getUserId();
         var prefP = uid
@@ -549,7 +553,7 @@ export default function startRuntime(environment) {
                 if(badges&&badges.length){
                     badges.forEach(function(b){
                         var color=rc(b.Rarity);
-                        var pill=document.createElement('div');pill.title=b.Title+' ('+b.Rarity+')';
+                        var pill=document.createElement('div');pill.title=b.Title+' ('+trRarity(b.Rarity)+')';
                         pill.style.cssText='display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 5px;border-radius:999px;background:'+color+'1a;border:1px solid '+(ring||color)+';font-size:11px;cursor:default;line-height:1;'+(ring?'box-shadow:0 0 0 1px '+ring+', 0 0 8px '+ring+'66;':'');
                         pill.innerHTML='<span class="material-icons" style="font-family:Material Icons;font-size:15px;line-height:1;color:#fff;opacity:0.95;">'+icName(b.Icon)+'</span><span style="color:'+color+';font-weight:700;line-height:1;">'+escapeHtml(b.Title)+'</span>';
                         sc.appendChild(pill);
@@ -562,7 +566,7 @@ export default function startRuntime(environment) {
                 if(badges&&badges.length){
                     badges.forEach(function(b){
                         var color=rc(b.Rarity);
-                        var dot=document.createElement('div');dot.title=b.Title+' ('+b.Rarity+')';
+                        var dot=document.createElement('div');dot.title=b.Title+' ('+trRarity(b.Rarity)+')';
                         dot.style.cssText='width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:'+color+'26;border:1.5px solid '+(ring||color)+';box-shadow:0 0 12px '+(ring||color)+'55'+(ring?', 0 0 0 1px '+ring:'')+';';
                         dot.innerHTML='<span class="material-icons" style="font-family:Material Icons;font-size:16px;line-height:1;color:#fff;">'+icName(b.Icon)+'</span>';
                         hdr.appendChild(dot);

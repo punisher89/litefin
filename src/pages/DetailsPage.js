@@ -12,7 +12,6 @@ import '../styles/details.css';
 import '../styles/season.css';
 
 import Page from './Page.js';
-import PosterQualityPanel from '../components/PosterQualityPanel.js';
 import ReleaseDatesPanel from '../components/ReleaseDatesPanel.js';
 import PersonAgeDecorator from '../utils/PersonAgeDecorator.js';
 import { api } from '../api/index.js';
@@ -1536,13 +1535,6 @@ class DetailsPage extends Page {
                 });
             }
         });
-    }
-
-    _renderPosterQuality() {
-        this._posterQuality?.destroy();
-        const poster = this.$('#poster');
-        if (poster && ['Movie', 'Series', 'Episode', 'Video'].includes(this._item?.Type))
-            this._posterQuality = new PosterQualityPanel(poster, this._item, this._selectedMediaSourceId);
     }
 
     _loadImages() {
@@ -3123,7 +3115,6 @@ class DetailsPage extends Page {
     }
 
     _renderHeroText() {
-        this._renderPosterQuality();
         const item = this._item;
 
         // Build meta items (Year, Runtime, Ratings)
@@ -7407,7 +7398,6 @@ class DetailsPage extends Page {
     }
 
     destroy() {
-        this._posterQuality?.destroy();
         this._releaseDates?.destroy();
         this._personAges?.destroy();
         // --------------------------------------------------------------------

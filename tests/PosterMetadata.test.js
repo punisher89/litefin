@@ -42,19 +42,21 @@ const { storage } = await import('../src/utils/StorageService.js');
 const { i18n } = await import('../src/utils/i18n.js');
 const { default: CardRenderer } = await import('../src/utils/CardRenderer.js');
 
-test('home cards render video quality and a score without requiring the library quality toggle', () => {
+test('home cards keep server-rendered technical artwork and display a community score', () => {
     CardRenderer.clearCache();
     const item = {
         Id: 'home-score',
         Name: 'Movie',
         Type: 'Movie',
         CommunityRating: 8.2,
+        ImageTags: { Primary: 'server-jet-token' },
         Width: 1920,
         Height: 1080,
         MediaStreams: [{ Type: 'Video', Width: 1920, Height: 1080 }]
     };
     let html = CardRenderer.createCardHtml(item, { type: 'poster', showPosterBadges: true });
-    assert.match(html, /quality-resolution[^>]*>1080p/);
+    assert.doesNotMatch(html, /quality-badge|poster-quality-chip/);
+    assert.match(html, /tag=server-jet-token/);
     assert.match(html, /poster-rating-badge/);
     assert.match(html, /8\.2/);
     html = CardRenderer.createCardHtml(item, { type: 'poster' });

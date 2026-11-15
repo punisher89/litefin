@@ -42,17 +42,20 @@ translation fall back to English. The test button and metadata labels are locali
 
 ## Posters and details
 
-Home posters, Continue Watching and Next Up display community scores and
-technical chips at the top left, inspired by the layout of Jellyfin-Enhanced:
-resolution, explicit source (BluRay/WEB-DL/etc.), Dolby Vision/HDR/HLG, IMAX/3D,
-video codec and audio format/channels. Atmos requires explicit stream evidence;
-EAC3 alone is not Atmos. The large movie/series details poster has the same stack;
-movie version selection updates its metadata. No Enhanced frontend code is copied.
-Normal item queries request the needed fields. If the
-companion's merged rows omit them, visible cards are filled lazily with bounded
-concurrency and a per-server/user cache. A series quality label describes a
-representative episode, with a tooltip explaining that episodes can differ;
-a specific episode always uses that episode's actual stream metadata.
+Home posters, Continue Watching and Next Up retain community scores. Technical
+quality labels come from the server's poster image, without Litefin overlays or
+representative-episode quality requests. The large movie/series details poster
+uses the original artwork path from before r4. Image tags provided by Jellyfin
+(including Jellyfin-Enhanced native poster tag variants) are passed unchanged.
+Jellyfin-Enhanced must have **Native poster tags** enabled on the server/user to
+include those tags for a native client; browser-only JS overlays cannot appear
+in Litefin. Existing library quality preferences and details technical text
+remain available. Missing community scores are filled lazily with bounded
+concurrency and a per-server/user cache.
+
+Rarity text uses the same localized labels in badge cards, equipped cards,
+showcases, pinned goals, recent unlocks and badge tooltips. API values and
+rarity classes remain unchanged for filtering, rewards and colors.
 
 Discover displays explicitly sourced **TMDB** vote averages below its film/TV
 posters. Generic Jellyfin community scores are not relabeled as TMDB scores.

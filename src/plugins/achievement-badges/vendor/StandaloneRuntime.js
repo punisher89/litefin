@@ -72,7 +72,7 @@ export default function startRuntime(environment) {
     // Translate a badge rarity label (Common, Uncommon, Rare, Epic, Legendary, Mythic).
     function trRarity(r) {
         if (r == null || r === '') return '';
-        var raw = String(r);
+        var raw = String(r).trim();
         var key = 'rarity.' + raw.toLowerCase();
         if (translations && translations[key]) return translations[key];
         return raw;
@@ -2992,7 +2992,7 @@ export default function startRuntime(environment) {
                 '<div class="ab-feed-icon ' + rarityClass(b.Rarity) + '">' + icon(b.Icon) + '</div>' +
                 '<div class="ab-feed-body">' +
                     '<div class="ab-feed-text"><strong>' + escapeHtml(b.Title) + '</strong></div>' +
-                    '<div class="ab-feed-meta"><span class="' + rarityClass(b.Rarity) + '">' + b.Rarity + '</span> · ' + when + '</div>' +
+                    '<div class="ab-feed-meta"><span class="' + rarityClass(b.Rarity) + '">' + escapeHtml(trRarity(b.Rarity)) + '</span> · ' + when + '</div>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -3318,7 +3318,7 @@ export default function startRuntime(environment) {
             equipped.slice(0, 5).map(function (b) {
                 var color = LB_RARITY_COLORS[(b.Rarity || '').toLowerCase()] || '#9fb3c8';
                 var iconName = safeIcon(b.Icon);
-                return '<span title="' + escapeHtml(b.Title || '') + ' (' + escapeHtml(b.Rarity || '') + ')" ' +
+                return '<span title="' + escapeHtml(b.Title || '') + ' (' + escapeHtml(trRarity(b.Rarity)) + ')" ' +
                     'style="width:' + px + 'px;height:' + px + 'px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;' +
                     'background:' + color + '26;border:1.5px solid ' + color + ';box-shadow:0 0 8px ' + color + '55;">' +
                     '<span class="material-icons" style="font-family:Material Icons;font-size:' + Math.max(10, px - 6) + 'px;line-height:1;color:#fff;">' + iconName + '</span>' +
@@ -3403,7 +3403,7 @@ export default function startRuntime(environment) {
         var scFrame = (v2EquippedFrameId && v2EquippedFrameId !== 'frame-default') ? ' ' + v2EquippedFrameId : '';
         badges.forEach(function (b) {
             var c = document.createElement('div'); c.className = 'ab-sc-card' + scFrame;
-            c.innerHTML = '<div class="ab-sc-icon">' + icon(b.Icon) + '</div><div><div style="font-weight:700;">' + escapeHtml(b.Title) + '</div><div class="' + rarityClass(b.Rarity) + '" style="font-size:0.88em;">' + escapeHtml(b.Rarity) + '</div></div>';
+            c.innerHTML = '<div class="ab-sc-icon">' + icon(b.Icon) + '</div><div><div style="font-weight:700;">' + escapeHtml(b.Title) + '</div><div class="' + rarityClass(b.Rarity) + '" style="font-size:0.88em;">' + escapeHtml(trRarity(b.Rarity)) + '</div></div>';
             sc.appendChild(c);
         });
     }
@@ -3421,7 +3421,7 @@ export default function startRuntime(environment) {
             var c = document.createElement('div');
             c.className = 'ab-card' + frameCls;
             c.setAttribute('data-badge-id', b.Id);
-            c.innerHTML = '<div class="ab-card-h"><div class="ab-card-icon">' + icon(b.Icon) + '</div><div style="flex:1;"><div class="ab-card-title">' + escapeHtml(b.Title) + '</div><div class="ab-card-meta ' + rarityClass(b.Rarity) + '">' + escapeHtml(b.Rarity) + '</div></div></div>' +
+            c.innerHTML = '<div class="ab-card-h"><div class="ab-card-icon">' + icon(b.Icon) + '</div><div style="flex:1;"><div class="ab-card-title">' + escapeHtml(b.Title) + '</div><div class="ab-card-meta ' + rarityClass(b.Rarity) + '">' + escapeHtml(trRarity(b.Rarity)) + '</div></div></div>' +
                 '<div class="ab-footer"><div class="ab-unlocked">' + tr('badge.equipped_state', 'Equipped') + '</div><button type="button" class="ab-btn">' + tr('badge.unequip', 'Unequip') + '</button></div>';
             c.querySelector('button').addEventListener('click', function () { doUnequip(b.Id); });
             row.appendChild(c);
@@ -3996,7 +3996,7 @@ export default function startRuntime(environment) {
             var eta = badgeEtaMap[b.Id];
             var etaText = eta && eta.DaysRemaining != null ? '\u00b7 ' + tr('common.eta', 'ETA ~') + eta.DaysRemaining + tr('common.day_suffix', 'd') : '';
             return '<div class="ab-goal-card ' + rarityClass(b.Rarity) + '-border" data-badge="' + b.Id + '">' +
-                '<div class="ab-goal-label ' + rarityClass(b.Rarity) + '">' + (b.Rarity || '') + '</div>' +
+                '<div class="ab-goal-label ' + rarityClass(b.Rarity) + '">' + escapeHtml(trRarity(b.Rarity)) + '</div>' +
                 '<div class="ab-goal-text">' + escapeHtml(b.Title || '') + '</div>' +
                 '<div class="ab-goal-meta">' + cur + ' / ' + tar + ' (' + pct + '%) ' + etaText + '</div>' +
                 '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin-top:0.5em; overflow:hidden;">' +
