@@ -1,13 +1,34 @@
-# Litefin — webOS 6 Normal, r9
+# Litefin — webOS 6 Normal, r10
 
-[Download the ready-to-install r9 IPK](https://github.com/punisher99/litefin/raw/refs/heads/builds/achievement-badges-webos6-normal/Litefin-2.0.300-webOS-Normal-r9.ipk)
+[Download the ready-to-install r10 IPK](https://github.com/punisher109/litefin/raw/refs/heads/builds/achievement-badges-webos6-normal/Litefin-2.0.300-webOS-Normal-r10.ipk)
 
 - App ID: `org.litefin.app`
-- Internal version: `2.0.300`; build revision: `r9`
+- Internal version: `2.0.300`; build revision: `r10`
 - Target: webOS 6 Normal
-- Source: [`48154ac39a65c94a7f43cc30c74e2ab980f8340a`](https://github.com/punisher99/litefin/commit/48154ac39a65c94a7f43cc30c74e2ab980f8340a)
-- Changes: [PR #4](https://github.com/punisher99/litefin/pull/4)
+- Source: [`b4fb53672e319274906ec9465044e336c222b874`](https://github.com/punisher109/litefin/commit/b4fb53672e319274906ec9465044e336c222b874)
+- Changes: [PR #4](https://github.com/punisher109/litefin/pull/4)
 - Build: `npm run package:webos-normal`
+
+## Personal metadata settings
+
+Continue Watching now reads Enhanced public-config and the current user's
+settings.json once per Home page instance. Personal values override public
+defaults; null inherits. Supported controls include the native master/user
+switches; quality, genre, language, rating and age groups; Continue Watching
+and item-type scopes; four corner positions/Corners profile off slots; order,
+caps, scale and spacing; quality-category switches/order; rating sources,
+minimum score and score color; audio/subtitle language display and priorities.
+Band/caption layouts are not replicated by the client overlay.
+
+To configure, use the SAME account in Jellyfin Web as in Litefin. Open the
+**Enhanced Panel** from the drawer, or **Jellyfin Enhanced** in the Jellyfin 12
+avatar menu, then **Media Tags**. Choose groups and corner positions, save,
+and reopen Litefin's Home page. Server/user native tag switches must permit
+the feature. The client only reads settings; no settings are written to the server.
+
+Browser checks also change user settings and recreate Home: disabled groups
+vanish, rating source selection changes, groups move to chosen corners and
+settings are fetched once again. Existing image nodes and URLs stay unchanged.
 
 ## Home poster artwork
 
@@ -41,7 +62,7 @@ missing fields are omitted. Older plugin versions fall back to actual Jellyfin
 media metadata without fictional provider scores.
 
 Jellyfin-Enhanced **Native poster tags** is required for annotations baked into
-server images on other rows, independently of the new Continue Watching overlay.
+server images on other rows, while the Continue Watching overlay follows the same master/user visibility choices.
 Browser-only Jellyfin Web overlays cannot run in Litefin.
 
 ## Details and achievements
@@ -64,7 +85,7 @@ Browser-only Jellyfin Web overlays cannot run in Litefin.
 The AchievementBadges server plugin remains required for its backend API.
 Global achievement overlays over the video player are outside this page work.
 
-Validation: 1,151 Node tests and ESLint pass. Actual compiled components checked
+Validation: 1,158 Node tests and ESLint pass. Actual compiled components checked
 in Chromium 79: ten tabs, native focus and modal trapping, synthetic notification,
 six translated rarities, hydration of signed movie and series Thumb URLs from
 plain batch-row data, resume overlay with image node, URL, inline style and dimensions unchanged,
@@ -76,4 +97,4 @@ The IPK was inspected for production component/API/locale markers. Physical LG
 hardware and live server operations still require device validation.
 
 Bundled MIT AchievementBadges and Apache Material Icons notices are included.
-SHA-256 hashes are in `SHA256SUMS`; previous r1–r8 packages are retained.
+SHA-256 hashes are in `SHA256SUMS`; previous r1–r9 packages are retained.
