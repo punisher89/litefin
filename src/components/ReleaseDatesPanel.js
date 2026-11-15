@@ -14,6 +14,13 @@ export default class ReleaseDatesPanel extends Component {
         this.item = item || {};
         this.mount();
         this._active = true;
+        // Favorite/metadata updates can replace the hero's contents without
+        // navigating away. Keep the already-resolved dates on that same page.
+        this._observer = new MutationObserver(() => {
+            const hero = container.querySelector('#hero-info');
+            if (this._active && hero && this.el && this.el.parentNode !== hero) hero.appendChild(this.el);
+        });
+        this._observer.observe(container, { childList: true, subtree: true });
         this.region = storage.getItem('pref:seerrRegion') || 'US';
         this._render(releaseDates(this.item, {}, this.region));
         this._load();
@@ -65,6 +72,7 @@ export default class ReleaseDatesPanel extends Component {
 
     destroy() {
         this._active = false;
+        this._observer.disconnect();
         super.destroy();
     }
 }
