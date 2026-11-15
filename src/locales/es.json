@@ -1710,7 +1710,8 @@
     "Yes": "Sí",
     "Zoom": "Zoom",
     "Achievements": "Achievements",
-    "AchievementsEnter": "Open achievements",
     "AchievementsLoading": "Loading Achievement Badges…",
-    "AchievementsUnavailable": "Could not open Achievement Badges. Install or update AchievementBadges on this Jellyfin server, check the connection, then try again."
+    "AchievementsUnavailable": "Could not open Achievement Badges. Install or update AchievementBadges on this Jellyfin server, check the connection, then try again.",
+    "AchievementsTestNotification": "Test notification",
+    "AchievementsTestUnavailable": "Notification preview is unavailable. Update AchievementBadges on the server."
 }

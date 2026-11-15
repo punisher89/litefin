@@ -35,6 +35,23 @@ function createHost(fetch) {
     return { host, session };
 }
 
+test('notification preview uses the upstream synthetic toast without writing to the API', () => {
+    const { host } = createHost(() => {
+        throw new Error('Preview must not call the API');
+    });
+    const previews = [];
+    host.frame = {
+        contentWindow: { abAchievementTestToast: (rarity) => previews.push(rarity) },
+        remove() {}
+    };
+    assert.equal(host.testNotification(), true);
+    assert.deepEqual(previews, ['rare']);
+    delete host.frame.contentWindow.abAchievementTestToast;
+    assert.equal(host.testNotification(), false);
+    host.destroy();
+    assert.equal(host.testNotification(), false);
+});
+
 test('server subpaths and encoded plugin paths survive URL resolution', () => {
     assert.equal(
         achievementUrl('https://media.example/jellyfin///', '/Plugins/AchievementBadges/users/a%20b'),

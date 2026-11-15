@@ -1710,7 +1710,8 @@
     "Yes": "Да",
     "Zoom": "Зум",
     "Achievements": "Достижения",
-    "AchievementsEnter": "Открыть достижения",
     "AchievementsLoading": "Загрузка Achievement Badges…",
-    "AchievementsUnavailable": "Не удалось открыть Achievement Badges. Установите или обновите плагин AchievementBadges на сервере Jellyfin, проверьте соединение и повторите попытку."
+    "AchievementsUnavailable": "Не удалось открыть Achievement Badges. Установите или обновите плагин AchievementBadges на сервере Jellyfin, проверьте соединение и повторите попытку.",
+    "AchievementsTestNotification": "Тест уведомлений",
+    "AchievementsTestUnavailable": "Тест уведомлений недоступен. Обновите AchievementBadges на сервере."
 }

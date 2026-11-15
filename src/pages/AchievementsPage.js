@@ -33,8 +33,7 @@ export default class AchievementsPage extends Page {
                 <div class="achievements-toolbar">
                     <h1 data-i18n="Achievements">Achievements</h1>
                     <div class="achievements-actions">
-                        <button class="btn focusable" tabindex="0" data-action="enter" data-i18n="AchievementsEnter">Open achievements</button>
-                        <button class="btn focusable" tabindex="0" data-action="retry" data-i18n="ButtonTryAgain">Try again</button>
+                        <button class="btn focusable" tabindex="0" data-action="test-notification" data-i18n="AchievementsTestNotification">Test notification</button>
                     </div>
                 </div>
                 <p class="achievements-status" role="status" aria-live="polite"></p>
@@ -46,10 +45,21 @@ export default class AchievementsPage extends Page {
         i18n.translateDOM(this.el);
         this.registerFocusSection('achievements-actions', this.$('.achievements-actions'), {
             orientation: 'horizontal',
-            leaveLeft: 'sidebar'
+            leaveLeft: 'sidebar',
+            onMove: (direction) => {
+                if (direction === 'down' || direction === 'right') {
+                    this._host?.focus();
+                    return true;
+                }
+                return false;
+            }
         });
-        this.$('[data-action="enter"]').addEventListener('click', () => this._host?.focus());
-        this.$('[data-action="retry"]').addEventListener('click', () => this._load());
+        this.$('[data-action="test-notification"]').addEventListener('click', () => {
+            if (this._host?.testNotification()) return;
+            const status = this.$('.achievements-status');
+            status.hidden = false;
+            status.textContent = i18n.t('AchievementsTestUnavailable');
+        });
         for (const name of ['auth:logout', 'auth:login', 'auth:restored']) {
             this._subscriptions.push(
                 eventBus.on(name, () => {
@@ -65,8 +75,8 @@ export default class AchievementsPage extends Page {
         const generation = ++this._generation;
         this._host?.destroy();
         const status = this.$('.achievements-status');
-        const enter = this.$('[data-action="enter"]');
-        enter.disabled = true;
+        const testButton = this.$('[data-action="test-notification"]');
+        testButton.disabled = true;
         status.hidden = false;
         status.textContent = i18n.t('AchievementsLoading');
         const host = new AchievementBadgesHost({
@@ -79,7 +89,7 @@ export default class AchievementsPage extends Page {
             getSession: () => ({ serverUrl: api.serverUrl, accessToken: api.accessToken, userId: api.userId }),
             getHeaders: (url) => customHeaders.getHeadersForUrl(url, api.serverUrl),
             fetch: window.fetch.bind(window),
-            onExit: () => focusManager.focusElement(enter),
+            onExit: () => focusManager.focusElement(testButton),
             onNavigate: (path) => router.navigate(path)
         });
         this._host = host;
@@ -87,7 +97,7 @@ export default class AchievementsPage extends Page {
             await host.mount(this.$('.achievements-host'));
             if (generation !== this._generation) return;
             status.hidden = true;
-            enter.disabled = false;
+            testButton.disabled = false;
         } catch (error) {
             if (generation !== this._generation) return;
             host.destroy();
@@ -99,6 +109,7 @@ export default class AchievementsPage extends Page {
                 this.markReady();
                 this.restoreScrollFocusWhenReady();
                 this.setActiveSection('achievements-actions');
+                if (!testButton.disabled) host.focus();
             }
         }
     }

@@ -31,8 +31,13 @@ under Jellyfin's plugin endpoints, as in Jellyfin Web. Cross-origin clients
 need the normal Jellyfin CORS configuration. Proxies that also protect static
 assets may require a same-origin deployment.
 
-Use **Open achievements** to transfer keyboard/remote focus into the page.
-Arrow keys move between controls. Escape / TV Back returns to the Litefin
+The page transfers keyboard/remote focus into the plugin automatically.
+The toolbar contains only **Test notification**, which plays the plugin's own
+synthetic Rare badge animation without awarding a badge or writing profile data.
+From that toolbar button, Down/Right returns to the plugin controls.
+Arrow keys move between controls with smooth scrolling; Magic Remote wheel
+input is eased and coalesced. The plugin's Reduced motion preference and the
+system motion preference disable these animations. Escape / TV Back returns to the Litefin
 toolbar (or closes an open badge dialog); the next Back uses Litefin's normal
 navigation. The plugin's Back Home link opens Litefin Home. Leaving the page
 removes its document, timers and observers and aborts outstanding requests.

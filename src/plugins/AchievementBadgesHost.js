@@ -7,6 +7,7 @@
  */
 
 import { installAchievementCompatibility } from './AchievementBadgesCompat.js';
+import AchievementBadgesScroller from './AchievementBadgesScroller.js';
 
 const PLUGIN_PATH = '/Plugins/AchievementBadges';
 
@@ -113,6 +114,7 @@ export default class AchievementBadgesHost {
                 removeItem: (key) => storage.removeItem(prefix + key)
             }
         });
+        this._scroller = new AchievementBadgesScroller(win);
         const style = doc.createElement('style');
         style.textContent = `
             @font-face{font-family:'Material Icons';font-style:normal;font-weight:400;
@@ -267,8 +269,28 @@ export default class AchievementBadgesHost {
     focus() {
         if (!this.frame || this._disposed) return;
         const control = this._controls()[0];
-        if (control) control.focus();
+        if (control) this._focusControl(control);
         else this.frame.focus();
+    }
+
+    /** Preview the plugin's real toast animation without awarding a badge. */
+    testNotification() {
+        if (this._disposed || !this.frame) return false;
+        const win = this.frame.contentWindow;
+        if (typeof win.abAchievementTestToast !== 'function') return false;
+        win.abAchievementTestToast('rare');
+        return true;
+    }
+
+    _focusControl(control) {
+        this._scroller.cancel();
+        // focus() scrolled instantly before scrollIntoView could animate.
+        control.focus({ preventScroll: true });
+        control.scrollIntoView({
+            behavior: this._scroller.reducedMotion() ? 'auto' : 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        });
     }
 
     _onKey(event) {
@@ -304,8 +326,7 @@ export default class AchievementBadgesHost {
         const next = controls.includes(target) ? nextAchievementControl(target, controls, direction) : controls[0];
         if (next) {
             event.preventDefault();
-            next.focus();
-            next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            this._focusControl(next);
         } else if (direction === 'left' || direction === 'up') {
             event.preventDefault();
             this.options.onExit();
@@ -336,6 +357,7 @@ export default class AchievementBadgesHost {
     /** Remove the entire browsing context, stopping all upstream timers/observers. */
     destroy() {
         this._disposed = true;
+        if (this._scroller) this._scroller.destroy();
         if (this._removeCompatibility) this._removeCompatibility();
         if (this._cancelScript) this._cancelScript();
         this._requests.forEach((controller) => controller.abort());
