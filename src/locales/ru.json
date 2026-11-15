@@ -1722,5 +1722,10 @@
     "SeriesSampleQuality": "Качество файла одной из серий; у других серий оно может отличаться.",
     "ReleasePremiere": "Премьера",
     "ReleaseTheatrical": "Прокат",
-    "ReleaseDigital": "Цифровой релиз"
+    "ReleaseDigital": "Цифровой релиз",
+    "DetailsAwards": "Награды",
+    "AwardsWins": "Победы",
+    "AwardsNominations": "Номинации",
+    "AwardsWon": "Победа",
+    "AwardsNominated": "Номинация"
 }

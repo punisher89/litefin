@@ -1,9 +1,3 @@
-.media-card .poster-rating-badge {
-    position: absolute; right: 10px; bottom: 46px; z-index: 3;
-    display: flex; align-items: center; padding: 4px 8px; border-radius: 7px;
-    color: var(--jf-text-primary); background: var(--jf-background); font-size: 17px; font-weight: 600;
-}
-.poster-rating-badge svg { width: 17px; height: 17px; margin-right: 5px; color: var(--jf-accent); }
 .card-tmdb-rating { display: flex; justify-content: center; align-items: center; margin-top: 6px; font-size: 17px; color: var(--jf-text-primary); }
 .card-tmdb-rating span { font-size: 12px; font-weight: 700; margin-right: 7px; color: var(--jf-accent); }
 .card-tmdb-rating svg { width: 17px; height: 17px; margin-right: 4px; }
@@ -14,3 +8,13 @@
 .details-release-dates span { margin: 3px 16px 3px 0; }
 
 .details-release-dates:empty { display: none; }
+
+.details-awards { margin-top: 16px; }
+.details-awards[hidden], .details-awards-list[hidden] { display: none; }
+.details-awards-toggle { width: 100%; min-height: 48px; padding: 12px 16px; text-align: left; font-size: 19px;
+    border: 1px solid var(--jf-accent); border-radius: var(--jf-border-radius); background: var(--jf-background); color: var(--jf-text-primary); }
+.details-awards-toggle.focused, .details-awards-toggle:focus { outline: 3px solid var(--jf-accent); }
+.details-award-row { display: flex; flex-direction: column; padding: 10px 4px; color: var(--jf-text-primary); }
+.details-award-row span { margin-top: 3px; font-size: 16px; color: var(--jf-text-secondary); }
+
+.details-award-row.focused { outline: 2px solid var(--jf-accent); border-radius: var(--jf-border-radius); }

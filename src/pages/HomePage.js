@@ -2610,7 +2610,7 @@ class HomePage extends Page {
             focusSectionId: `home-row-${descriptor.id}`,
             // Card render function — delegates to CardRenderer via Page._renderMediaCard
             renderCard: (item) =>
-                CardRenderer.createCardHtml(item, {
+                this._posterMetadata.renderCard(item, {
                     isLandscape,
                     type: descriptor.cardType || descriptor.contextType || 'poster',
                     contextType: descriptor.contextType,

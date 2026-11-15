@@ -42,7 +42,7 @@ const { storage } = await import('../src/utils/StorageService.js');
 const { i18n } = await import('../src/utils/i18n.js');
 const { default: CardRenderer } = await import('../src/utils/CardRenderer.js');
 
-test('home cards keep server-rendered technical artwork and display a community score', () => {
+test('home cards preserve server artwork without a separate score star', () => {
     CardRenderer.clearCache();
     const item = {
         Id: 'home-score',
@@ -57,8 +57,7 @@ test('home cards keep server-rendered technical artwork and display a community 
     let html = CardRenderer.createCardHtml(item, { type: 'poster', showPosterBadges: true });
     assert.doesNotMatch(html, /quality-badge|poster-quality-chip/);
     assert.match(html, /tag=server-jet-token/);
-    assert.match(html, /poster-rating-badge/);
-    assert.match(html, /8\.2/);
+    assert.doesNotMatch(html, /poster-rating-badge/);
     html = CardRenderer.createCardHtml(item, { type: 'poster' });
     assert.doesNotMatch(html, /poster-rating-badge/);
 });
@@ -72,4 +71,15 @@ test('Discover displays a specifically identified TMDB score below the poster', 
     assert.match(html, /card-tmdb-rating/);
     assert.match(html, /TMDB/);
     assert.match(html, /7\.6/);
+});
+
+test('home landscape and expanded art prefer annotated server images over ordinary backdrops', () => {
+    CardRenderer.clearCache();
+    const movie = { Id: 'signed-landscape', Name: 'Signed', Type: 'Movie',
+        ImageTags: { Primary: 'poster-jetToken', Thumb: 'thumb-jetToken' }, BackdropImageTags: ['plain-backdrop'] };
+    const html = CardRenderer.createCardHtml(movie, { isLandscape: true, type: 'resume', contextType: 'resume', showPosterBadges: true });
+    assert.match(html, /Images\/Thumb[^"<>]*tag=thumb-jetToken/);
+    assert.doesNotMatch(html, /tag=plain-backdrop|poster-rating-badge/);
+    const fresh = { ...movie, ImageTags: { ...movie.ImageTags, Thumb: 'thumb-jetUpdated' } };
+    assert.match(CardRenderer.createCardHtml(fresh, { isLandscape: true, type: 'resume', contextType: 'resume', showPosterBadges: true }), /tag=thumb-jetUpdated/);
 });

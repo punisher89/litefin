@@ -1,13 +1,17 @@
 import { api } from '../api/index.js';
-import { detailsIcons } from './Icons.js';
-import { shouldShowScore } from './visibility.js';
+import CardRenderer from './CardRenderer.js';
+import { lazyLoader } from './LazyLoader.js';
+import { serverPosterArtwork, mergeServerArtwork } from './ServerPosterArtwork.js';
 
 const cache = new Map();
 
-/** Lazy rating fallback for unrated movie and resume/series posters. */
+/** Companion row wrappers can bypass Enhanced's DTO filter. Resolve native
+ * artwork from standard authenticated item responses, only for nearby cards.
+ */
 export default class PosterMetadataDecorator {
     constructor(container) {
         this.container = container;
+        this._records = new Map();
         this._seen = new WeakSet();
         this._queue = [];
         this._running = 0;
@@ -29,21 +33,29 @@ export default class PosterMetadataDecorator {
         this._scan();
     }
 
+    renderCard(item, options) {
+        const key = item.Id + '|' + options.contextType;
+        const record = this._records.get(key);
+        const artworkItem = record?.fresh ? mergeServerArtwork(item, record.fresh) : item;
+        this._records.set(key, { item: artworkItem, options, fresh: record?.fresh });
+        return CardRenderer.createCardHtml(artworkItem, options);
+    }
+
     _scan() {
         this.container.querySelectorAll('[data-poster-series-id]').forEach((card) => {
             if (this._seen.has(card)) return;
             this._seen.add(card);
-            if (!card.querySelector('.poster-rating-badge')) this._io.observe(card);
+            this._io.observe(card);
         });
     }
 
-    _cached(key, load) {
-        const scoped = this._session + key;
-        let record = cache.get(scoped);
-        if (!record || Date.now() - record.time > 3600000) {
-            if (cache.size > 300) cache.delete(cache.keys().next().value);
-            record = { promise: load().catch(() => null), time: Date.now() };
-            cache.set(scoped, record);
+    _cached(id) {
+        const key = this._session + '/' + id;
+        let record = cache.get(key);
+        if (!record || Date.now() - record.time > 600000) {
+            if (cache.size >= 300) cache.delete(cache.keys().next().value);
+            record = { time: Date.now(), promise: api.getItem(id, { Fields: 'ImageBlurHashes' }).catch(() => null) };
+            cache.set(key, record);
         }
         return record.promise;
     }
@@ -60,32 +72,54 @@ export default class PosterMetadataDecorator {
     }
 
     async _decorate(card) {
-        const seriesId = card.dataset.posterSeriesId;
-        const isMovie = card.dataset.posterMediaType === 'Movie';
+        const key = card.dataset.itemId + '|' + card.dataset.contextType;
+        const record = this._records.get(key);
         const valid = () =>
-            this._active && this.container.contains(card) && `${api.serverUrl}|${api.userId}` === this._session;
-        if (!valid()) return;
-        if ((seriesId || isMovie) && !card.querySelector('.poster-rating-badge')) {
-            const series = isMovie
-                ? await this._cached('/item/' + card.dataset.itemId, () =>
-                      api.getItem(card.dataset.itemId, { Fields: 'CommunityRating,UserData' })
-                  )
-                : await this._cached('/rating/' + seriesId, () =>
-                      api.getItem(seriesId, { Fields: 'CommunityRating,UserData' })
-                  );
-            const rating = Number(series?.CommunityRating);
-            if (valid() && rating > 0 && rating <= 10 && shouldShowScore(series)) {
-                const badge = document.createElement('div');
-                badge.className = 'poster-rating-badge';
-                badge.innerHTML = detailsIcons.ratingStar + rating.toFixed(1);
-                card.querySelector('.card-image')?.appendChild(badge);
-            }
+            this._active && this.container.contains(card) && this._session === `${api.serverUrl}|${api.userId}`;
+        if (!record || !valid()) return;
+        const landscape =
+            record.options.isLandscape ||
+            document.documentElement.getAttribute('data-layout-media-rows') === 'expanded';
+        const fresh = await this._cached(card.dataset.itemId);
+        if (!fresh || !valid()) return;
+        let item = mergeServerArtwork(record.item, fresh);
+        // Series thumbs in an episode DTO are not stamped by all plugin versions.
+        if (landscape && item.Type === 'Episode' && item.SeriesId) {
+            const series = await this._cached(item.SeriesId);
+            if (!valid()) return;
+            if (series)
+                item = {
+                    ...item,
+                    SeriesPrimaryImageTag: series.ImageTags?.Primary || item.SeriesPrimaryImageTag,
+                    SeriesThumbImageTag: series.ImageTags?.Thumb || item.SeriesThumbImageTag
+                };
         }
+        record.fresh = item;
+        record.item = item;
+        if (!serverPosterArtwork(item, landscape, CardRenderer._getPrefs().preferEpisodeImages)) return;
+        const temp = document.createElement('div');
+        temp.innerHTML = CardRenderer.createCardHtml(item, record.options);
+        const wrapper = card.querySelector('.card-image');
+        if (!wrapper) return;
+        const oldImage = wrapper.querySelector('img.lazy, img.poster-layer, img[data-src], img.loaded');
+        const newImage = temp.querySelector(
+            '.card-image img.lazy, .card-image img.poster-layer, .card-image img[data-src]'
+        );
+        if (!newImage) return;
+        const newUrl = newImage.dataset.src;
+        if (oldImage && (oldImage.dataset.src || oldImage.getAttribute('src')) === newUrl) return;
+        lazyLoader.clearContainer(wrapper);
+        wrapper.querySelectorAll('img, .blurhash-canvas').forEach((image) => image.remove());
+        temp.querySelectorAll('.card-image > img, .card-image > .blurhash-canvas').forEach((image) =>
+            wrapper.appendChild(image)
+        );
+        lazyLoader.observe(wrapper);
     }
 
     destroy() {
         this._active = false;
         this._queue.length = 0;
+        this._records.clear();
         this._observer.disconnect();
         this._io.disconnect();
     }

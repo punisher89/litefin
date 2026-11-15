@@ -12,6 +12,7 @@ import '../styles/details.css';
 import '../styles/season.css';
 
 import Page from './Page.js';
+import AwardsPanel from '../components/AwardsPanel.js';
 import ReleaseDatesPanel from '../components/ReleaseDatesPanel.js';
 import PersonAgeDecorator from '../utils/PersonAgeDecorator.js';
 import { api } from '../api/index.js';
@@ -1719,6 +1720,9 @@ class DetailsPage extends Page {
     async _loadSecondaryContent() {
         this._releaseDates?.destroy();
         this._releaseDates = new ReleaseDatesPanel(this.el, this._item);
+        this._awards?.destroy();
+        this._awards = new AwardsPanel(this.el, this._item, () => this._rebuildNavigationChain());
+        this.registerFocusSection('details-awards', this._awards.el, { orientation: 'vertical' });
         // Load additional data based on type
         if (this._item.Type === 'Series') {
             /*
@@ -2035,6 +2039,7 @@ class DetailsPage extends Page {
         // Get all registered sections and rebuild their leaveUp/leaveDown links
         const sectionOrder = [
             'details-actions',
+            'details-awards',
             'details-see-more',
             'details-rich-meta',
             'collection-movies-section',
@@ -4481,6 +4486,7 @@ class DetailsPage extends Page {
         const sections = [
             // Actions is always first and visible - needed so we can find what's after it
             { name: 'details-actions', elementId: '#actions', isVisible: () => true },
+            { name: 'details-awards', elementId: '.details-awards', isVisible: () => this._awards?.el?.hidden === false },
             {
                 name: 'details-see-more',
                 elementId: '#details-overview',
@@ -4714,6 +4720,7 @@ class DetailsPage extends Page {
                 elementId: '#details-overview',
                 isVisible: () => this.$('.see-more-btn')?.style?.display !== 'none'
             },
+            { name: 'details-awards', elementId: '.details-awards', isVisible: () => this._awards?.el?.hidden === false },
             { name: 'details-actions', elementId: '#actions', isVisible: () => true } // Actions are always visible
         ];
 
@@ -4840,7 +4847,8 @@ class DetailsPage extends Page {
         // leaveUp is set correctly during initial section registration.
         // This function is specifically for linking DOWN direction.
         const next = this._getNextVisibleSection(sectionName);
-        config.leaveDown = targetName || (next ? next.targetName : null);
+        config.leaveDown = sectionName === 'details-actions' && this._awards?.el?.hidden === false
+            ? 'details-awards' : targetName || (next ? next.targetName : null);
 
         // Re-register to apply changes (preserves existing leaveUp)
         focusManager.register(sectionName, config.container, config);
@@ -7398,6 +7406,7 @@ class DetailsPage extends Page {
     }
 
     destroy() {
+        this._awards?.destroy();
         this._releaseDates?.destroy();
         this._personAges?.destroy();
         // --------------------------------------------------------------------

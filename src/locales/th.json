@@ -1774,5 +1774,10 @@
     "SeriesSampleQuality": "Video quality of a representative episode; other episodes may differ.",
     "ReleasePremiere": "Premiere",
     "ReleaseTheatrical": "Theatrical",
-    "ReleaseDigital": "Digital release"
+    "ReleaseDigital": "Digital release",
+    "DetailsAwards": "Awards",
+    "AwardsWins": "Wins",
+    "AwardsNominations": "Nominations",
+    "AwardsWon": "Won",
+    "AwardsNominated": "Nominated"
 }

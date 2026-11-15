@@ -11,6 +11,7 @@
 import '../styles/discover.css';
 
 import Page from './Page.js';
+import AwardsPanel from '../components/AwardsPanel.js';
 import ReleaseDatesPanel from '../components/ReleaseDatesPanel.js';
 import PersonAgeDecorator from '../utils/PersonAgeDecorator.js';
 import DescriptionModal from '../components/DescriptionModal.js';
@@ -888,6 +889,9 @@ class SeerrDetailsPage extends Page {
     async _loadSecondaryContent(mediaType, tmdbId) {
         this._releaseDates?.destroy();
         this._releaseDates = new ReleaseDatesPanel(this.el, this._item);
+        this._awards?.destroy();
+        this._awards = new AwardsPanel(this.el, this._item, () => this._linkAwardsNavigation());
+        this.registerFocusSection('details-awards', this._awards.el, { orientation: 'vertical' });
         if (!this._personAges) this._personAges = new PersonAgeDecorator(this.el, () => this._item);
         if (!this._item) return;
 
@@ -1079,6 +1083,19 @@ class SeerrDetailsPage extends Page {
         state.delete(stateKey);
     }
 
+    _linkAwardsNavigation() {
+        if (this._awards?.el?.hidden !== false) return;
+        const awards = focusManager.getSectionConfig('details-awards');
+        const actions = focusManager.getSectionConfig('seerr-details-actions');
+        if (!awards || !actions) return;
+        if (actions.leaveDown !== 'details-awards') awards.leaveDown = actions.leaveDown;
+        awards.leaveUp = 'seerr-details-actions';
+        awards.leaveLeft = 'sidebar';
+        actions.leaveDown = 'details-awards';
+        const next = focusManager.getSectionConfig(awards.leaveDown);
+        if (next) next.leaveUp = 'details-awards';
+    }
+
     _registerFocus() {
         const playBtn = this.$('.seerr-play-btn');
         const hasPlayAction = playBtn && !playBtn.classList.contains('hidden');
@@ -1249,6 +1266,7 @@ class SeerrDetailsPage extends Page {
             });
         }
 
+        this._linkAwardsNavigation();
         if (hasAction) this.setActiveSection('seerr-details-actions');
         else if (hasOverviewAction) this.setActiveSection('seerr-details-overview');
         else if (hasRichMeta) this.setActiveSection('details-rich-meta');
@@ -1487,6 +1505,7 @@ class SeerrDetailsPage extends Page {
     }
 
     destroy() {
+        this._awards?.destroy();
         this._releaseDates?.destroy();
         this._personAges?.destroy();
         if (this._tooltipTimers) {

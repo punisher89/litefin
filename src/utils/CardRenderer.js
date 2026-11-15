@@ -14,6 +14,7 @@ import { i18n } from './i18n.js';
 import { storage } from './StorageService.js';
 import { shouldShowScore } from './visibility.js';
 import { detailsIcons, getStaticIcon } from './Icons.js';
+import { serverPosterArtwork } from './ServerPosterArtwork.js';
 import { platformInfo } from './PlatformInfo.js';
 
 class CardRenderer {
@@ -442,7 +443,8 @@ class CardRenderer {
             CardRenderer._htmlCacheKey = cacheKey;
         }
         const itemId = item.Id;
-        const cached = CardRenderer._htmlCache.get(itemId);
+        const artworkKey = `${itemId}|${item.ImageTags?.Primary || ''}|${item.ImageTags?.Thumb || ''}|${item.SeriesPrimaryImageTag || ''}|${item.SeriesThumbImageTag || ''}`;
+        const cached = CardRenderer._htmlCache.get(artworkKey);
         if (cached !== undefined) return cached;
 
         let imageUrl = '';
@@ -481,11 +483,19 @@ class CardRenderer {
         // By default, we expect an image. We DO NOT render the fallback DOM yet to save memory.
         imageInnerHtml = '';
 
+        const nativeArtwork = options.showPosterBadges
+            ? serverPosterArtwork(item, isLandscape || isExpanded, prefs.preferEpisodeImages) : null;
+
         // Poster supplied verbatim by an external provider. Same idea as
         // _dynamicThumbUrl below: skip Jellyfin URL building, which is
         // meaningless for a remote item.
         if (item._imageUrl) {
             imageUrl = item._imageUrl;
+        } else if (nativeArtwork) {
+            const params = imageService.getParams(isLandscape || isExpanded ? 'card-backdrop' : 'poster', contextType);
+            imageUrl = _imgUrl(nativeArtwork.id, nativeArtwork.type, {
+                maxWidth: params.maxWidth, quality: params.quality, tag: nativeArtwork.tag
+            });
         } else if (type === 'person') {
             const primaryTag = item.ImageTags?.Primary || item.PrimaryImageTag;
             const isArtist = item.Type === 'MusicArtist' || item.Type === 'Artist';
@@ -1437,7 +1447,13 @@ class CardRenderer {
             };
 
             let thumbUrl = '';
-            if (preferBackdrops) {
+            const nativeThumb = options.showPosterBadges
+                ? serverPosterArtwork(item, true, prefs.preferEpisodeImages) : null;
+            if (nativeThumb) {
+                thumbUrl = _imgUrl(nativeThumb.id, nativeThumb.type, {
+                    maxWidth: thumbParams.maxWidth, quality: thumbParams.quality, tag: nativeThumb.tag
+                });
+            } else if (preferBackdrops) {
                 thumbUrl = resolveBackdrop() || resolveThumb();
             } else {
                 thumbUrl = resolveThumb() || resolveBackdrop();
@@ -1464,7 +1480,7 @@ class CardRenderer {
             if (thumbUrl) {
                 // Return image tag with data-thumb-src. The image is downloaded eagerly
                 // on-demand when the card receives focus to preserve precious memory.
-                thumbPart = `<img data-thumb-src="${thumbUrl}" class="thumb-layer" alt="" />`;
+                thumbPart = `<img data-thumb-src="${thumbUrl}" class="thumb-layer" ${nativeThumb?.type === 'Primary' ? 'style="object-fit:contain"' : ''} alt="" />`;
             }
         }
 
@@ -1493,7 +1509,7 @@ class CardRenderer {
                 ? `<canvas class="blurhash-canvas" data-blurhash="${blurHash}"></canvas>`
                 : '';
         const imagePart = imageUrl
-            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
+            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} ${nativeArtwork && (isLandscape || isExpanded) && nativeArtwork.type === 'Primary' && !(item.Type === 'Episode' && nativeArtwork.id === itemId) ? 'style="object-fit:contain"' : ''} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
             : `${CardRenderer.getFallbackHtml(item, isLandscape, { hideInitials, isLibrary: type === 'library' })}`;
         const finalContextType = contextType || item.Type;
 
@@ -1589,16 +1605,6 @@ class CardRenderer {
         // Rank badge for ordered rows (Home Screen Sections "Top Ten")
         const rankBadgeHtml = item._rank ? `<div class="card-rank-badge">${parseInt(item._rank, 10)}</div>` : '';
 
-        const rating = Number(item.CommunityRating);
-        const ratingBadgeHtml =
-            options.showPosterBadges &&
-            ['Movie', 'Series', 'Episode'].includes(item.Type) &&
-            Number.isFinite(rating) &&
-            rating > 0 &&
-            rating <= 10 &&
-            shouldShowScore(item)
-                ? `<div class="poster-rating-badge" aria-label="${escapeHtml(i18n.t('CommunityRating'))}: ${rating.toFixed(1)}">${detailsIcons.ratingStar}${rating.toFixed(1)}</div>`
-                : '';
         const tmdbRating = Number(item._tmdbRating);
         const tmdbRatingHtml =
             isSeerrItem &&
@@ -1611,7 +1617,6 @@ class CardRenderer {
                 : '';
         const badgeContainer = `
             ${rankBadgeHtml}
-            ${ratingBadgeHtml}
             ${episodeBadgeHtml}
             ${unplayedCountBadgeHtml}
             ${qualityBadgeHtml}
@@ -1676,7 +1681,7 @@ class CardRenderer {
         `;
 
         // Cache the output for reuse during this render context
-        CardRenderer._htmlCache.set(itemId, html);
+        CardRenderer._htmlCache.set(artworkKey, html);
         return html;
     }
 

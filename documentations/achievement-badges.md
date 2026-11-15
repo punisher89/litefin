@@ -42,16 +42,28 @@ translation fall back to English. The test button and metadata labels are locali
 
 ## Posters and details
 
-Home posters, Continue Watching and Next Up retain community scores. Technical
-quality labels come from the server's poster image, without Litefin overlays or
-representative-episode quality requests. The large movie/series details poster
-uses the original artwork path from before r4. Image tags provided by Jellyfin
-(including Jellyfin-Enhanced native poster tag variants) are passed unchanged.
-Jellyfin-Enhanced must have **Native poster tags** enabled on the server/user to
-include those tags for a native client; browser-only JS overlays cannot appear
-in Litefin. Existing library quality preferences and details technical text
-remain available. Missing community scores are filled lazily with bounded
-concurrency and a per-server/user cache.
+Home posters, Continue Watching and Next Up use the server's annotated artwork,
+without a separate Litefin rating star or technical chip stack. Signed native
+Thumb/Primary variants take precedence over ordinary backdrops, including the
+wide image used during poster expansion. For companion batch/merged responses
+whose wrapper bypasses Enhanced's DTO filter, nearby cards refresh image tags
+through the normal authenticated item endpoint. Episode landscape cards also
+resolve signed series thumbs without revealing episode screenshots when the
+spoiler-free preference is active. The full server tag and user marker are
+preserved, as are playback state, button focus and native lazy image loading.
+Requests are bounded to four concurrent cards with a server/user-scoped cache.
+
+Jellyfin-Enhanced must have **Native poster tags** enabled on the server/user;
+browser-only JS overlays cannot appear in Litefin. Existing library quality
+preferences and details technical text remain available.
+
+Movie/series details (including Discover details) have a native **Awards**
+section backed by `/JellyfinEnhanced/awards/movie|tv/{tmdbId}`. It displays confirmed
+wins/nominations and expandable rows with award names, year and recipients;
+rows can be traversed with the TV remote. Server **Show Awards** must be enabled
+and the title needs a TMDB ID. Disabled/unavailable or empty awards are hidden.
+The client does not use its own Wikidata/TMDB credentials or invent award facts.
+The panel survives hero refresh and releases observers/navigation on exit.
 
 Rarity text uses the same localized labels in badge cards, equipped cards,
 showcases, pinned goals, recent unlocks and badge tooltips. API values and
