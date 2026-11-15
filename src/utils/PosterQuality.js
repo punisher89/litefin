@@ -92,7 +92,11 @@ export function posterQualityTags(item, sourceId) {
         const sound = [audio.Title, audio.DisplayTitle, audio.Profile, audio.Codec].join(' ');
         const code = (audio.Codec || '').toLowerCase();
         const label = /atmos/i.test(sound)
-            ? 'Atmos'
+            ? code === 'eac3'
+                ? 'DD+ ATMOS'
+                : code === 'truehd'
+                  ? 'TRUEHD ATMOS'
+                  : 'ATMOS'
             : /dts[ :_-]?x\b/i.test(sound)
               ? 'DTS:X'
               : /truehd/i.test(code)

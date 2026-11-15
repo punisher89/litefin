@@ -62,7 +62,14 @@ Otherwise a lightweight, noninteractive overlay displays technical format/audio,
 certification and source-labelled ratings from the read-only Enhanced tag-data
 API. Older servers fall back to their actual Jellyfin media DTO, without invented
 provider scores. Metadata rendering does not request or replace poster artwork;
-labels do not intercept input or cover the progress bar. Removed virtual cards
+labels do not intercept input or cover the progress bar. Resume technical badges
+read their exact base palette from the installed Enhanced quality resource as
+color data only (never executing its script). Rating badges use the plugin's
+own CDN PNG logos, numeric values and dark backgrounds, instead of provider-name
+text. Composite audio labels and source-native colors follow those server
+resources. Logo sizing/opacity are isolated from the card artwork's image rules;
+existing episode badges retain their own space. Logos and Enhanced frontend
+scripts are not bundled into Litefin. Removed virtual cards
 and page teardown release their overlay components. The app's score visibility
 preference remains respected.
 

@@ -41,12 +41,16 @@ export function resumeMetadata(data, showScores = true) {
             const value = Number(raw);
             if (raw == null || !Number.isFinite(value) || value < 0 || value > maximum) continue;
             const score = (value * displayMaximum) / maximum;
-            ratings.push({ label, value: displayMaximum === 100 ? `${Math.round(score)}%` : score.toFixed(1) });
+            ratings.push({
+                source: key,
+                label,
+                value: displayMaximum === 100 ? `${Math.round(score)}${key === 'metacritic' ? '' : '%'}` : score.toFixed(1)
+            });
         }
         if (!ratings.length) {
             const value = Number(data.CommunityRating);
             if (data.CommunityRating != null && value >= 0 && value <= 10)
-                ratings.push({ label: 'JF', value: value.toFixed(1) });
+                ratings.push({ source: 'community', label: 'JF', value: value.toFixed(1) });
         }
     }
     return {
