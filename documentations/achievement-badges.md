@@ -49,7 +49,10 @@ wide image used during poster expansion. For companion batch/merged responses
 whose wrapper bypasses Enhanced's DTO filter, nearby cards refresh image tags
 through the normal authenticated item endpoint. Episode landscape cards also
 resolve signed series thumbs without revealing episode screenshots when the
-spoiler-free preference is active. The full server tag and user marker are
+spoiler-free preference is active. Horizontal slots never fall back to a vertical
+signed movie/series poster: without an annotated wide image, they keep the normal
+wide thumbnail/backdrop. Seasons are included in hydration, and both portrait
+episode and season cards refresh their parent series artwork when necessary. The full server tag and user marker are
 preserved, as are playback state, button focus and native lazy image loading.
 Requests are bounded to four concurrent cards with a server/user-scoped cache.
 

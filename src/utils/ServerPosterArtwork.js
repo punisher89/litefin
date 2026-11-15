@@ -6,17 +6,21 @@ export function hasServerPosterTag(tag) {
 }
 
 export function serverPosterArtwork(item, landscape = false, preferEpisodeImages = false) {
-    if (!item || !['Movie', 'Series', 'Episode', 'Season', 'Video'].includes(item.Type)) return null;
+    if (!item || !['Movie', 'Series', 'Episode', 'Season', 'Video', 'BoxSet'].includes(item.Type)) return null;
     const own = (type) => ({ id: item.Id, type, tag: item.ImageTags?.[type] });
     const series = (type) => ({ id: item.SeriesId, type, tag: item['Series' + type + 'ImageTag'] });
     const episode = item.Type === 'Episode';
+    const primaryIsWide = Number(item.PrimaryImageAspectRatio) >= 1.2 || (episode && !item.PrimaryImageAspectRatio);
+    const wideOwn = [own('Thumb'), ...(primaryIsWide ? [own('Primary')] : [])];
     const candidates = landscape
         ? episode && !preferEpisodeImages
-            ? [series('Thumb'), series('Primary')]
-            : [own('Thumb'), own('Primary'), series('Thumb'), series('Primary')]
+            ? [series('Thumb')]
+            : [...wideOwn, series('Thumb')]
         : episode
           ? [series('Primary'), own('Primary')]
-          : [own('Primary')];
+          : item.Type === 'Season'
+            ? [own('Primary'), series('Primary')]
+            : [own('Primary')];
     return candidates.find((image) => image.id && hasServerPosterTag(image.tag)) || null;
 }
 
@@ -31,7 +35,13 @@ export function mergeServerArtwork(item, fresh) {
         'ParentPrimaryImageTag',
         'ParentPrimaryImageItemId',
         'SeriesId',
-        'PrimaryImageAspectRatio'
+        'PrimaryImageAspectRatio',
+        'BackdropImageTags',
+        'ParentBackdropImageTags',
+        'ParentBackdropItemId',
+        'SeriesBackdropImageTags',
+        'ParentThumbItemId',
+        'ParentThumbImageTag'
     ]) {
         if (fresh[key] != null) result[key] = fresh[key];
     }

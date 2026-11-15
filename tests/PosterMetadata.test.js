@@ -83,3 +83,19 @@ test('home landscape and expanded art prefer annotated server images over ordina
     const fresh = { ...movie, ImageTags: { ...movie.ImageTags, Thumb: 'thumb-jetUpdated' } };
     assert.match(CardRenderer.createCardHtml(fresh, { isLandscape: true, type: 'resume', contextType: 'resume', showPosterBadges: true }), /tag=thumb-jetUpdated/);
 });
+
+test('resume keeps wide artwork when the server only annotates the portrait poster', () => {
+    CardRenderer.clearCache();
+    const item = { Id: 'portrait-only', Type: 'Movie', Name: 'Wide fallback', PrimaryImageAspectRatio: 0.667,
+        ImageTags: { Primary: 'portrait-jetSigned', Thumb: 'plain-wide' }, BackdropImageTags: ['plain-bg'] };
+    const html = CardRenderer.createCardHtml(item, { isLandscape: true, type: 'resume', contextType: 'resume', showPosterBadges: true });
+    assert.doesNotMatch(html, /object-fit:contain|tag=portrait-jetSigned/);
+    assert.match(html, /Images\/(Thumb|Backdrop)/);
+});
+
+test('latest seasons are included in server artwork hydration', () => {
+    CardRenderer.clearCache();
+    const html = CardRenderer.createCardHtml({ Id: 'season', Type: 'Season', SeriesId: 'series', Name: 'Season 1' },
+        { type: 'poster', contextType: 'latest', showPosterBadges: true });
+    assert.match(html, /data-poster-media-type="Season"/);
+});

@@ -54,7 +54,10 @@ export default class PosterMetadataDecorator {
         let record = cache.get(key);
         if (!record || Date.now() - record.time > 600000) {
             if (cache.size >= 300) cache.delete(cache.keys().next().value);
-            record = { time: Date.now(), promise: api.getItem(id, { Fields: 'ImageBlurHashes' }).catch(() => null) };
+            record = {
+                time: Date.now(),
+                promise: api.getItem(id, { Fields: 'ImageBlurHashes,SeriesPrimaryImageTag' }).catch(() => null)
+            };
             cache.set(key, record);
         }
         return record.promise;
@@ -84,19 +87,20 @@ export default class PosterMetadataDecorator {
         if (!fresh || !valid()) return;
         let item = mergeServerArtwork(record.item, fresh);
         // Series thumbs in an episode DTO are not stamped by all plugin versions.
-        if (landscape && item.Type === 'Episode' && item.SeriesId) {
+        if (['Episode', 'Season'].includes(item.Type) && item.SeriesId) {
             const series = await this._cached(item.SeriesId);
             if (!valid()) return;
             if (series)
                 item = {
                     ...item,
                     SeriesPrimaryImageTag: series.ImageTags?.Primary || item.SeriesPrimaryImageTag,
-                    SeriesThumbImageTag: series.ImageTags?.Thumb || item.SeriesThumbImageTag
+                    SeriesThumbImageTag: series.ImageTags?.Thumb || item.SeriesThumbImageTag,
+                    SeriesBackdropImageTags: series.BackdropImageTags || item.SeriesBackdropImageTags
                 };
         }
         record.fresh = item;
         record.item = item;
-        if (!serverPosterArtwork(item, landscape, CardRenderer._getPrefs().preferEpisodeImages)) return;
+        if (!landscape && !serverPosterArtwork(item, false, CardRenderer._getPrefs().preferEpisodeImages)) return;
         const temp = document.createElement('div');
         temp.innerHTML = CardRenderer.createCardHtml(item, record.options);
         const wrapper = card.querySelector('.card-image');

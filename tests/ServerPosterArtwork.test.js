@@ -32,3 +32,16 @@ test('award API casing is normalized while names and recipients remain data', ()
     assert.equal(normalizeAwards({ found: false }), null);
     assert.equal(normalizeAwards({ awards: [{ name: 'Invented', result: 'Maybe' }] }), null);
 });
+
+test('horizontal cards never select a portrait movie or series Primary as their native variant', () => {
+    const movie = { Id: 'movie', Type: 'Movie', PrimaryImageAspectRatio: 0.667, ImageTags: { Primary: 'portrait-jetSigned' } };
+    assert.equal(serverPosterArtwork(movie, true), null);
+    const episode = { Id: 'episode', Type: 'Episode', SeriesId: 'series', SeriesPrimaryImageTag: 'portrait-jetSigned' };
+    assert.equal(serverPosterArtwork(episode, true), null);
+});
+
+test('recent seasons without a signed own poster can use the series poster', () => {
+    const season = { Id: 'season', Type: 'Season', SeriesId: 'series',
+        ImageTags: { Primary: 'ordinary-season' }, SeriesPrimaryImageTag: 'series-jetSigned-jeu123' };
+    assert.deepEqual(serverPosterArtwork(season), { id: 'series', type: 'Primary', tag: 'series-jetSigned-jeu123' });
+});

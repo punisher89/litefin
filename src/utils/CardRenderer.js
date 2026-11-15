@@ -1480,7 +1480,7 @@ class CardRenderer {
             if (thumbUrl) {
                 // Return image tag with data-thumb-src. The image is downloaded eagerly
                 // on-demand when the card receives focus to preserve precious memory.
-                thumbPart = `<img data-thumb-src="${thumbUrl}" class="thumb-layer" ${nativeThumb?.type === 'Primary' ? 'style="object-fit:contain"' : ''} alt="" />`;
+                thumbPart = `<img data-thumb-src="${thumbUrl}" class="thumb-layer" alt="" />`;
             }
         }
 
@@ -1509,7 +1509,7 @@ class CardRenderer {
                 ? `<canvas class="blurhash-canvas" data-blurhash="${blurHash}"></canvas>`
                 : '';
         const imagePart = imageUrl
-            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} ${nativeArtwork && (isLandscape || isExpanded) && nativeArtwork.type === 'Primary' && !(item.Type === 'Episode' && nativeArtwork.id === itemId) ? 'style="object-fit:contain"' : ''} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
+            ? `${imageInnerHtml}${thumbPart}${blurHashHtml}<img src="${placeholder}" ${dataAttributes} alt="${escapeHtml(item.Name)}" class="lazy ${canExpand ? 'poster-layer' : ''}" />`
             : `${CardRenderer.getFallbackHtml(item, isLandscape, { hideInitials, isLibrary: type === 'library' })}`;
         const finalContextType = contextType || item.Type;
 
@@ -1629,7 +1629,7 @@ class CardRenderer {
         `;
 
         const html = `
-            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" ${options.showPosterBadges && ['Movie', 'Series', 'Episode'].includes(item.Type) ? `data-poster-series-id="${escapeHtml(item.Type === 'Series' ? itemId : item.SeriesId || '')}" data-poster-media-type="${item.Type}"` : ''} ${type === 'person' ? `data-person-id="${escapeHtml(item._tmdbPersonId ? `tmdb-person-${item._tmdbPersonId}` : itemId)}"` : ''} data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
+            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" ${options.showPosterBadges && ['Movie', 'Series', 'Episode', 'Season', 'Video', 'BoxSet'].includes(item.Type) ? `data-poster-series-id="${escapeHtml(item.Type === 'Series' ? itemId : item.SeriesId || '')}" data-poster-media-type="${item.Type}"` : ''} ${type === 'person' ? `data-person-id="${escapeHtml(item._tmdbPersonId ? `tmdb-person-${item._tmdbPersonId}` : itemId)}"` : ''} data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
                 <div class="card-image">
                     ${imagePart}
                     ${progressHtml}
