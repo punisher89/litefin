@@ -73,10 +73,24 @@ scripts are not bundled into Litefin. Removed virtual cards
 and page teardown release their overlay components. The app's score visibility
 preference remains respected.
 
-For annotations baked into server images, Jellyfin-Enhanced must have **Native
-poster tags** enabled on the server/user. The resume metadata overlay uses
-tag-data independently of that image option. Browser-only JS overlays cannot appear in Litefin. Existing library quality
-preferences and details technical text remain available.
+Resume metadata reads `/JellyfinEnhanced/public-config` and the signed-in user's
+`/JellyfinEnhanced/user-settings/{userId}/settings.json` once per Home page
+instance. Personal values override public defaults; null values inherit. It
+honors the native master/user switches, the five quality/genre/language/rating/
+age groups, Continue Watching/item-type scopes, corner positions (including
+Corners profile off slots), group/category order, caps, source selection and
+minimum score, score color, scale/gap, quality switches and language priorities.
+The overlay supports four-corner placement; bands/caption layouts are not
+replicated. Image geometry stays unchanged. Metadata and settings refresh on
+re-entry so a failed old request or a changed privacy policy is not retained
+between Home page instances.
+
+To configure: in Jellyfin Web, use the same account as Litefin. Open **Enhanced
+Panel** from the drawer, or **Jellyfin Enhanced** from the Jellyfin 12 avatar menu,
+then **Media Tags**. Enable the desired groups, choose corner positions and save.
+Return to Litefin's Home page to refresh its metadata. No server settings are
+written by Litefin. Server-native annotated images on other rows remain under
+Jellyfin-Enhanced's own rendering/settings.
 
 Movie/series details (including Discover details) have a native **Awards**
 section backed by `/JellyfinEnhanced/awards/movie|tv/{tmdbId}`. It displays confirmed

@@ -14,7 +14,7 @@ const files = {
 };
 
 export function ratingLogoFile(source, value) {
-    if (source === 'rtCritic') return parseFloat(value) < 60 ? 'rottentomatoes_rotten.png' : 'rottentomatoes_fresh.png';
+    if (source === 'rtCritic' || source === 'critic') return parseFloat(value) < 60 ? 'rottentomatoes_rotten.png' : 'rottentomatoes_fresh.png';
     return Object.prototype.hasOwnProperty.call(files, source) ? files[source] : null;
 }
 

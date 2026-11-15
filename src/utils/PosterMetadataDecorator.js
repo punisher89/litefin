@@ -1,4 +1,5 @@
 import { api } from '../api/index.js';
+import { resolveResumeSettings } from './ResumeMetadataSettings.js';
 import ResumeMetadataOverlay from '../components/ResumeMetadataOverlay.js';
 import CardRenderer from './CardRenderer.js';
 import { lazyLoader } from './LazyLoader.js';
@@ -13,6 +14,7 @@ export default class PosterMetadataDecorator {
     constructor(container) {
         this.container = container;
         this._records = new Map();
+        this._resumeFacts = new Map();
         this._overlays = new Map();
         this._seen = new WeakSet();
         this._queue = [];
@@ -71,9 +73,22 @@ export default class PosterMetadataDecorator {
         return record.promise;
     }
 
+    _resumePreferences() {
+        if (!this._settingsPromise)
+            this._settingsPromise = Promise.all([
+                api.get('/JellyfinEnhanced/public-config', null, { suppressUnauthorized: true }).catch(() => null),
+                api
+                    .get('/JellyfinEnhanced/user-settings/' + encodeURIComponent(api.userId) + '/settings.json', null, {
+                        suppressUnauthorized: true
+                    })
+                    .catch(() => null)
+            ]);
+        return this._settingsPromise;
+    }
+
     async _resumeData(id) {
         const key = this._session + '/resume-metadata/' + id;
-        let record = cache.get(key);
+        let record = this._resumeFacts.get(key);
         if (!record || Date.now() - record.time > 600000) {
             const promise = (async () => {
                 try {
@@ -102,8 +117,8 @@ export default class PosterMetadataDecorator {
                 }
             })();
             record = { time: Date.now(), promise };
-            if (cache.size >= 300) cache.delete(cache.keys().next().value);
-            cache.set(key, record);
+            if (this._resumeFacts.size >= 300) this._resumeFacts.delete(this._resumeFacts.keys().next().value);
+            this._resumeFacts.set(key, record);
         }
         return record.promise;
     }
@@ -131,9 +146,13 @@ export default class PosterMetadataDecorator {
                 record.options.isLandscape ||
                 document.documentElement.getAttribute('data-layout-media-rows') === 'expanded';
             if (serverPosterArtwork(record.item, wide, CardRenderer._getPrefs().preferEpisodeImages)) return;
+            const [config, user] = await this._resumePreferences();
+            if (!valid()) return;
+            const settings = resolveResumeSettings(config, user, record.item.Type);
+            if (!settings.enabled || !Object.values(settings.groups).some((group) => group.enabled)) return;
             const data = await this._resumeData(card.dataset.itemId);
             if (data && valid() && !this._overlays.has(card))
-                this._overlays.set(card, new ResumeMetadataOverlay(card, record.item, data));
+                this._overlays.set(card, new ResumeMetadataOverlay(card, record.item, data, settings));
             return;
         }
         const landscape =
@@ -180,6 +199,7 @@ export default class PosterMetadataDecorator {
         this._active = false;
         this._queue.length = 0;
         this._records.clear();
+        this._resumeFacts.clear();
         this._overlays.forEach((overlay) => overlay.destroy());
         this._overlays.clear();
         this._observer.disconnect();

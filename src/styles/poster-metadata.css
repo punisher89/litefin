@@ -26,16 +26,18 @@
     position: absolute; top: 6px; left: 6px; right: 6px; bottom: 26px;
     z-index: 5; pointer-events: none; overflow: hidden;
 }
-.resume-metadata-quality, .resume-metadata-ratings {
-    position: absolute; display: flex; flex-direction: column; max-width: 53%;
-}
-.resume-metadata-quality { top: 0; left: 0; align-items: flex-start; }
-.resume-metadata-episode-offset .resume-metadata-quality { top: 52px; }
-.resume-metadata-ratings { bottom: 0; right: 0; align-items: flex-end; max-width: 43%; }
+.resume-metadata-corner { position: absolute; display: flex; flex-direction: column; align-items: flex-start; max-width: 53%; }
+.resume-metadata-corner[data-resume-corner="top-left"] { top: 0; left: 0; }
+.resume-metadata-corner[data-resume-corner="top-right"] { top: 0; right: 0; align-items: flex-end; }
+.resume-metadata-corner[data-resume-corner="bottom-left"] { bottom: 0; left: 0; }
+.resume-metadata-corner[data-resume-corner="bottom-right"] { bottom: 0; right: 0; align-items: flex-end; }
+.resume-metadata-episode-offset [data-resume-corner="top-left"] { top: 52px; }
+.resume-metadata-group { display: flex; flex-direction: column; align-items: inherit; }
+.resume-metadata-group:empty { display: none; }
 .resume-metadata-chip {
     display: inline-flex; align-items: center; flex-shrink: 0; white-space: nowrap;
-    padding: 2px 6px; margin-bottom: 3px; border-radius: 4px;
-    font-size: 13px; font-weight: 700; line-height: 1.1;
+    padding: calc(2px * var(--resume-tag-scale, 1)) calc(6px * var(--resume-tag-scale, 1)); margin-bottom: calc(3px * var(--resume-tag-scale, 1) * var(--resume-tag-gap, 1)); border-radius: 4px;
+    font-size: calc(13px * var(--resume-tag-scale, 1)); font-weight: 700; line-height: 1.1;
     background: var(--resume-tag-dark); color: var(--resume-tag-ink);
     box-shadow: 0 2px 4px var(--resume-tag-shadow);
 }
@@ -47,7 +49,7 @@
 .resume-meta-range { background: #8b4513; }
 .resume-meta-extras { background: #0072ce; }
 .resume-meta-rating { font-weight: 600; font-variant: normal; }
-.resume-rating-logo { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-right: 4px; flex-shrink: 0; }
+.resume-rating-logo { display: inline-flex; align-items: center; justify-content: center; width: calc(14px * var(--resume-tag-scale, 1)); height: calc(14px * var(--resume-tag-scale, 1)); margin-right: calc(4px * var(--resume-tag-scale, 1)); flex-shrink: 0; }
 .resume-rating-logo img, .resume-rating-logo svg { display: block; width: 100%; height: 100%; object-fit: contain; }
 .resume-meta-rating[data-rating-source="community"] { color: #ffc107; }
 .resume-meta-rating[data-rating-source="community"] svg { fill: currentColor; }
@@ -56,3 +58,6 @@
 .resume-meta-certification[data-certification="G"], .resume-meta-certification[data-certification="TV-G"], .resume-meta-certification[data-certification="0+"] { background: #218739; }
 .resume-meta-certification[data-certification="PG-13"], .resume-meta-certification[data-certification="TV-14"], .resume-meta-certification[data-certification="16+"] { background: #e66e00; }
 .resume-meta-certification[data-certification="R"], .resume-meta-certification[data-certification="TV-MA"], .resume-meta-certification[data-certification="18+"] { background: #b81926; }
+
+.resume-meta-language { padding: 1px; background: var(--resume-tag-dark); }
+.resume-meta-genre { font-size: calc(11px * var(--resume-tag-scale, 1)); }
