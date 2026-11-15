@@ -6,7 +6,7 @@
 export default function startRuntime(environment) {
     const { window, document, localStorage, sessionStorage, fetch, setTimeout, clearTimeout,
         setInterval, clearInterval, requestAnimationFrame, cancelAnimationFrame, MutationObserver,
-        Audio, Notification, log } = environment;
+        Audio, Notification, URL, log } = environment;
 (function(){
     // Guard against a second copy of this script in the same page (double
     // bootstrap): every timer, observer and poll below would run twice.

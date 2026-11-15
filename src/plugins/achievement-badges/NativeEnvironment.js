@@ -13,6 +13,7 @@ export default class NativeEnvironment {
         this._listeners = [];
         this._audio = [];
         this._audioContexts = [];
+        this._objectUrls = new Set();
         this._dead = false;
         this.assets = document.createElement('div');
         this.assets.className = 'achievement-native-assets';
@@ -87,6 +88,19 @@ export default class NativeEnvironment {
             dispatchEvent: (event) => events.dispatchEvent(event)
         };
         const owner = this;
+        const scopedURL = function (url, base) {
+            return new window.URL(url, base);
+        };
+        scopedURL.createObjectURL = (blob) => {
+            if (this._dead) return '';
+            const url = window.URL.createObjectURL(blob);
+            this._objectUrls.add(url);
+            return url;
+        };
+        scopedURL.revokeObjectURL = (url) => {
+            window.URL.revokeObjectURL(url);
+            this._objectUrls.delete(url);
+        };
         this.scope = {
             window: win,
             document: doc,
@@ -94,6 +108,7 @@ export default class NativeEnvironment {
             sessionStorage: scopedStorage,
             fetch: options.fetch,
             log: options.log,
+            URL: scopedURL,
             setTimeout: (callback, delay, ...args) => {
                 const id = window.setTimeout(() => {
                     this._timers.delete(id);
@@ -165,6 +180,8 @@ export default class NativeEnvironment {
                 context.close().catch(() => {});
             } catch {}
         });
+        this._objectUrls.forEach((url) => window.URL.revokeObjectURL(url));
+        this._objectUrls.clear();
         this.root.innerHTML = '';
     }
 }

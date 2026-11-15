@@ -6,7 +6,7 @@
 export default function startRuntime(environment) {
     const { window, document, localStorage, sessionStorage, fetch, setTimeout, clearTimeout,
         setInterval, clearInterval, requestAnimationFrame, cancelAnimationFrame, MutationObserver,
-        Audio, Notification, log } = environment;
+        Audio, Notification, URL, log } = environment;
 (function () {
     // Same guard as enhance.js: run once per page even if the bootstrap is doubled.
     if (window.__abStandaloneLoaded) return;

@@ -6,7 +6,7 @@
 export default function startRuntime(environment) {
     const { window, document, localStorage, sessionStorage, fetch, setTimeout, clearTimeout,
         setInterval, clearInterval, requestAnimationFrame, cancelAnimationFrame, MutationObserver,
-        Audio, Notification, log } = environment;
+        Audio, Notification, URL, log } = environment;
 (function () {
     if (window.__abEnhanceLoaded) return;
     window.__abEnhanceLoaded = true;
