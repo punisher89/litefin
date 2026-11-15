@@ -2189,7 +2189,7 @@ class HomePage extends Page {
         try {
             const batchMap = await api.getBatchLatest(libraryIds, {
                 limit: homeRowLimit,
-                fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag,CommunityRating,Width,Height,MediaStreams',
+                fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag,CommunityRating,Width,Height,MediaStreams,Path',
                 ...(hidePlayed ? { isPlayed: false } : {})
             });
 

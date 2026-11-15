@@ -156,7 +156,7 @@ export default function startRuntime(environment) {
     // Lightweight i18n for the sidebar entry. Loads the user's preferred
     // language and re-applies the few translatable bits (sidebar label,
     // header tooltip) once it resolves.
-    var _abSidebarTranslations = {};
+    var _abSidebarTranslations = environment.translations || {};
     function tr(key, fallback){
         if (_abSidebarTranslations && Object.prototype.hasOwnProperty.call(_abSidebarTranslations, key)){
             return _abSidebarTranslations[key];
@@ -175,7 +175,7 @@ export default function startRuntime(environment) {
             var prefs = parts[0] || {};
             var cfg = parts[1] || {};
             var userLang = (prefs.Language || prefs.language || 'default').toString().toLowerCase();
-            var adminLang = (cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
+            var adminLang = (environment.language || cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
             var lang = (userLang === 'default' || !userLang) ? adminLang : userLang;
             lang = (lang || 'en').replace(/[^a-z-]/g, '') || 'en';
             return fetch(buildUrl('Plugins/AchievementBadges/translations/' + lang), { headers: authHeaders(), credentials: 'include' })

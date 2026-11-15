@@ -35,7 +35,7 @@ export default class PosterMetadataDecorator {
         this.container.querySelectorAll('[data-poster-series-id]').forEach((card) => {
             if (this._seen.has(card)) return;
             this._seen.add(card);
-            if (!card.querySelector('.quality-badge') || !card.querySelector('.poster-rating-badge'))
+            if (!card.querySelector('.quality-codec') || !card.querySelector('.poster-rating-badge'))
                 this._io.observe(card);
         });
     }
@@ -69,13 +69,13 @@ export default class PosterMetadataDecorator {
         let fallbackItem = null;
         const valid = () =>
             this._active && this.container.contains(card) && `${api.serverUrl}|${api.userId}` === this._session;
-        if (!card.querySelector('.quality-badge')) {
+        if (!card.querySelector('.quality-codec')) {
             const item = await this._cached(
                 isSeries ? '/quality/' + seriesId : '/item/' + card.dataset.itemId,
                 async () => {
                     if (!isSeries)
                         return api.getItem(card.dataset.itemId, {
-                            Fields: 'MediaStreams,Width,Height,CommunityRating,UserData'
+                            Fields: 'MediaSources,Path,MediaStreams,Width,Height,CommunityRating,UserData'
                         });
                     const result = await api.getItems({
                         ParentId: seriesId,
@@ -83,7 +83,7 @@ export default class PosterMetadataDecorator {
                         Recursive: true,
                         Limit: 1,
                         SortBy: 'SortName',
-                        Fields: 'Width,Height,MediaStreams',
+                        Fields: 'Width,Height,MediaStreams,MediaSources,Path',
                         EnableTotalRecordCount: false
                     });
                     return result.Items?.[0] || null;
@@ -96,6 +96,7 @@ export default class PosterMetadataDecorator {
                 const badge = wrapper.firstElementChild;
                 if (badge) {
                     if (isSeries) badge.title = i18n.t('SeriesSampleQuality');
+                    card.querySelector('.quality-badge')?.remove();
                     card.querySelector('.card-image')?.appendChild(badge);
                 }
             }
@@ -105,7 +106,7 @@ export default class PosterMetadataDecorator {
             const series = isMovie
                 ? fallbackItem ||
                   (await this._cached('/item/' + card.dataset.itemId, () =>
-                      api.getItem(card.dataset.itemId, { Fields: 'MediaStreams,Width,Height,CommunityRating,UserData' })
+                      api.getItem(card.dataset.itemId, { Fields: 'MediaSources,Path,MediaStreams,Width,Height,CommunityRating,UserData' })
                   ))
                 : await this._cached('/rating/' + seriesId, () =>
                       api.getItem(seriesId, { Fields: 'CommunityRating,UserData' })

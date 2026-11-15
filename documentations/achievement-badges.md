@@ -33,13 +33,22 @@ license in `src/assets/licenses/MaterialIcons-LICENSE.txt`.
 Chromium 79 fallbacks convert OKLCH literals to sRGB, expand inset positioning
 and supply older flex spacing. Some advanced decorative effects still depend
 on the TV engine. The Classic/Revamp choice, language and reduced-motion
-settings remain those of the plugin; upstream currently has no Russian page
-translation. The test button and new Litefin metadata labels are localized.
+settings remain available. Achievement DOM translation markers use their own
+namespace so the global Litefin translator cannot replace text or remove child
+controls. Default language follows Litefin; explicit per-user plugin language
+choices still apply. English fallbacks and Russian core UI strings are bundled;
+server custom translations override them. Upstream-only strings without a Russian
+translation fall back to English. The test button and metadata labels are localized.
 
 ## Posters and details
 
 Home posters, Continue Watching and Next Up display community scores and
-video-quality labels. Normal item queries request the needed fields. If the
+technical chips at the top left, inspired by the layout of Jellyfin-Enhanced:
+resolution, explicit source (BluRay/WEB-DL/etc.), Dolby Vision/HDR/HLG, IMAX/3D,
+video codec and audio format/channels. Atmos requires explicit stream evidence;
+EAC3 alone is not Atmos. The large movie/series details poster has the same stack;
+movie version selection updates its metadata. No Enhanced frontend code is copied.
+Normal item queries request the needed fields. If the
 companion's merged rows omit them, visible cards are filled lazily with bounded
 concurrency and a per-server/user cache. A series quality label describes a
 representative episode, with a tooltip explaining that episodes can differ;

@@ -1392,7 +1392,7 @@ export class ApiClient {
             // Default item count per library row configured via user settings
             Limit: defaultLimit,
             // Request tags, backdrop, and series metadata needed for home card representation
-            Fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag,CommunityRating,Width,Height,MediaStreams',
+            Fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag,CommunityRating,Width,Height,MediaStreams,Path',
             ImageTypeLimit: 1,
             EnableImageTypes: 'Primary,Backdrop,Thumb',
             ParentId: parentId
@@ -1428,7 +1428,7 @@ export class ApiClient {
             Limit: defaultLimit,
             Recursive: true,
             // Include Tags so game ROM items can be identified with platform badges and progress bar suppression
-            Fields: 'SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,Tags,CommunityRating,Width,Height,MediaStreams',
+            Fields: 'SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,Tags,CommunityRating,Width,Height,MediaStreams,Path',
             ImageTypeLimit: 1,
             EnableImageTypes: 'Primary,Backdrop,Thumb',
             EnableTotalRecordCount: false,

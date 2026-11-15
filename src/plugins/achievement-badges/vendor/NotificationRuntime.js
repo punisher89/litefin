@@ -163,7 +163,7 @@ export default function startRuntime(environment) {
     }
 
     // ===== i18n (lightweight, mirrors standalone.js) =====
-    var _abTranslations = {};
+    var _abTranslations = environment.translations || {};
     function tr(key, fallback) {
         if (_abTranslations && Object.prototype.hasOwnProperty.call(_abTranslations, key)) {
             return _abTranslations[key];
@@ -188,7 +188,7 @@ export default function startRuntime(environment) {
             var existingContainer = document.getElementById(TOAST_ID);
             if (existingContainer) positionToastContainer(existingContainer);
             var userLang = (prefs.Language || prefs.language || 'default').toString().toLowerCase();
-            var adminLang = (cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
+            var adminLang = (environment.language || cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
             var lang = (userLang === 'default' || !userLang) ? adminLang : userLang;
             lang = (lang || 'en').replace(/[^a-z-]/g, '') || 'en';
             return fetch(buildUrl('Plugins/AchievementBadges/translations/' + lang), { headers: authHeaders(), credentials: 'include' })

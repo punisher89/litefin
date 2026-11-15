@@ -46,7 +46,7 @@ export default function startRuntime(environment) {
     // ===== i18n =====
     // Holds the currently loaded translation dictionary. Starts empty so tr()
     // gracefully falls back to the key (English-like) before translations load.
-    var translations = {};
+    var translations = environment.translations || {};
     var currentLang = 'en';
     function tr(key, fallback) {
         if (translations && Object.prototype.hasOwnProperty.call(translations, key)) {
@@ -88,17 +88,17 @@ export default function startRuntime(environment) {
             .catch(function () { translations = translations || {}; return translations; });
     }
     // Walk the DOM and replace text/title/placeholder on any element that
-    // has a data-i18n / data-i18n-title / data-i18n-placeholder marker.
+    // has a data-ab-i18n / data-ab-i18n-title / data-ab-i18n-placeholder marker.
     // Safe to call repeatedly (on tab re-render, language change, etc.).
     function applyStaticTranslations(scope) {
         var rootEl = scope || document.getElementById(ROOT_ID);
         if (!rootEl) return;
-        rootEl.querySelectorAll('[data-i18n]').forEach(function (node) {
+        rootEl.querySelectorAll('[data-ab-i18n]').forEach(function (node) {
             // Skip containers that already have child elements — setting
             // textContent would nuke them. Protects abSaLb, abSaActivity,
             // abSaSettingsContent, etc. once populated.
             if (node.children && node.children.length > 0) return;
-            var k = node.getAttribute('data-i18n');
+            var k = node.getAttribute('data-ab-i18n');
             // Leaf text containers that later get OVERWRITTEN by loadAll /
             // other renderers carry the "common.loading" placeholder and
             // no children — applyStaticTranslations would happily re-set
@@ -112,13 +112,13 @@ export default function startRuntime(environment) {
             var v = tr(k, null);
             if (v != null) node.textContent = v;
         });
-        rootEl.querySelectorAll('[data-i18n-title]').forEach(function (node) {
-            var k = node.getAttribute('data-i18n-title');
+        rootEl.querySelectorAll('[data-ab-i18n-title]').forEach(function (node) {
+            var k = node.getAttribute('data-ab-i18n-title');
             var v = tr(k, null);
             if (v != null) node.setAttribute('title', v);
         });
-        rootEl.querySelectorAll('[data-i18n-placeholder]').forEach(function (node) {
-            var k = node.getAttribute('data-i18n-placeholder');
+        rootEl.querySelectorAll('[data-ab-i18n-placeholder]').forEach(function (node) {
+            var k = node.getAttribute('data-ab-i18n-placeholder');
             var v = tr(k, null);
             if (v != null) node.setAttribute('placeholder', v);
         });
@@ -1217,15 +1217,15 @@ export default function startRuntime(environment) {
             '<div class="ab-wrap">' +
                 '<div id="abSaWelcomeBanner" class="ab-welcome-banner" style="display:none;"></div>' +
                 '<div class="ab-topbar">' +
-                    '<h2 style="margin:0;" data-i18n="achievements.title">Achievements</h2>' +
+                    '<h2 style="margin:0;" data-ab-i18n="achievements.title">Achievements</h2>' +
                     /* v1.8.47: Classic/Revamp toggle \u2014 mirrors the admin-page
                        toggle. Persists via the same `ab-style-pref` localStorage
                        key so the user's choice is shared across both surfaces. */
-                    '<button type="button" id="abSaStyleToggleBtn" class="abSaStyleToggleBtn" aria-pressed="false" title="Toggle Revamp / Classic UI" data-i18n="ui.toggle.classic">UI: Classic</button>' +
+                    '<button type="button" id="abSaStyleToggleBtn" class="abSaStyleToggleBtn" aria-pressed="false" title="Toggle Revamp / Classic UI" data-ab-i18n="ui.toggle.classic">UI: Classic</button>' +
                     /* [issue #155] Starts at the server root this script came
                        from, so it keeps the base URL Jellyfin runs under. A
                        root-relative /web/... left it out. */
-                    '<a class="ab-back" href="' + SERVER_ROOT + 'web/index.html#/home">\u2190 <span data-i18n="achievements.back_home">Back Home</span></a>' +
+                    '<a class="ab-back" href="' + SERVER_ROOT + 'web/index.html#/home">\u2190 <span data-ab-i18n="achievements.back_home">Back Home</span></a>' +
                 '</div>' +
                 '<div class="ab-hero">' +
                     /* v1.8.52: hero arc donut on the right side. Hidden in Classic
@@ -1240,7 +1240,7 @@ export default function startRuntime(environment) {
                                 ' style="--rv-arc-c:540.35;--rv-arc-off:540.35"></circle>' +
                         '</svg>' +
                         '<div class="abSaHeroArcCenter">' +
-                            '<div class="abSaHeroArcEyebrow" data-i18n="achievements.completion">Completion</div>' +
+                            '<div class="abSaHeroArcEyebrow" data-ab-i18n="achievements.completion">Completion</div>' +
                             '<div id="abSaHeroArcPct" class="abSaHeroArcPct">0%</div>' +
                         '</div>' +
                     '</div>' +
@@ -1248,81 +1248,81 @@ export default function startRuntime(environment) {
                         '<div class="ab-hero-left">' +
                             '<div id="abSaRankIcon" class="ab-hero-icon">\ud83c\udfc5</div>' +
                             '<div>' +
-                                '<div id="abSaTitle" class="ab-hero-title" data-i18n="achievements.profile_title">Achievement Profile</div>' +
+                                '<div id="abSaTitle" class="ab-hero-title" data-ab-i18n="achievements.profile_title">Achievement Profile</div>' +
                                 '<div id="abSaTitleDisplay" class="ab-title-display" style="display:none; font-size:0.85em; font-weight:600; margin-top:0.2em;"></div>' +
-                                '<div id="abSaRankLabel" class="ab-hero-sub" style="font-size:1em; font-weight:600; margin-top:0.2em;" data-i18n="rank.rookie">Rookie</div>' +
-                                '<div id="abSaSub" class="ab-hero-sub" style="font-size:0.85em; opacity:0.8;" data-i18n="common.loading">Loading...</div>' +
+                                '<div id="abSaRankLabel" class="ab-hero-sub" style="font-size:1em; font-weight:600; margin-top:0.2em;" data-ab-i18n="rank.rookie">Rookie</div>' +
+                                '<div id="abSaSub" class="ab-hero-sub" style="font-size:0.85em; opacity:0.8;" data-ab-i18n="common.loading">Loading...</div>' +
                                 '<div id="abSaHeroStreak" class="ab-hero-streak" style="display:none;"></div>' +
                             '</div>' +
                         '</div>' +
                         '<div style="margin-top:0.75em;">' +
-                            '<div id="abSaRankBarText" class="ab-eyebrow" style="display:flex; justify-content:space-between;"><span data-i18n="achievements.rank_progress">Rank progress</span><span id="abSaRankBarPct">0%</span></div>' +
+                            '<div id="abSaRankBarText" class="ab-eyebrow" style="display:flex; justify-content:space-between;"><span data-ab-i18n="achievements.rank_progress">Rank progress</span><span id="abSaRankBarPct">0%</span></div>' +
                             '<div id="abSaRankBarTrack" style="height:6px; border-radius:3px; background:rgba(255,255,255,0.12); overflow:hidden; margin-top:4px;">' +
                                 '<div id="abSaRankBarFill" style="height:100%; width:0%; background:#667eea; transition:width 0.4s;"></div>' +
                             '</div>' +
                         '</div>' +
-                        '<div id="abSaShowcaseWrap" style="margin-top:1em;"><div class="ab-eyebrow" data-i18n="achievements.showcase">Showcase</div><div id="abSaShowcase" class="ab-showcase"><div class="ab-muted" data-i18n="achievements.showcase_empty">Equip badges to build your showcase.</div></div></div>' +
-                        '<div style="margin-top:1em;"><a id="abSaProfileCardLink" href="#" target="_blank" class="ab-muted" style="font-size:0.85em; text-decoration:underline;" data-i18n="achievements.profile_card_link">Open shareable profile card</a></div>' +
+                        '<div id="abSaShowcaseWrap" style="margin-top:1em;"><div class="ab-eyebrow" data-ab-i18n="achievements.showcase">Showcase</div><div id="abSaShowcase" class="ab-showcase"><div class="ab-muted" data-ab-i18n="achievements.showcase_empty">Equip badges to build your showcase.</div></div></div>' +
+                        '<div style="margin-top:1em;"><a id="abSaProfileCardLink" href="#" target="_blank" class="ab-muted" style="font-size:0.85em; text-decoration:underline;" data-ab-i18n="achievements.profile_card_link">Open shareable profile card</a></div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaError" style="display:none;" class="ab-error"></div>' +
                 '<div class="ab-stats">' +
-                    '<div class="ab-stat"><div class="ab-stat-t" data-i18n="achievements.unlocked">Unlocked</div><div id="abSaUnlocked" class="ab-stat-v">0</div></div>' +
-                    '<div class="ab-stat"><div class="ab-stat-t" data-i18n="achievements.total">Total</div><div id="abSaTotal" class="ab-stat-v">0</div></div>' +
-                    '<div class="ab-stat"><div class="ab-stat-t" data-i18n="achievements.completion">Completion</div><div id="abSaPct" class="ab-stat-v">0%</div></div>' +
-                    '<div class="ab-stat"><div class="ab-stat-t" data-i18n="achievements.score">Score</div><div id="abSaScore" class="ab-stat-v">0</div></div>' +
+                    '<div class="ab-stat"><div class="ab-stat-t" data-ab-i18n="achievements.unlocked">Unlocked</div><div id="abSaUnlocked" class="ab-stat-v">0</div></div>' +
+                    '<div class="ab-stat"><div class="ab-stat-t" data-ab-i18n="achievements.total">Total</div><div id="abSaTotal" class="ab-stat-v">0</div></div>' +
+                    '<div class="ab-stat"><div class="ab-stat-t" data-ab-i18n="achievements.completion">Completion</div><div id="abSaPct" class="ab-stat-v">0%</div></div>' +
+                    '<div class="ab-stat"><div class="ab-stat-t" data-ab-i18n="achievements.score">Score</div><div id="abSaScore" class="ab-stat-v">0</div></div>' +
                 '</div>' +
                 '<div class="ab-tabs">' +
-                    '<button type="button" class="ab-tab active" id="abSaTabBadges" data-i18n="tabs.my_badges">My Badges</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabQuests" data-i18n="tabs.quests">Quests</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabRecap" data-i18n="tabs.recap">Recap</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabLb" data-i18n="tabs.leaderboard">Leaderboard</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabCompare" data-i18n="tabs.compare">Compare</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabActivity" data-i18n="tabs.activity">Activity</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabWrapped" data-i18n="tabs.wrapped">Wrapped</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabStats" data-i18n="tabs.stats">Stats</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabLoadout" data-i18n="tabs.loadout">Loadout</button>' +
-                    '<button type="button" class="ab-tab" id="abSaTabSettings" data-i18n-title="tabs.settings" title="Settings"><span class="material-icons" style="font-size:1.1em;vertical-align:middle;">settings</span></button>' +
+                    '<button type="button" class="ab-tab active" id="abSaTabBadges" data-ab-i18n="tabs.my_badges">My Badges</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabQuests" data-ab-i18n="tabs.quests">Quests</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabRecap" data-ab-i18n="tabs.recap">Recap</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabLb" data-ab-i18n="tabs.leaderboard">Leaderboard</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabCompare" data-ab-i18n="tabs.compare">Compare</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabActivity" data-ab-i18n="tabs.activity">Activity</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabWrapped" data-ab-i18n="tabs.wrapped">Wrapped</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabStats" data-ab-i18n="tabs.stats">Stats</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabLoadout" data-ab-i18n="tabs.loadout">Loadout</button>' +
+                    '<button type="button" class="ab-tab" id="abSaTabSettings" data-ab-i18n-title="tabs.settings" title="Settings"><span class="material-icons" style="font-size:1.1em;vertical-align:middle;">settings</span></button>' +
                 '</div>' +
                 '<div id="abSaPanelBadges" class="ab-panel">' +
                     '<div id="abSaPinnedWrap" style="display:none;">' +
-                        '<div class="ab-eyebrow" style="display:flex; align-items:center; gap:0.4em;"><span class="material-icons" style="font-size:1em;">push_pin</span> <span data-i18n="achievements.working_on">Working on</span></div>' +
+                        '<div class="ab-eyebrow" style="display:flex; align-items:center; gap:0.4em;"><span class="material-icons" style="font-size:1em;">push_pin</span> <span data-ab-i18n="achievements.working_on">Working on</span></div>' +
                         '<div id="abSaPinnedRow" class="ab-goals-row"></div>' +
                     '</div>' +
                     '<div class="ab-filter-row" style="display:flex; gap:0.75em; flex-wrap:wrap; margin-bottom:1em; align-items:center;">' +
-                        '<input type="search" id="abSaSearch" placeholder="Search badges by title, category, rarity..." data-i18n-placeholder="filter.search_placeholder" class="ab-input" style="flex:1; min-width:240px;">' +
-                        '<select id="abSaCategoryFilter" class="ab-select" title="Filter by category" data-i18n-title="filter.by_category">' +
-                            '<option value="" data-i18n="filter.all_categories">All categories</option>' +
+                        '<input type="search" id="abSaSearch" placeholder="Search badges by title, category, rarity..." data-ab-i18n-placeholder="filter.search_placeholder" class="ab-input" style="flex:1; min-width:240px;">' +
+                        '<select id="abSaCategoryFilter" class="ab-select" title="Filter by category" data-ab-i18n-title="filter.by_category">' +
+                            '<option value="" data-ab-i18n="filter.all_categories">All categories</option>' +
                         '</select>' +
                         '<select id="abSaFilter" class="ab-select">' +
-                            '<option value="all" data-i18n="filter.all_badges">All badges</option>' +
-                            '<option value="unlocked" data-i18n="filter.unlocked_only">Unlocked only</option>' +
-                            '<option value="recent" data-i18n="filter.recently_unlocked">Recently unlocked</option>' +
-                            '<option value="locked" data-i18n="filter.locked_only">Locked only</option>' +
-                            '<option value="close" data-i18n="filter.close_to_unlock">Close to unlock (&gt;50%)</option>' +
-                            '<option value="r-common" data-i18n="filter.rarity_common">Rarity: Common</option>' +
-                            '<option value="r-uncommon" data-i18n="filter.rarity_uncommon">Rarity: Uncommon</option>' +
-                            '<option value="r-rare" data-i18n="filter.rarity_rare">Rarity: Rare</option>' +
-                            '<option value="r-epic" data-i18n="filter.rarity_epic">Rarity: Epic</option>' +
-                            '<option value="r-legendary" data-i18n="filter.rarity_legendary">Rarity: Legendary</option>' +
-                            '<option value="r-mythic" data-i18n="filter.rarity_mythic">Rarity: Mythic</option>' +
+                            '<option value="all" data-ab-i18n="filter.all_badges">All badges</option>' +
+                            '<option value="unlocked" data-ab-i18n="filter.unlocked_only">Unlocked only</option>' +
+                            '<option value="recent" data-ab-i18n="filter.recently_unlocked">Recently unlocked</option>' +
+                            '<option value="locked" data-ab-i18n="filter.locked_only">Locked only</option>' +
+                            '<option value="close" data-ab-i18n="filter.close_to_unlock">Close to unlock (&gt;50%)</option>' +
+                            '<option value="r-common" data-ab-i18n="filter.rarity_common">Rarity: Common</option>' +
+                            '<option value="r-uncommon" data-ab-i18n="filter.rarity_uncommon">Rarity: Uncommon</option>' +
+                            '<option value="r-rare" data-ab-i18n="filter.rarity_rare">Rarity: Rare</option>' +
+                            '<option value="r-epic" data-ab-i18n="filter.rarity_epic">Rarity: Epic</option>' +
+                            '<option value="r-legendary" data-ab-i18n="filter.rarity_legendary">Rarity: Legendary</option>' +
+                            '<option value="r-mythic" data-ab-i18n="filter.rarity_mythic">Rarity: Mythic</option>' +
                         '</select>' +
-                        '<select id="abSaSort" class="ab-select" title="Sort order" data-i18n-title="filter.sort_order">' +
-                            '<option value="default" data-i18n="filter.sort_default">Default</option>' +
-                            '<option value="rarity-desc" data-i18n="filter.sort_rarity_desc">Sort: Rarity (highest)</option>' +
-                            '<option value="rarity-asc" data-i18n="filter.sort_rarity_asc">Sort: Rarity (lowest)</option>' +
-                            '<option value="progress-desc" data-i18n="filter.sort_progress_desc">Sort: Progress (most)</option>' +
-                            '<option value="progress-asc" data-i18n="filter.sort_progress_asc">Sort: Progress (least)</option>' +
-                            '<option value="title-asc" data-i18n="filter.sort_title_asc">Sort: Title A-Z</option>' +
+                        '<select id="abSaSort" class="ab-select" title="Sort order" data-ab-i18n-title="filter.sort_order">' +
+                            '<option value="default" data-ab-i18n="filter.sort_default">Default</option>' +
+                            '<option value="rarity-desc" data-ab-i18n="filter.sort_rarity_desc">Sort: Rarity (highest)</option>' +
+                            '<option value="rarity-asc" data-ab-i18n="filter.sort_rarity_asc">Sort: Rarity (lowest)</option>' +
+                            '<option value="progress-desc" data-ab-i18n="filter.sort_progress_desc">Sort: Progress (most)</option>' +
+                            '<option value="progress-asc" data-ab-i18n="filter.sort_progress_asc">Sort: Progress (least)</option>' +
+                            '<option value="title-asc" data-ab-i18n="filter.sort_title_asc">Sort: Title A-Z</option>' +
                         '</select>' +
                     '</div>' +
                     '<div id="abSaEquippedWrap">' +
-                      '<h3 style="margin:0 0 0.75em;" data-i18n="achievements.equipped_badges">Equipped badges</h3>' +
-                      '<div id="abSaEquippedEmpty" class="ab-muted" style="padding:0.8em;border:1px dashed rgba(255,255,255,0.16);border-radius:12px;" data-i18n="achievements.equipped_empty">No equipped badges yet.</div>' +
+                      '<h3 style="margin:0 0 0.75em;" data-ab-i18n="achievements.equipped_badges">Equipped badges</h3>' +
+                      '<div id="abSaEquippedEmpty" class="ab-muted" style="padding:0.8em;border:1px dashed rgba(255,255,255,0.16);border-radius:12px;" data-ab-i18n="achievements.equipped_empty">No equipped badges yet.</div>' +
                       '<div id="abSaEquipped" class="ab-grid"></div>' +
                     '</div>' +
                     '<div id="abSaGrid" class="ab-grid" style="margin-top:1.5em;"></div>' +
-                    '<div id="abSaEmptyFilter" class="ab-muted" style="display:none; margin-top:1em;" data-i18n="achievements.no_badges_match_filter">No badges match your filter.</div>' +
+                    '<div id="abSaEmptyFilter" class="ab-muted" style="display:none; margin-top:1em;" data-ab-i18n="achievements.no_badges_match_filter">No badges match your filter.</div>' +
                 '</div>' +
                 '<div id="abSaPanelQuests" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
@@ -1331,129 +1331,129 @@ export default function startRuntime(environment) {
                             '<div id="abSaDailyRerollSlot"></div>' +
                         '</div>' +
                         '<div class="ab-muted" style="font-size:0.85em; margin:0.4em 0 0.85em;">Resets at midnight UTC. Everyone shares the same daily challenge.</div>' +
-                        '<div id="abSaDailyQuest" data-i18n="common.loading">Loading...</div>' +
+                        '<div id="abSaDailyQuest" data-ab-i18n="common.loading">Loading...</div>' +
                         '<div style="display:flex; align-items:center; justify-content:space-between; gap:0.6em; margin-top:1.6em; flex-wrap:wrap;">' +
                             '<h3 style="margin:0;">Weekly quests</h3>' +
                             '<div id="abSaWeeklyRerollSlot"></div>' +
                         '</div>' +
                         '<div class="ab-muted" style="font-size:0.85em; margin:0.4em 0 0.85em;">Resets every Monday UTC. Bigger reward, harder target.</div>' +
-                        '<div id="abSaWeeklyQuest" data-i18n="common.loading">Loading...</div>' +
+                        '<div id="abSaWeeklyQuest" data-ab-i18n="common.loading">Loading...</div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelRecap" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
                         '<div style="display:flex; gap:0.5em; margin-bottom:1em;">' +
-                            '<button type="button" class="ab-btn" data-period="week" data-i18n="recap.this_week">This week</button>' +
-                            '<button type="button" class="ab-btn" data-period="month" data-i18n="recap.this_month">This month</button>' +
-                            '<button type="button" class="ab-btn" data-period="year" data-i18n="recap.this_year">This year</button>' +
+                            '<button type="button" class="ab-btn" data-period="week" data-ab-i18n="recap.this_week">This week</button>' +
+                            '<button type="button" class="ab-btn" data-period="month" data-ab-i18n="recap.this_month">This month</button>' +
+                            '<button type="button" class="ab-btn" data-period="year" data-ab-i18n="recap.this_year">This year</button>' +
                         '</div>' +
-                        '<div id="abSaRecap" data-i18n="recap.loading">Loading recap...</div>' +
+                        '<div id="abSaRecap" data-ab-i18n="recap.loading">Loading recap...</div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelLb" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
                         '<div class="ab-tabs" style="margin-bottom:1em;">' +
-                            '<button type="button" class="ab-tab active" data-lb="score" data-i18n="lb.score">Score</button>' +
-                            '<button type="button" class="ab-tab" data-lb="movies" data-i18n="lb.movies">Movies</button>' +
-                            '<button type="button" class="ab-tab" data-lb="episodes" data-i18n="lb.episodes">Episodes</button>' +
-                            '<button type="button" class="ab-tab" data-lb="hours" data-i18n="lb.hours">Hours</button>' +
-                            '<button type="button" class="ab-tab" data-lb="streak" data-i18n="lb.best_streak">Best Streak</button>' +
-                            '<button type="button" class="ab-tab" data-lb="series" data-i18n="lb.series">Series</button>' +
+                            '<button type="button" class="ab-tab active" data-lb="score" data-ab-i18n="lb.score">Score</button>' +
+                            '<button type="button" class="ab-tab" data-lb="movies" data-ab-i18n="lb.movies">Movies</button>' +
+                            '<button type="button" class="ab-tab" data-lb="episodes" data-ab-i18n="lb.episodes">Episodes</button>' +
+                            '<button type="button" class="ab-tab" data-lb="hours" data-ab-i18n="lb.hours">Hours</button>' +
+                            '<button type="button" class="ab-tab" data-lb="streak" data-ab-i18n="lb.best_streak">Best Streak</button>' +
+                            '<button type="button" class="ab-tab" data-lb="series" data-ab-i18n="lb.series">Series</button>' +
                         '</div>' +
-                        '<div id="abSaLb" data-i18n="common.loading">Loading...</div>' +
+                        '<div id="abSaLb" data-ab-i18n="common.loading">Loading...</div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelCompare" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
-                        '<h3 style="margin:0 0 0.75em;" data-i18n="compare.title">Compare profiles</h3>' +
+                        '<h3 style="margin:0 0 0.75em;" data-ab-i18n="compare.title">Compare profiles</h3>' +
                         '<div id="abSaCompareHistoryWrap" style="display:none;">' +
-                            '<div class="ab-eyebrow" style="margin-bottom:0.5em;" data-i18n="compare.recent">Recent comparisons</div>' +
+                            '<div class="ab-eyebrow" style="margin-bottom:0.5em;" data-ab-i18n="compare.recent">Recent comparisons</div>' +
                             '<div id="abSaCompareHistory" style="display:flex; gap:0.5em; flex-wrap:wrap; margin-bottom:1em;"></div>' +
                         '</div>' +
                         '<div style="display:flex; gap:0.75em; flex-wrap:wrap; margin-bottom:1em;">' +
                             '<select id="abSaCompareUserA" class="ab-select" style="flex:1; min-width:200px;"></select>' +
-                            '<div style="font-weight:800; align-self:center; opacity:0.6;" data-i18n="compare.vs">VS</div>' +
+                            '<div style="font-weight:800; align-self:center; opacity:0.6;" data-ab-i18n="compare.vs">VS</div>' +
                             '<select id="abSaCompareUserB" class="ab-select" style="flex:1; min-width:200px;"></select>' +
                         '</div>' +
-                        '<div id="abSaCompareResult"><div class="ab-muted" data-i18n="compare.pick_two">Pick two users to compare.</div></div>' +
+                        '<div id="abSaCompareResult"><div class="ab-muted" data-ab-i18n="compare.pick_two">Pick two users to compare.</div></div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelActivity" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
-                        '<h3 id="abSaActivityHeading" style="margin:0 0 0.75em;" data-i18n="activity.server_feed">Server activity feed</h3>' +
+                        '<h3 id="abSaActivityHeading" style="margin:0 0 0.75em;" data-ab-i18n="activity.server_feed">Server activity feed</h3>' +
                         '<div style="display:flex; gap:0.6em; flex-wrap:wrap; margin-bottom:1em; align-items:center;">' +
                             '<select id="abSaActivityUserFilter" class="ab-select" style="min-width:200px;"></select>' +
                             '<div style="flex:1;"></div>' +
                             '<div id="abSaActivityPager" class="ab-pager"></div>' +
                         '</div>' +
-                        '<div id="abSaActivity" data-i18n="common.loading">Loading...</div>' +
+                        '<div id="abSaActivity" data-ab-i18n="common.loading">Loading...</div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelWrapped" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
                         '<div style="display:flex; align-items:center; gap:1em; margin-bottom:1em; flex-wrap:wrap;">' +
-                            '<h3 style="margin:0;" data-i18n="wrapped.title">Year wrapped</h3>' +
+                            '<h3 style="margin:0;" data-ab-i18n="wrapped.title">Year wrapped</h3>' +
                             '<select id="abSaWrappedYear" class="ab-select" style="width:auto;"></select>' +
-                            '<div class="ab-muted" style="font-size:0.85em;" data-i18n="wrapped.description">Spotify-style end-of-year recap of your viewing</div>' +
+                            '<div class="ab-muted" style="font-size:0.85em;" data-ab-i18n="wrapped.description">Spotify-style end-of-year recap of your viewing</div>' +
                         '</div>' +
-                        '<div id="abSaWrapped" data-i18n="common.loading">Loading...</div>' +
+                        '<div id="abSaWrapped" data-ab-i18n="common.loading">Loading...</div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelStats" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
-                        '<h3 style="margin:0 0 0.75em;" data-i18n="stats.your_data">Your data</h3>' +
+                        '<h3 style="margin:0 0 0.75em;" data-ab-i18n="stats.your_data">Your data</h3>' +
                         '<div id="abSaCategoryRings" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:0.75em; margin-bottom:1.25em;"></div>' +
                         '<div id="abSaCharts" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1em;"></div>' +
-                        '<h3 style="margin:1.5em 0 0.75em;" data-i18n="stats.personal_records">Personal records</h3>' +
-                        '<div id="abSaRecords" data-i18n="common.loading">Loading...</div>' +
-                        '<h3 style="margin:1.5em 0 0.75em;" data-i18n="stats.score_bank">Score bank & prestige</h3>' +
-                        '<div id="abSaBank" data-i18n="common.loading">Loading...</div>' +
-                        '<h3 style="margin:1.5em 0 0.75em;" data-i18n="stats.prestige_lb">Prestige leaderboard</h3>' +
-                        '<div id="abSaPrestigeLb" data-i18n="common.loading">Loading...</div>' +
-                        '<h3 style="margin:1.5em 0 0.75em;" data-i18n="stats.server_stats">Server stats</h3>' +
-                        '<div id="abSaServerStats" data-i18n="common.loading">Loading...</div>' +
-                        '<h3 style="margin:1.5em 0 0.75em;" data-i18n="stats.notification_prefs">Notification preferences</h3>' +
-                        '<div class="ab-muted" style="font-size:0.85em; margin-bottom:0.5em;" data-i18n="stats.notification_prefs_desc">Control what the plugin shows you and whether you appear in server features.</div>' +
-                        '<div id="abSaPrefs" class="ab-prefs" data-i18n="common.loading">Loading...</div>' +
+                        '<h3 style="margin:1.5em 0 0.75em;" data-ab-i18n="stats.personal_records">Personal records</h3>' +
+                        '<div id="abSaRecords" data-ab-i18n="common.loading">Loading...</div>' +
+                        '<h3 style="margin:1.5em 0 0.75em;" data-ab-i18n="stats.score_bank">Score bank & prestige</h3>' +
+                        '<div id="abSaBank" data-ab-i18n="common.loading">Loading...</div>' +
+                        '<h3 style="margin:1.5em 0 0.75em;" data-ab-i18n="stats.prestige_lb">Prestige leaderboard</h3>' +
+                        '<div id="abSaPrestigeLb" data-ab-i18n="common.loading">Loading...</div>' +
+                        '<h3 style="margin:1.5em 0 0.75em;" data-ab-i18n="stats.server_stats">Server stats</h3>' +
+                        '<div id="abSaServerStats" data-ab-i18n="common.loading">Loading...</div>' +
+                        '<h3 style="margin:1.5em 0 0.75em;" data-ab-i18n="stats.notification_prefs">Notification preferences</h3>' +
+                        '<div class="ab-muted" style="font-size:0.85em; margin-bottom:0.5em;" data-ab-i18n="stats.notification_prefs_desc">Control what the plugin shows you and whether you appear in server features.</div>' +
+                        '<div id="abSaPrefs" class="ab-prefs" data-ab-i18n="common.loading">Loading...</div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelLoadout" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
                         '<div id="abSaLoadoutHero" style="display:flex; gap:1em; flex-wrap:wrap; align-items:center; justify-content:space-between; padding:1.1em 1.35em; border-radius:14px; background:linear-gradient(135deg, rgba(102,126,234,0.22), rgba(118,75,162,0.22)); border:1px solid rgba(255,255,255,0.1); margin-bottom:1.25em; box-shadow:0 6px 24px rgba(0,0,0,0.18);">' +
                             '<div>' +
-                                '<div class="ab-muted" style="font-size:0.78em; letter-spacing:0.06em; text-transform:uppercase; font-weight:600;" data-i18n="loadout.score_balance">Score balance</div>' +
+                                '<div class="ab-muted" style="font-size:0.78em; letter-spacing:0.06em; text-transform:uppercase; font-weight:600;" data-ab-i18n="loadout.score_balance">Score balance</div>' +
                                 '<div style="display:flex; align-items:baseline; gap:0.5em; margin-top:0.25em;">' +
                                     '<div id="abSaLoadoutScore" style="font-size:2.6em; font-weight:800; background:linear-gradient(135deg,#a3b5f7,#d4c1ff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; line-height:1;">0</div>' +
-                                    '<div class="ab-muted" style="font-size:0.9em;" data-i18n="loadout.shop.score">score</div>' +
+                                    '<div class="ab-muted" style="font-size:0.9em;" data-ab-i18n="loadout.shop.score">score</div>' +
                                 '</div>' +
-                                '<div class="ab-muted" style="font-size:0.8em; margin-top:0.4em;"><span data-i18n="loadout.lifetime_spent">Lifetime spent:</span> <span id="abSaLoadoutSpent" style="color:rgba(255,255,255,0.85); font-weight:600;">0</span></div>' +
+                                '<div class="ab-muted" style="font-size:0.8em; margin-top:0.4em;"><span data-ab-i18n="loadout.lifetime_spent">Lifetime spent:</span> <span id="abSaLoadoutSpent" style="color:rgba(255,255,255,0.85); font-weight:600;">0</span></div>' +
                             '</div>' +
                             '<div id="abSaLoadoutBoostStack" style="display:flex; flex-direction:column; gap:0.5em; align-items:flex-end;"></div>' +
                         '</div>' +
                         '<div class="ab-tabs" style="margin-bottom:1.1em;">' +
-                            '<button type="button" class="ab-tab active" data-lo="powerups" data-i18n="loadout.tab.powerups">Power-ups</button>' +
-                            '<button type="button" class="ab-tab" data-lo="shop" data-i18n="loadout.tab.shop">Shop</button>' +
-                            '<button type="button" class="ab-tab" data-lo="cosmetics" data-i18n="loadout.tab.cosmetics">Cosmetics</button>' +
+                            '<button type="button" class="ab-tab active" data-lo="powerups" data-ab-i18n="loadout.tab.powerups">Power-ups</button>' +
+                            '<button type="button" class="ab-tab" data-lo="shop" data-ab-i18n="loadout.tab.shop">Shop</button>' +
+                            '<button type="button" class="ab-tab" data-lo="cosmetics" data-ab-i18n="loadout.tab.cosmetics">Cosmetics</button>' +
                         '</div>' +
                         '<div id="abSaLoPanelPowerups" class="ab-lo-panel">' +
-                            '<div class="ab-muted" style="font-size:0.88em; margin-bottom:0.85em;" data-i18n="loadout.intro.powerups">Activate consumables you have earned or bought. Streak Freeze auto-consumes if you miss a day.</div>' +
-                            '<div id="abSaLoPowerupGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:0.85em;"><div class="ab-muted" data-i18n="common.loading">Loading...</div></div>' +
+                            '<div class="ab-muted" style="font-size:0.88em; margin-bottom:0.85em;" data-ab-i18n="loadout.intro.powerups">Activate consumables you have earned or bought. Streak Freeze auto-consumes if you miss a day.</div>' +
+                            '<div id="abSaLoPowerupGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:0.85em;"><div class="ab-muted" data-ab-i18n="common.loading">Loading...</div></div>' +
                         '</div>' +
                         '<div id="abSaLoPanelShop" class="ab-lo-panel" style="display:none;">' +
-                            '<div class="ab-muted" style="font-size:0.88em; margin-bottom:0.85em;" data-i18n="loadout.intro.shop">Spend score on power-up refills, profile themes, badge frames, and custom rank titles.</div>' +
-                            '<div id="abSaLoShopBody"><div class="ab-muted" data-i18n="common.loading">Loading...</div></div>' +
+                            '<div class="ab-muted" style="font-size:0.88em; margin-bottom:0.85em;" data-ab-i18n="loadout.intro.shop">Spend score on power-up refills, profile themes, badge frames, and custom rank titles.</div>' +
+                            '<div id="abSaLoShopBody"><div class="ab-muted" data-ab-i18n="common.loading">Loading...</div></div>' +
                         '</div>' +
                         '<div id="abSaLoPanelCosmetics" class="ab-lo-panel" style="display:none;">' +
-                            '<div class="ab-muted" style="font-size:0.88em; margin-bottom:0.85em;" data-i18n="loadout.intro.cosmetics">Equip cosmetics you own. Theme repaints this page; frame restyles equipped badges; title replaces your auto rank name.</div>' +
-                            '<div id="abSaLoCosmeticsBody"><div class="ab-muted" data-i18n="common.loading">Loading...</div></div>' +
+                            '<div class="ab-muted" style="font-size:0.88em; margin-bottom:0.85em;" data-ab-i18n="loadout.intro.cosmetics">Equip cosmetics you own. Theme repaints this page; frame restyles equipped badges; title replaces your auto rank name.</div>' +
+                            '<div id="abSaLoCosmeticsBody"><div class="ab-muted" data-ab-i18n="common.loading">Loading...</div></div>' +
                         '</div>' +
                         '<div id="abSaLoStatus" class="ab-muted" style="margin-top:0.85em; font-size:0.85em; min-height:1.2em;"></div>' +
                     '</div>' +
                 '</div>' +
                 '<div id="abSaPanelSettings" class="ab-panel" style="display:none;">' +
                     '<div class="ab-panel-card">' +
-                        '<h3 style="margin:0 0 1em;" data-i18n="settings.title">Settings</h3>' +
-                        '<div id="abSaSettingsContent" data-i18n="settings.loading">Loading settings...</div>' +
+                        '<h3 style="margin:0 0 1em;" data-ab-i18n="settings.title">Settings</h3>' +
+                        '<div id="abSaSettingsContent" data-ab-i18n="settings.loading">Loading settings...</div>' +
                     '</div>' +
                 '</div>' +
             '</div>';
@@ -3588,12 +3588,12 @@ export default function startRuntime(environment) {
     function renderSettingsPanel(prefs) {
         var box = el('abSaSettingsContent');
         if (!box) return;
-        // Strip the `data-i18n="settings.loading"` attribute that sat on the
+        // Strip the `data-ab-i18n="settings.loading"` attribute that sat on the
         // container from initial HTML — without this, applyStaticTranslations
         // walks the DOM on every language-change pass and RESETS textContent
         // to the translated "Loading settings..." string, WIPING the entire
         // rendered panel. Classic textContent-kills-children hazard.
-        if (box.hasAttribute('data-i18n')) box.removeAttribute('data-i18n');
+        if (box.hasAttribute('data-ab-i18n')) box.removeAttribute('data-ab-i18n');
 
         function toggle(key, label, desc, checked) {
             return '<label class="ab-toggle">' +
@@ -3866,7 +3866,7 @@ export default function startRuntime(environment) {
                     // Resolve the chosen language now (honor "default" -> admin).
                     var chosen = sel.value;
                     var pc = publicConfigGlobal || {};
-                    var adminLang = (pc.DefaultLanguage || pc.defaultLanguage || 'en').toString().toLowerCase();
+                    var adminLang = (environment.language || pc.DefaultLanguage || pc.defaultLanguage || 'en').toString().toLowerCase();
                     var eff = (!chosen || chosen === 'default') ? adminLang : chosen;
                     // Keep the local prefs in sync with the user's choice.
                     prefs.Language = chosen;
@@ -4197,7 +4197,7 @@ export default function startRuntime(environment) {
             var p = parts[0] || {};
             var cfg = parts[1] || {};
             var userLang = (p.Language || p.language || 'default').toString().toLowerCase();
-            var adminLang = (cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
+            var adminLang = (environment.language || cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
             var effective = (userLang === 'default' || !userLang) ? adminLang : userLang;
             return loadTranslations(effective).then(function () {
                 applyStaticTranslations();
@@ -4571,12 +4571,12 @@ export default function startRuntime(environment) {
             // so the control goes away rather than sitting there doing nothing.
             // Hidden, not disabled: a dead button invites clicking.
             btn.hidden = isStyleForced();
-            // Update the data-i18n key so applyStaticTranslations picks up
+            // Update the data-ab-i18n key so applyStaticTranslations picks up
             // the correct one on next pass; also set textContent immediately
             // so the user sees the change without waiting for a translations
             // reload.
             var key = pref === 'revamp' ? 'ui.toggle.revamp' : 'ui.toggle.classic';
-            btn.setAttribute('data-i18n', key);
+            btn.setAttribute('data-ab-i18n', key);
             btn.textContent = tr(key, pref === 'revamp' ? 'UI: Revamp' : 'UI: Classic');
             btn.setAttribute('aria-pressed', pref === 'revamp' ? 'true' : 'false');
         }
@@ -4736,7 +4736,7 @@ export default function startRuntime(environment) {
             var cfg = values[0] || {};
             var prefs = values[1] || {};
             var chosen = (prefs.Language || prefs.language || 'default').toString().toLowerCase();
-            var adminLanguage = (cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
+            var adminLanguage = (environment.language || cfg.DefaultLanguage || cfg.defaultLanguage || 'en').toString().toLowerCase();
             var effectiveLanguage = !chosen || chosen === 'default' ? adminLanguage : chosen;
             return loadTranslations(effectiveLanguage).catch(function () { return {}; }).then(function () {
                 renderNativeNavigationSettings(findNativeUserSettingsHost(), prefs);

@@ -14,6 +14,7 @@ import { i18n } from './i18n.js';
 import { storage } from './StorageService.js';
 import { shouldShowScore } from './visibility.js';
 import { detailsIcons, getStaticIcon } from './Icons.js';
+import { posterQualityHtml } from './PosterQuality.js';
 import { platformInfo } from './PlatformInfo.js';
 
 class CardRenderer {
@@ -258,6 +259,7 @@ class CardRenderer {
      */
     static getQualityBadgeHtml(item, enabledForHome = false) {
         if (!item) return '';
+        if (enabledForHome && !CardRenderer.isGame(item)) return posterQualityHtml(item);
         // Game ROMs do not have video resolution/HDR streams
         if (CardRenderer.isGame(item)) return '';
         if (!enabledForHome && !CardRenderer._getPrefs().showQualityBadges) return '';

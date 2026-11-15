@@ -1,5 +1,8 @@
 import revampStyles from './vendor/RevampStyles.js';
 import { achievementLegacyCss } from '../AchievementBadgesCompat.js';
+import { i18n } from '../../utils/i18n.js';
+import english from './translations/en.json';
+import russian from './translations/ru.json';
 
 /** Owns the bundled renderer's DOM, storage, observers and scheduling. No frame/global bootstrap. */
 export default class NativeEnvironment {
@@ -106,7 +109,29 @@ export default class NativeEnvironment {
             document: doc,
             localStorage: scopedStorage,
             sessionStorage: scopedStorage,
-            fetch: options.fetch,
+            language: i18n.currentLang,
+            translations: { ...english, ...(String(i18n.currentLang).split('-')[0] === 'ru' ? russian : {}) },
+            // Keep the backend's custom translations; a missing bundle must never expose raw keys.
+            fetch: async (url, init) => {
+                const match = String(url).match(/\/AchievementBadges\/translations\/([a-z-]+)/i);
+                if (!match) return options.fetch(url, init);
+                let remote = {};
+                try {
+                    const response = await options.fetch(url, init);
+                    if (response.ok) remote = await response.json();
+                } catch (error) {
+                    if (this._dead) throw error;
+                }
+                const local = match[1].split('-')[0] === 'ru' ? russian : {};
+                // Some plugin versions return the English bundle for an unknown language.
+                // Do not let that fallback erase our bundled Russian strings.
+                remote = Object.fromEntries(
+                    Object.entries(remote || {}).filter(([key, value]) => !local[key] || value !== english[key])
+                );
+                return new Response(JSON.stringify({ ...english, ...local, ...remote }), {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            },
             log: options.log,
             URL: scopedURL,
             setTimeout: (callback, delay, ...args) => {

@@ -14,3 +14,26 @@
 .details-release-dates span { margin: 3px 16px 3px 0; }
 
 .details-release-dates:empty { display: none; }
+
+/* Compact technical stack, matching the placement of Enhanced poster tags. */
+.media-card .quality-badge.poster-quality-tags,
+.hero-poster .quality-badge.poster-quality-tags {
+    position: absolute; top: 8px; left: 8px; right: auto; bottom: auto;
+    display: flex; flex-direction: column; align-items: flex-start;
+    height: auto; padding: 0; background: transparent; box-shadow: none; border: 0;
+    max-width: calc(100% - 48px); z-index: 4; pointer-events: none;
+    opacity: 1; transform: none; visibility: visible;
+}
+.poster-quality-chip {
+    display: block; padding: 2px 6px; margin-bottom: 3px; border-radius: 4px;
+    font-size: 13px; line-height: 1.3; font-weight: 700;
+    color: var(--jf-text-primary); background: var(--jf-accent);
+    text-shadow: 0 1px 2px var(--jf-background);
+}
+.poster-quality-chip.quality-codec { background: var(--jf-success, var(--jf-accent)); }
+.poster-quality-chip.quality-audio { background: var(--jf-accent); }
+.poster-quality-chip.quality-range { background: var(--jf-warning, var(--jf-background)); }
+.poster-quality-chip.quality-source { background: var(--jf-background); }
+.hero-poster .poster-quality-chip { font-size: 16px; padding: 3px 8px; }
+
+.poster-quality-chip.quality-resolution { background: var(--jf-info, var(--jf-accent)); }

@@ -54,7 +54,7 @@ test('home cards render video quality and a score without requiring the library 
         MediaStreams: [{ Type: 'Video', Width: 1920, Height: 1080 }]
     };
     let html = CardRenderer.createCardHtml(item, { type: 'poster', showPosterBadges: true });
-    assert.match(html, /quality-badge[^>]*>1080p/);
+    assert.match(html, /quality-resolution[^>]*>1080p/);
     assert.match(html, /poster-rating-badge/);
     assert.match(html, /8\.2/);
     html = CardRenderer.createCardHtml(item, { type: 'poster' });
