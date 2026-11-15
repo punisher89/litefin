@@ -1708,5 +1708,9 @@
     "YearLabel": "Rok: {0}",
     "YearValue": "{0} rok",
     "Yes": "Tak",
-    "Zoom": "Powiększenie"
+    "Zoom": "Powiększenie",
+    "Achievements": "Achievements",
+    "AchievementsEnter": "Open achievements",
+    "AchievementsLoading": "Loading Achievement Badges…",
+    "AchievementsUnavailable": "Could not open Achievement Badges. Install or update AchievementBadges on this Jellyfin server, check the connection, then try again."
 }

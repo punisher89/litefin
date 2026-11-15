@@ -715,6 +715,9 @@ const seerrPersonChunk = createPageChunkLoader(
 const discoverChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "discover" */ '../pages/DiscoverPage.js')
 );
+const achievementsChunk = createPageChunkLoader(
+    () => import(/* webpackChunkName: "achievements" */ '../pages/AchievementsPage.js')
+);
 const favoritesChunk = createPageChunkLoader(
     () => import(/* webpackChunkName: "favorites" */ '../pages/FavoritesPage.js')
 );
@@ -927,6 +930,13 @@ class SeerrPersonPage extends AsyncPageProxy {
 class DiscoverPage extends AsyncPageProxy {
     constructor(options) {
         super(options, discoverChunk);
+    }
+}
+
+/** Route proxy for the server-hosted Achievement Badges interface. */
+class AchievementsPage extends AsyncPageProxy {
+    constructor(options) {
+        super(options, achievementsChunk);
     }
 }
 
@@ -2432,6 +2442,7 @@ class App {
         router.register('/search', SearchPage);
         router.register('/discover', DiscoverPage);
         router.register('/favorites', FavoritesPage);
+        router.register('/achievements', AchievementsPage);
         router.register('/settings', SettingsPage);
         router.register('/livetv', LiveTvPage);
         router.register('/offline', OfflinePage);

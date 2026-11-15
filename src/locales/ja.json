@@ -1708,5 +1708,9 @@
     "YearLabel": "製作年: {0}",
     "YearValue": "{0} 年",
     "Yes": "はい",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Achievements": "Achievements",
+    "AchievementsEnter": "Open achievements",
+    "AchievementsLoading": "Loading Achievement Badges…",
+    "AchievementsUnavailable": "Could not open Achievement Badges. Install or update AchievementBadges on this Jellyfin server, check the connection, then try again."
 }

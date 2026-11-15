@@ -1,0 +1,42 @@
+.achievements-page .achievements-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 20px 32px;
+    color: var(--jf-text-primary);
+    background: var(--jf-background);
+}
+
+.achievements-toolbar h1 {
+    margin: 0 20px 0 0;
+    font-size: 1.5rem;
+}
+
+.achievements-actions {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.achievements-actions button {
+    margin: 4px;
+}
+
+.achievements-status {
+    padding: 24px 32px;
+    color: var(--jf-text-secondary);
+}
+
+.achievements-host {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+.achievements-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}

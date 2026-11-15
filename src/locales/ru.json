@@ -1708,5 +1708,9 @@
     "YearLabel": "Год: {0}",
     "YearValue": "{0} г.",
     "Yes": "Да",
-    "Zoom": "Зум"
+    "Zoom": "Зум",
+    "Achievements": "Достижения",
+    "AchievementsEnter": "Открыть достижения",
+    "AchievementsLoading": "Загрузка Achievement Badges…",
+    "AchievementsUnavailable": "Не удалось открыть Achievement Badges. Установите или обновите плагин AchievementBadges на сервере Jellyfin, проверьте соединение и повторите попытку."
 }
