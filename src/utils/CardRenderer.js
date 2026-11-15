@@ -64,7 +64,8 @@ class CardRenderer {
             useSeasonBadges: storage.getItem('pref:useSeasonBadges') === 'true',
             swapEpisodeTitles: storage.getItem('pref:swapEpisodeTitles') === 'true',
             showFavoriteBadges: storage.getItem('pref:showFavoriteBadges') === 'true',
-            showQualityBadges: storage.getItem('pref:showQualityBadges') === 'true'
+            showQualityBadges: storage.getItem('pref:showQualityBadges') === 'true',
+            scoreVisibility: storage.getItem('pref:scoreVisibility') || 'all'
         };
         // Each of these shapes the markup the HTML cache keeps, so all of them are
         // part of its key: a changed setting rebuilds the cards once
@@ -255,11 +256,11 @@ class CardRenderer {
      * @param {Object} item
      * @returns {string} HTML string
      */
-    static getQualityBadgeHtml(item) {
+    static getQualityBadgeHtml(item, enabledForHome = false) {
         if (!item) return '';
         // Game ROMs do not have video resolution/HDR streams
         if (CardRenderer.isGame(item)) return '';
-        if (!CardRenderer._getPrefs().showQualityBadges) return '';
+        if (!enabledForHome && !CardRenderer._getPrefs().showQualityBadges) return '';
 
         let width = item.Width;
         let height = item.Height;
@@ -273,8 +274,13 @@ class CardRenderer {
          * Extract video stream attributes from media source container metadata.
          * We inspect VideoRange, VideoRangeType, Profile, Title, and Codec strings.
          */
-        if (item.MediaSources && item.MediaSources.length > 0) {
-            const source = item.MediaSources[0];
+        const qualitySources = item.MediaSources?.length
+            ? item.MediaSources
+            : item.MediaStreams?.length
+              ? [{ MediaStreams: item.MediaStreams }]
+              : [];
+        if (qualitySources.length > 0) {
+            const source = qualitySources[0];
             if (source.Width) width = source.Width;
             if (source.Height) height = source.Height;
             if (source.MediaStreams) {
@@ -429,7 +435,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${options.showPosterBadges}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -960,8 +966,7 @@ class CardRenderer {
         // playback percentage from server UserData.
         // --------------------------------------------------------------------
         const hasPlaybackTicks = Boolean(item?.UserData?.PlaybackPositionTicks && item?.RunTimeTicks);
-        const hasPlayedPercentage =
-            item?.UserData?.PlayedPercentage != null && item.UserData.PlayedPercentage > 0;
+        const hasPlayedPercentage = item?.UserData?.PlayedPercentage != null && item.UserData.PlayedPercentage > 0;
 
         if (
             !hideProgressBar &&
@@ -1062,7 +1067,7 @@ class CardRenderer {
         }
 
         // Quality Badge (Resolution/HDR)
-        const qualityBadgeHtml = CardRenderer.getQualityBadgeHtml(item);
+        const qualityBadgeHtml = CardRenderer.getQualityBadgeHtml(item, options.showPosterBadges);
 
         let seerrTypeBadgeHtml = '';
         let seerrBadgeHtml = '';
@@ -1583,8 +1588,29 @@ class CardRenderer {
         // Rank badge for ordered rows (Home Screen Sections "Top Ten")
         const rankBadgeHtml = item._rank ? `<div class="card-rank-badge">${parseInt(item._rank, 10)}</div>` : '';
 
+        const rating = Number(item.CommunityRating);
+        const ratingBadgeHtml =
+            options.showPosterBadges &&
+            ['Movie', 'Series', 'Episode'].includes(item.Type) &&
+            Number.isFinite(rating) &&
+            rating > 0 &&
+            rating <= 10 &&
+            shouldShowScore(item)
+                ? `<div class="poster-rating-badge" aria-label="${escapeHtml(i18n.t('CommunityRating'))}: ${rating.toFixed(1)}">${detailsIcons.ratingStar}${rating.toFixed(1)}</div>`
+                : '';
+        const tmdbRating = Number(item._tmdbRating);
+        const tmdbRatingHtml =
+            isSeerrItem &&
+            type !== 'person' &&
+            Number.isFinite(tmdbRating) &&
+            tmdbRating > 0 &&
+            tmdbRating <= 10 &&
+            shouldShowScore(item)
+                ? `<div class="card-tmdb-rating"><span>TMDB</span> ${detailsIcons.ratingStar}${tmdbRating.toFixed(1)}</div>`
+                : '';
         const badgeContainer = `
             ${rankBadgeHtml}
+            ${ratingBadgeHtml}
             ${episodeBadgeHtml}
             ${unplayedCountBadgeHtml}
             ${qualityBadgeHtml}
@@ -1597,7 +1623,7 @@ class CardRenderer {
         `;
 
         const html = `
-            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
+            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" ${options.showPosterBadges && ['Movie', 'Series', 'Episode'].includes(item.Type) ? `data-poster-series-id="${escapeHtml(item.Type === 'Series' ? itemId : item.SeriesId || '')}" data-poster-media-type="${item.Type}"` : ''} ${type === 'person' ? `data-person-id="${escapeHtml(item._tmdbPersonId ? `tmdb-person-${item._tmdbPersonId}` : itemId)}"` : ''} data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
                 <div class="card-image">
                     ${imagePart}
                     ${progressHtml}
@@ -1640,6 +1666,7 @@ class CardRenderer {
                     }
                     ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
                     ${metaHtml}
+                    ${tmdbRatingHtml}
                 </div>
                 `
                         : ''

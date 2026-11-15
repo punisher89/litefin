@@ -32,6 +32,7 @@ import '../styles/home.css';
 import '../styles/hero-carousel.css';
 
 import Page from './Page.js';
+import PosterMetadataDecorator from '../utils/PosterMetadataDecorator.js';
 import { api } from '../api/index.js';
 import { VirtualCardRow } from '../components/VirtualCardRow.js';
 import { state } from '../core/StateManager.js';
@@ -359,6 +360,7 @@ class HomePage extends Page {
     }
 
     onInit() {
+        this._posterMetadata = new PosterMetadataDecorator(this.el);
         this._isMounted = true;
 
         // Guard: must be authenticated to show home
@@ -408,6 +410,7 @@ class HomePage extends Page {
             idleGate.cancel(this._homeIdlePrefetchTask);
             this._homeIdlePrefetchTask = null;
         }
+        this._posterMetadata?.destroy();
         if (this._homeIdlePrefetchTimer) {
             clearTimeout(this._homeIdlePrefetchTimer);
             this._homeIdlePrefetchTimer = null;
@@ -921,9 +924,7 @@ class HomePage extends Page {
 
                             // Empty array from a healthy companion plugin means zero active items
                             // (e.g. after marking the last item played) — avoid firing legacy endpoints.
-                            log.info(
-                                'Successfully fetched and verified merged items from server-side Litefin plugin'
-                            );
+                            log.info('Successfully fetched and verified merged items from server-side Litefin plugin');
                             return filteredPluginItems.length > 0 ? filteredPluginItems : null;
                         }
 
@@ -1888,8 +1889,8 @@ class HomePage extends Page {
                 sectionEl.style.setProperty('--card-expansion', '0px');
             } else if (isModern || isModernPosters) {
                 const scale = isModernPosters
-                    ? (parseFloat(storage.getItem('pref:modernPostersCardSizeScale')) || 1.2)
-                    : (parseFloat(storage.getItem('pref:modernCardSizeScale')) || 1.2);
+                    ? parseFloat(storage.getItem('pref:modernPostersCardSizeScale')) || 1.2
+                    : parseFloat(storage.getItem('pref:modernCardSizeScale')) || 1.2;
                 const itemMargin = Math.round(26 * scale);
                 sectionEl.style.setProperty('--card-width', `${Math.round(212 * scale)}px`);
                 sectionEl.style.setProperty('--card-height', `${Math.round(318 * scale)}px`);
@@ -2188,7 +2189,7 @@ class HomePage extends Page {
         try {
             const batchMap = await api.getBatchLatest(libraryIds, {
                 limit: homeRowLimit,
-                fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag',
+                fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag,CommunityRating,Width,Height,MediaStreams',
                 ...(hidePlayed ? { isPlayed: false } : {})
             });
 
@@ -2609,12 +2610,12 @@ class HomePage extends Page {
             focusSectionId: `home-row-${descriptor.id}`,
             // Card render function — delegates to CardRenderer via Page._renderMediaCard
             renderCard: (item) =>
-                this._renderMediaCard(
-                    item,
+                CardRenderer.createCardHtml(item, {
                     isLandscape,
-                    descriptor.cardType || descriptor.contextType || 'poster',
-                    descriptor.contextType
-                )
+                    type: descriptor.cardType || descriptor.contextType || 'poster',
+                    contextType: descriptor.contextType,
+                    showPosterBadges: true
+                })
         });
 
         // ── Register FocusManager section for this row ────────────────────────

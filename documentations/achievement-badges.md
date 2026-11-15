@@ -1,78 +1,79 @@
-# Achievement Badges
+# Native achievements and card metadata (webOS 6 Normal)
 
-Open **Achievements** in Litefin's sidebar, or navigate to `#/achievements`.
-The entry can be reordered or hidden in the sidebar settings, in both layouts.
+Open **Achievements** in Litefin's sidebar or `#/achievements`.
 
-Install [AchievementBadges for Jellyfin](https://github.com/ZL154/AchievementBadges_for_Jellyfin)
-on the same Jellyfin server first. The plugin must expose `public-config` and
-the `client-script/sidebar`, `standalone`, and `enhance` bundles. No Jellyfin Web
-file patching or JS Injector installation is required for the Litefin page.
+The page is a Litefin `Page` containing `AchievementBadgesPanel`, a normal
+`Component`. It mounts into Litefin's DOM and uses its FocusManager, modal
+traps, NavigationState and ScrollController. There is no iframe, separate
+browser context, remote JavaScript bootstrap, or second login. The test
+notification button uses the page's button style and the original synthetic
+Rare toast; it never awards a badge or changes profile data.
 
-Litefin hosts all three original frontend bundles from the installed plugin
-in a separate document. This preserves My Badges, Quests, Recap, Leaderboard,
-Compare, Activity, Wrapped, Stats, Loadout/shop, Settings, friends, messaging,
-profile cards, effects and plugin feature/privacy settings. Features available
-to a user remain controlled by the server plugin. The server still computes
-and stores all achievements, quests, cosmetics and social data.
+The complete vanilla-JS page, friends/messaging and notification renderers
+are bundled from AchievementBadges commit
+`8939cd412d28a8d3ba0b54fc338c21847e83e6bd`, with their MIT license under
+`src/plugins/achievement-badges/vendor/LICENSE.txt`. The standalone bootstrap
+is replaced by the Component mount lifecycle. Their DOM/storage/scheduling
+adapters are scoped to that component and removed on navigation. Script
+updates now ship with Litefin instead of downloading the server's frontend
+on every visit. All ten original tabs, user settings, feature/privacy rules,
+shop/loadout, profile cards and social functionality retain the plugin API.
 
-The interface follows the plugin's own Classic/Revamp style and language
-settings. The Litefin menu and toolbar are localized independently. Upstream
-does not currently ship a Russian UI translation; its English fallback is
-preserved. The Material Icons font is bundled locally so icons work without
-Google Fonts access. Its Apache 2.0 license is in
-`src/assets/licenses/MaterialIcons-LICENSE.txt`.
+**AchievementBadges must still be installed on the Jellyfin server** to
+calculate/store awards and provide its API, translations and media assets.
+The native page does not require Jellyfin Web injection. Global overlays in
+Litefin's video player are outside the page integration.
 
-Litefin supplies the current session token in request headers, including for
-Jellyfin 12, and preserves a Jellyfin base path such as `/jellyfin`. No token
-is placed in the iframe URL or written to `jellyfin_credentials`. Local UI
-preferences are namespaced by server and user. Custom server request headers
-are forwarded for plugin API calls. Static bundles/assets must be accessible
-under Jellyfin's plugin endpoints, as in Jellyfin Web. Cross-origin clients
-need the normal Jellyfin CORS configuration. Proxies that also protect static
-assets may require a same-origin deployment.
+Current session authentication stays in headers; base URLs such as
+`/jellyfin` and custom server headers are preserved. UI preferences keep the
+same server/user namespace as previous Litefin builds. User avatars use
+header-authenticated blobs. Local Material Icons include their Apache 2.0
+license in `src/assets/licenses/MaterialIcons-LICENSE.txt`.
 
-The page transfers keyboard/remote focus into the plugin automatically.
-The toolbar contains only **Test notification**, which plays the plugin's own
-synthetic Rare badge animation without awarding a badge or writing profile data.
-From that toolbar button, Down/Right returns to the plugin controls.
-Arrow keys move between controls with smooth scrolling; Magic Remote wheel
-input is eased and coalesced. The plugin's Reduced motion preference and the
-system motion preference disable these animations. Escape / TV Back returns to the Litefin
-toolbar (or closes an open badge dialog); the next Back uses Litefin's normal
-navigation. The plugin's Back Home link opens Litefin Home. Leaving the page
-removes its document, timers and observers and aborts outstanding requests.
+Chromium 79 fallbacks convert OKLCH literals to sRGB, expand inset positioning
+and supply older flex spacing. Some advanced decorative effects still depend
+on the TV engine. The Classic/Revamp choice, language and reduced-motion
+settings remain those of the plugin; upstream currently has no Russian page
+translation. The test button and new Litefin metadata labels are localized.
 
-The server serves its own JavaScript without Litefin's Babel transpilation.
-Compatibility on older TVs therefore also depends on the installed plugin's
-browser requirements. This integration does not replace server dashboard
-administration or add global badge overlays to Litefin's video player.
+## Posters and details
 
-## webOS 6 Normal
+Home posters, Continue Watching and Next Up display community scores and
+video-quality labels. Normal item queries request the needed fields. If the
+companion's merged rows omit them, visible cards are filled lazily with bounded
+concurrency and a per-server/user cache. A series quality label describes a
+representative episode, with a tooltip explaining that episodes can differ;
+a specific episode always uses that episode's actual stream metadata.
 
-The target package is `npm run package:webos-normal` (Normal bundle).
-webOS 6 uses Chromium 79. The host converts numeric OKLCH colors to sRGB,
-expands `inset` into four physical edges, and supplies spacing for key flex
-rows. It applies the same fixes to styles added later by dialogs and friends.
-Some advanced blend/blur decoration may differ on this older engine. The
-TV page enlarges controls and provides an explicit focus outline; locked
-badge cards can also be opened with OK. User avatars load through authenticated
-blob requests instead of putting the session token in image URLs.
+Discover displays explicitly sourced **TMDB** vote averages below its film/TV
+posters. Generic Jellyfin community scores are not relabeled as TMDB scores.
+Score visibility settings remain respected.
+
+Cast and guest-star posters show age at production when a real filming date
+is present. Otherwise they show **At release**, using the exact premiere date
+instead of inventing a shooting date. Living actors show their current age;
+deceased actors show their age at death and a small dagger. Unknown/invalid
+dates are omitted. A posthumous release does not imply a fictional filming age.
+Facts are fetched for near-visible cast cards, cached, and batched through
+Jellyfin-Enhanced `people/info` when available. Standard Jellyfin person
+metadata and Seerr person facts provide fallbacks. No browser TMDB API key
+is embedded in the client.
+
+Details pages show confirmed premiere, theatrical and digital release dates.
+Seerr detail metadata is preserved when supplied. The optional
+`JellyfinEnhanced/tmdb` proxy can fill TMDB release categories using its
+server-side TMDB configuration. Region-specific release dates identify their
+country; the client uses its Seerr region preference (US fallback). Without
+that optional data source, existing confirmed dates still display. A TV air
+date or physical-disc release is never substituted for a digital release.
 
 ## Validation
 
-Run `npm test`, `npm run locale:check -- --all --no-untranslated`, and `npm run package:webos-normal`. The host tests
-cover base URLs, authenticated writes, refreshed tokens, session switching,
-request cancellation, and directional navigation. A live Jellyfin deployment
-is still required to verify actual awards, purchases, attachments, sharing,
-privacy rules and messaging end to end.
-
-Frontend contract inspected against upstream commit
-`8939cd412d28a8d3ba0b54fc338c21847e83e6bd`.
-
-Browser integration was exercised with the actual upstream bundles and a mock
-API in current Chromium and Chromium 79.0.3945.0: badge rendering, all ten
-page tabs, an authenticated equip write, keyboard navigation, a full-size
-chase dialog, Back Home, and teardown without continued polling. The Normal
-IPK builds successfully. These checks do not emulate LG hardware or its
-virtual keyboard. The repository's locale checker also reports pre-existing
-missing keys unrelated to this page.
+Build with `npm run package:webos-normal`; run `npm test` and ESLint on changed
+modules. Node tests cover session security, card scores/quality, calendar-age
+boundaries, deceased/posthumous cases, date validation and TMDB release types.
+Browser checks use actual bundled components and original plugin API shapes
+in Chromium 79: zero iframes, all ten tabs, native focus/modal trapping,
+synthetic notifications, metadata rendering, and teardown without background
+polling. Live purchases, messaging/attachments, optional metadata availability
+and LG hardware/virtual keyboard still require validation on the target TV.

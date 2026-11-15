@@ -11,6 +11,8 @@
 import '../styles/discover.css';
 
 import Page from './Page.js';
+import ReleaseDatesPanel from '../components/ReleaseDatesPanel.js';
+import PersonAgeDecorator from '../utils/PersonAgeDecorator.js';
 import DescriptionModal from '../components/DescriptionModal.js';
 import SeerrRequestModal from '../components/SeerrRequestModal.js';
 import { RichMetadataTable } from '../components/RichMetadataTable.js';
@@ -884,6 +886,9 @@ class SeerrDetailsPage extends Page {
     }
 
     async _loadSecondaryContent(mediaType, tmdbId) {
+        this._releaseDates?.destroy();
+        this._releaseDates = new ReleaseDatesPanel(this.el, this._item);
+        if (!this._personAges) this._personAges = new PersonAgeDecorator(this.el, () => this._item);
         if (!this._item) return;
 
         // 1. Cast & Crew (check setting pref:hideCastSection)
@@ -1482,6 +1487,8 @@ class SeerrDetailsPage extends Page {
     }
 
     destroy() {
+        this._releaseDates?.destroy();
+        this._personAges?.destroy();
         if (this._tooltipTimers) {
             this._tooltipTimers.forEach((t) => clearTimeout(t));
             this._tooltipTimers = null;

@@ -12,6 +12,8 @@ import '../styles/details.css';
 import '../styles/season.css';
 
 import Page from './Page.js';
+import ReleaseDatesPanel from '../components/ReleaseDatesPanel.js';
+import PersonAgeDecorator from '../utils/PersonAgeDecorator.js';
 import { api } from '../api/index.js';
 import { router } from '../core/Router.js';
 import { eventBus } from '../core/EventBus.js';
@@ -114,7 +116,7 @@ class DetailsPage extends Page {
      */
     _renderMediaCard(item, isLandscape, type, options = {}) {
         // Resolve contextType string cleanly so Page.js receives a valid string rather than an options Object
-        const contextType = typeof options === 'string' ? options : (options?.contextType || 'details-row');
+        const contextType = typeof options === 'string' ? options : options?.contextType || 'details-row';
         return super._renderMediaCard(item, isLandscape, type, contextType);
     }
 
@@ -1715,6 +1717,8 @@ class DetailsPage extends Page {
     }
 
     async _loadSecondaryContent() {
+        this._releaseDates?.destroy();
+        this._releaseDates = new ReleaseDatesPanel(this.el, this._item);
         // Load additional data based on type
         if (this._item.Type === 'Series') {
             /*
@@ -4372,6 +4376,7 @@ class DetailsPage extends Page {
     }
 
     _renderPeople() {
+        if (!this._personAges) this._personAges = new PersonAgeDecorator(this.el, () => this._item);
         this._renderVirtualRow({
             sectionId: 'people-section',
             listId: 'people-row',
@@ -4812,6 +4817,7 @@ class DetailsPage extends Page {
     }
 
     _renderGuestStars(people) {
+        if (!this._personAges) this._personAges = new PersonAgeDecorator(this.el, () => this._item);
         this._renderVirtualRow({
             sectionId: 'guest-stars-section',
             listId: 'guest-stars-row',
@@ -7392,6 +7398,8 @@ class DetailsPage extends Page {
     }
 
     destroy() {
+        this._releaseDates?.destroy();
+        this._personAges?.destroy();
         // --------------------------------------------------------------------
         // Flag this instance as destroyed.
         // This acts as a circuit breaker for any pending, asynchronous API calls

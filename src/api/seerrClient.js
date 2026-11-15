@@ -410,6 +410,10 @@ export class SeerrClient {
      * @param {number} personId - The TMDB person identifier.
      * @returns {Promise<Object>} Normalized person details and appearances.
      */
+    async personFacts(personId) {
+        return this._request(`/Person/${encodeURIComponent(personId)}`);
+    }
+
     async person(personId) {
         try {
             // Request person entity and combined credits in parallel

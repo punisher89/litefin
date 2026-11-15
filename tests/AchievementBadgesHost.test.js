@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import AchievementBadgesHost, { achievementUrl, nextAchievementControl } from '../src/plugins/AchievementBadgesHost.js';
+import AchievementBadgesHost, { achievementUrl } from '../src/plugins/achievement-badges/AchievementBadgesClient.js';
 import { achievementLegacyCss } from '../src/plugins/AchievementBadgesCompat.js';
 
 test('webOS 6 color and positioning fallbacks preserve alpha and all four edges', () => {
@@ -34,23 +34,6 @@ function createHost(fetch) {
     host._session = { ...session };
     return { host, session };
 }
-
-test('notification preview uses the upstream synthetic toast without writing to the API', () => {
-    const { host } = createHost(() => {
-        throw new Error('Preview must not call the API');
-    });
-    const previews = [];
-    host.frame = {
-        contentWindow: { abAchievementTestToast: (rarity) => previews.push(rarity) },
-        remove() {}
-    };
-    assert.equal(host.testNotification(), true);
-    assert.deepEqual(previews, ['rare']);
-    delete host.frame.contentWindow.abAchievementTestToast;
-    assert.equal(host.testNotification(), false);
-    host.destroy();
-    assert.equal(host.testNotification(), false);
-});
 
 test('server subpaths and encoded plugin paths survive URL resolution', () => {
     assert.equal(
@@ -105,16 +88,4 @@ test('leaving the page aborts pending plugin requests', async () => {
     host.destroy();
     await assert.rejects(request, /aborted/);
     assert.equal(host._requests.size, 0);
-});
-
-test('remote navigation follows aligned controls and can leave the left edge', () => {
-    const control = (left, top) => ({ getBoundingClientRect: () => ({ left, top, width: 40, height: 40 }) });
-    const first = control(0, 0),
-        right = control(70, 0),
-        below = control(0, 80),
-        diagonal = control(45, 70);
-    const controls = [first, right, below, diagonal];
-    assert.equal(nextAchievementControl(first, controls, 'right'), right);
-    assert.equal(nextAchievementControl(first, controls, 'down'), below);
-    assert.equal(nextAchievementControl(first, controls, 'left'), null);
 });

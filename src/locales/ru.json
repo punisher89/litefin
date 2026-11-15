@@ -1713,5 +1713,14 @@
     "AchievementsLoading": "Загрузка Achievement Badges…",
     "AchievementsUnavailable": "Не удалось открыть Achievement Badges. Установите или обновите плагин AchievementBadges на сервере Jellyfin, проверьте соединение и повторите попытку.",
     "AchievementsTestNotification": "Тест уведомлений",
-    "AchievementsTestUnavailable": "Тест уведомлений недоступен. Обновите AchievementBadges на сервере."
+    "AchievementsTestUnavailable": "Тест уведомлений недоступен. Обновите AchievementBadges на сервере.",
+    "ActorAgeAtFilming": "На съёмках: {0}",
+    "ActorAgeAtRelease": "При выходе: {0}",
+    "ActorAgeNow": "Сейчас: {0}",
+    "ActorAgeAtDeath": "Умер в {0}",
+    "ActorDeceased": "Умерший",
+    "SeriesSampleQuality": "Качество файла одной из серий; у других серий оно может отличаться.",
+    "ReleasePremiere": "Премьера",
+    "ReleaseTheatrical": "Прокат",
+    "ReleaseDigital": "Цифровой релиз"
 }
