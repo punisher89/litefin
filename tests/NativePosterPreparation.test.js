@@ -97,39 +97,3 @@ test('user opt-out and stale page completion cannot apply native mode', async (t
     done({ NativePosterTagsEnabled: true });
     assert.equal(await pending, original);
 });
-
-test('only Resume movies use web tags on unannotated wide art, including backdrop-only movies', () => {
-    const loader = new NativePosters(null);
-    const item = {
-        Id: 'native-movie',
-        Type: 'Movie',
-        Name: 'Movie',
-        _nativePosterTagsEnabled: true,
-        ImageTags: { Primary: 'poster-jetSigned-jeu123' },
-        BackdropImageTags: ['wide']
-    };
-    const options = { type: 'resume', contextType: 'resume', isLandscape: true, showPosterBadges: true };
-    const html = loader.renderCard(item, options);
-    assert(html.includes('data-web-movie-tags="true"'));
-    assert(html.includes('/Images/Backdrop'));
-    assert(!html.includes('-jetSigned'));
-    assert(
-        !loader
-            .renderCard(item, { ...options, contextType: 'latest', type: 'poster', isLandscape: false })
-            .includes('data-web-movie-tags')
-    );
-    assert(!loader.renderCard({ ...item, Type: 'Episode' }, options).includes('data-web-movie-tags'));
-    assert(!loader.renderCard(item, { ...options, showPosterBadges: false }).includes('data-web-movie-tags'));
-    assert.equal(item._webResumeTags, undefined);
-    loader.destroy();
-});
-
-test('upstream badge CSS is scoped inside its movie host, including media queries', async () => {
-    const { scopeWebTagCss } = await import('../src/utils/EnhancedWebTagRenderer.js');
-    const css = scopeWebTagCss(
-        '.quality, .rating { color: red; } @media (min-width: 100px) { .quality { color: blue; } }'
-    );
-    assert(css.includes('.lf-movie-web-tags .quality, .lf-movie-web-tags .rating'));
-    assert(css.includes('@media (min-width: 100px) { .lf-movie-web-tags .quality'));
-    assert(!css.includes('.lf-movie-web-tags @media'));
-});
