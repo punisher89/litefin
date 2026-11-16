@@ -1,70 +1,76 @@
-# Litefin — webOS 6 Normal, r11
+# Litefin — webOS 6 Normal, r12 (movie web-tag trial)
 
-[Download the ready-to-install r11 IPK](https://github.com/punisher89/litefin/raw/refs/heads/builds/achievement-badges-webos6-normal/Litefin-2.0.300-webOS-Normal-r11.ipk)
+[Download ready-to-install r12 IPK](https://github.com/punisher89/litefin/raw/refs/heads/builds/achievement-badges-webos6-normal/Litefin-2.0.300-webOS-Normal-r12.ipk)
 
 - App ID: `org.litefin.app`
-- Internal version: `2.0.300`; build revision: `r11`
-- Target: webOS 6 Normal
-- Source: [`25f1923b65e76ffe7ce3b278b6142d6bef2c3dcd`](https://github.com/punisher89/litefin/commit/25f1923b65e76ffe7ce3b278b6142d6bef2c3dcd)
+- Internal version: `2.0.300`; build revision: `r12`
+- Target: webOS 6 Normal / Chromium 79
+- Source: [`165adbbc4aa39aa8fd79ac312a6d43fbd52f03dd`](https://github.com/punisher89/litefin/commit/165adbbc4aa39aa8fd79ac312a6d43fbd52f03dd)
 - Changes: [PR #4](https://github.com/punisher89/litefin/pull/4)
 - Build: `npm run package:webos-normal`
 
-## Original native metadata path restored
+## Movie metadata without a server patch
 
-Home now follows the supplied working 2.0.150 IPK: Jellyfin-Enhanced draws the
-metadata into its server-rendered images. The hand-built Continue Watching
-layer, tag-data parsing, badge palette/logo downloads and client interpretation
-of groups/corners have been removed. Server metadata determines the actual
-appearance and available groups, including those the client reconstruction missed.
+This trial changes only movies in Continue Watching. Adapted original
+Jellyfin-Enhanced web renderers draw labels on their ordinary wide artwork:
+quality detection and colors, genre icons, audio-language flags, age ratings,
+community/critic ratings and MDBList provider logos/scores when enabled.
+The movie keeps its original image node, URL, fit, frame and progress while the
+labels load. A movie with only a Backdrop also receives labels; there is no need
+to put a vertical Primary poster into its horizontal frame.
 
-The client checks the native master/user switches once per Home page instance.
-Standard authenticated Items DTO batches refresh signed image tags; the optional
-Litefin batch-Latest path is skipped in native mode, matching 2.0.150. IDs are
-batched/deduplicated, playback state is retained and stale session/page completions
-are discarded. Seasons and parent series posters are hydrated too.
+Episodes retain the working r11 server-native images. Other Home rows, movie
+and series details, awards and achievements retain their existing behavior.
+No server plugin modification or manual reapplication after plugin auto-updates
+is required. Native master/user switches still control feature availability.
 
-Continue Watching uses signed episode Primary or available wide Thumb images,
-retaining the complete native signature/user marker. A Thumb may reuse a native
-suffix issued for the SAME item's Primary, preserving its own image file hash.
-The existing horizontal frame, fit, progress and remote navigation are preserved;
-vertical movie posters are never fitted inside wide cards. If no annotated wide
-source exists, normal wide artwork remains. Duplicate client episode badges
-are omitted on native Resume artwork; the episode code stays in the subtitle.
+The client reads public/current-user settings and user-scoped tag-data in
+nearby-card batches. It reads optional tag-styles and MDBList ratings APIs.
+Settings are never written; tag-data POST is a read-only lookup. Missing or
+filtered data is not replaced with unfiltered raw facts. Observer/component/CSS
+state is released on Home exit. No extra focus targets or pointer handlers are
+added. Renderer code is bundled; no remote scripts are downloaded or executed.
 
-No Jellyfin Server/plugin update or settings change is required for a server
-already working with 2.0.150. Existing Enhanced native settings continue to apply.
-Litefin reads settings only. Re-enter Home after changing server preferences.
-A browser-only Web overlay still requires Enhanced's native image mode for use
-in an independent TV client.
+Group visibility/scopes, corners, group order/caps, quality category controls and
+rating source selection are adapted to the movie overlay. Re-enter Home after
+changing personal preferences. This is web rendering: native band/caption
+layouts, per-item native looks and native-only extra groups are not reproduced.
+Quality/audio detection may differ from native images. Audio flags follow the
+original web renderer (up to three). MDBList scores use its original web
+normalized 0–100 formatting, e.g. 81 rather than 8.1; generic community ratings
+keep the original community/critic renderer. The visual match with the user's
+native server images still needs evaluation on the actual TV.
 
-## Details and achievements
+## Existing details and achievements
 
-- Native collapsible Awards section for movie/series and Discover details;
+- Native collapsible Awards section on movie/series and Discover details,
   confirmed wins/nominations, years and recipients with remote navigation.
-  Uses the Enhanced awards API and requires Show Awards and a TMDB ID.
+  Requires the Enhanced awards API, Show Awards and a TMDB ID.
 - TMDB ratings below Discover posters.
 - Cast ages now/at death, deceased marker and production age when known;
   otherwise explicitly At release. Unknown dates are omitted.
 - Confirmed premiere, theatrical and digital dates; optional Enhanced TMDB proxy.
-- Native Achievements page with all ten tabs, shared focus/scrolling/modal
-  handling and a synthetic notification test. No iframe or remote frontend scripts.
-- Russian core UI, custom server translations and six localized rarity levels.
+- Native Achievements page with ten tabs, shared focus/scrolling/modal handling
+  and a synthetic notification test. No iframe or remote frontend scripts.
+- Russian core UI, server custom translations and six localized rarity levels.
   Upstream strings without Russian translations fall back to English.
 
 The AchievementBadges server backend remains required. Global achievement
-overlays over the video player are outside this page work.
+notifications over the video player are outside this page work.
 
-## Validation
+## Validation and source notices
 
-All 1,148 Node tests and ESLint pass. Actual compiled components were checked in
-Chromium 79 with a mock API: native movie Thumb/episode Primary URLs, same-owner
-native Thumb suffix, standard DTO hydration, horizontal frames, no manual
-metadata layer or tag-data/palette/logo requests, ten achievement tabs, native
-focus and modal trap, synthetic notification, six translated rarities, awards
-expansion and D-pad navigation, actor ages, release dates and teardown.
-The production IPK was extracted and checked for app/version, native API markers
-and absence of the removed metadata layer. Physical LG hardware and the user's
-live server have not been tested in this environment.
+All 1,155 Node tests and ESLint pass. Compiled components exercised in Chromium
+79 with a mock API: original web quality labels, three loaded visible MDBList
+logos, movie artwork-node/URL preservation, horizontal frames, Backdrop-only
+movies, series remaining native, no extra focus targets, personal group/corner/
+source changes after re-entry, teardown without subsequent requests, all ten
+achievement tabs, focus/modal handling, notification, translated rarities,
+awards and actor ages/release dates. The production IPK was extracted and
+checked for app/version, movie/native code paths and included GPL notices.
+Physical LG hardware and the user's live server were not tested here.
 
-Bundled MIT AchievementBadges and Apache Material Icons notices are included.
-SHA-256 hashes are in `SHA256SUMS`; previous r1–r10 packages are retained.
+Adapted Jellyfin-Enhanced web renderers are GPL-3.0; their source and change
+notice are in src/plugins/jellyfin-enhanced-web, with notices also in the IPK.
+Existing MIT AchievementBadges and Apache Material Icons notices remain included.
+SHA-256 hashes are in `SHA256SUMS`; earlier r1–r11 packages are retained.
