@@ -1,6 +1,17 @@
 import { api } from '../api/index.js';
 import CardRenderer from './CardRenderer.js';
 import { hasServerPosterTag, mergeServerArtwork } from './ServerPosterArtwork.js';
+import EnhancedWebTagRenderer from './EnhancedWebTagRenderer.js';
+import MovieWebTags from '../components/MovieWebTags.js';
+import { logger } from './Logger.js';
+
+const log = logger.create('PosterMetadata');
+const dto = (value) =>
+    Array.isArray(value)
+        ? value.map(dto)
+        : value && typeof value === 'object'
+          ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k[0].toUpperCase() + k.slice(1), dto(v)]))
+          : value;
 
 const types = new Set(['Movie', 'Series', 'Season', 'Episode', 'Video', 'BoxSet']);
 const key = (id) =>
@@ -19,6 +30,22 @@ export default class PosterMetadataDecorator {
         this._active = true;
         this._items = new Map();
         this._session = `${api.serverUrl}|${api.userId}`;
+        this._movies = new Map();
+        this._webData = new Map();
+        this._webComponents = new Map();
+        this._seenCards = new WeakSet();
+        if (container && typeof MutationObserver !== 'undefined') {
+            this._movieObserver = new MutationObserver(() => this._scanMovies());
+            this._movieObserver.observe(container, { childList: true, subtree: true });
+            this._movieVisibility = new IntersectionObserver(
+                (entries) => {
+                    const cards = entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target);
+                    cards.forEach((card) => this._movieVisibility.unobserve(card));
+                    this._loadMovies(cards).catch((error) => log.warn('Movie web tags unavailable', error));
+                },
+                { root: container.querySelector('.page-content'), rootMargin: '300px' }
+            );
+        }
     }
 
     _valid() {
@@ -41,6 +68,8 @@ export default class PosterMetadataDecorator {
                             { suppressUnauthorized: true, timeout: 5000 }
                         )
                         .catch(() => null);
+                    this._config = config;
+                    this._userSettings = user || {};
                     return this._valid() && field(user, 'UseNativePosterTags') !== false;
                 } catch {
                     return false;
@@ -121,11 +150,103 @@ export default class PosterMetadataDecorator {
     }
 
     renderCard(item, options) {
+        if (
+            item.Type === 'Movie' &&
+            options.contextType === 'resume' &&
+            options.showPosterBadges &&
+            item._nativePosterTagsEnabled
+        ) {
+            this._movies.set(key(item.Id), item);
+            return CardRenderer.createCardHtml({ ...item, _webResumeTags: true }, options);
+        }
         return CardRenderer.createCardHtml(item, options);
+    }
+
+    _scanMovies() {
+        if (!this._valid()) return;
+        this._webComponents.forEach((component, card) => {
+            if (!this.container.contains(card)) {
+                component.destroy();
+                this._webComponents.delete(card);
+            }
+        });
+        this.container.querySelectorAll('[data-web-movie-tags]').forEach((card) => {
+            if (this._seenCards.has(card)) return;
+            this._seenCards.add(card);
+            this._movieVisibility?.observe(card);
+        });
+    }
+
+    async _loadMovies(cards) {
+        if (!cards.length || !this._valid()) return;
+        if (!this._webRenderer) {
+            this._webRenderer = new EnhancedWebTagRenderer(this._config || {}, this._userSettings || {});
+            this._webStyle = document.createElement('style');
+            this._webStyle.textContent = this._webRenderer.css;
+            this.container.appendChild(this._webStyle);
+            this._webRenderer.styleReady.then((css) => {
+                if (this._valid() && this._webStyle) this._webStyle.textContent += css;
+            });
+        }
+        const ids = [...new Set(cards.map((card) => key(card.dataset.itemId)))].filter((id) => !this._webData.has(id));
+        for (let start = 0; start < ids.length; start += 100) {
+            const batch = ids.slice(start, start + 100);
+            const request = api
+                .post('/JellyfinEnhanced/tag-data/' + encodeURIComponent(api.userId), batch, {
+                    suppressUnauthorized: true,
+                    timeout: 6000
+                })
+                .then((data) => {
+                    const records = dto(data)?.Items || [];
+                    return new Map(records.map((item) => [key(item.Id), item]));
+                })
+                .catch(() => new Map());
+            batch.forEach((id) =>
+                this._webData.set(
+                    id,
+                    request.then((items) => items.get(id) || null)
+                )
+            );
+        }
+        await this._webRenderer.ready;
+        await Promise.all(
+            cards.map(async (card) => {
+                const record = await this._webData.get(key(card.dataset.itemId));
+                const item = record
+                    ? { ...record, UserData: this._movies.get(key(card.dataset.itemId))?.UserData }
+                    : null;
+                if (!item || !this._valid() || !this.container.contains(card)) return;
+                let ratings = null;
+                const tmdbId = item.ProviderIds?.Tmdb;
+                if (
+                    this._webRenderer.JE.pluginConfig.MdblistRatingsEnabled &&
+                    tmdbId &&
+                    this._webRenderer.policy.groups.rating.enabled
+                ) {
+                    ratings = await api
+                        .get('/JellyfinEnhanced/mdblist-ratings/movie/' + encodeURIComponent(tmdbId), null, {
+                            suppressUnauthorized: true,
+                            timeout: 6000
+                        })
+                        .then(dto)
+                        .catch(() => null);
+                }
+                if (!this._valid() || !this.container.contains(card) || this._webComponents.has(card)) return;
+                const host = card.querySelector('.card-image');
+                if (host) this._webComponents.set(card, new MovieWebTags(host, this._webRenderer, item, ratings));
+            })
+        );
     }
 
     destroy() {
         this._active = false;
         this._items.clear();
+        this._movieObserver?.disconnect();
+        this._movieVisibility?.disconnect();
+        this._webComponents.forEach((component) => component.destroy());
+        this._webComponents.clear();
+        this._webData.clear();
+        this._movies.clear();
+        this._webStyle?.remove();
     }
 }

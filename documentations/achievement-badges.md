@@ -42,39 +42,42 @@ translation fall back to English. The test button and metadata labels are locali
 
 ## Posters and details
 
-Home rows use Jellyfin-Enhanced's server-rendered image variants, following the
-supplied 2.0.150 IPK. The server draws the complete metadata, logos, flags and
-layout into the image using its own settings. Litefin no longer reconstructs a
-subset from tag-data, downloads badge palettes/logos or adds a separate score star.
+Home rows use Jellyfin-Enhanced's server-rendered native images, with one
+experimental exception: **movies in Continue Watching** use adapted original
+Jellyfin-Enhanced web renderers over their ordinary wide artwork. This addresses
+servers that render native tags only for Primary images, without fitting a
+vertical movie poster into the wide slot or modifying the server plugin.
+Episodes retain the working native Primary path. Other Home rows retain native
+poster rendering, season/series hydration and complete server image tags.
 
-Each Home page reads `/JellyfinEnhanced/public-config` and the signed-in user's
-`/JellyfinEnhanced/user-settings/{userId}/settings.json` once to check the native
-master/user switches. Standard authenticated `/Items` DTO batches refresh image
-tags, since companion merged/batch wrappers can bypass Enhanced's DTO filter.
-As in 2.0.150, the optional Litefin batch-Latest path is skipped in native mode.
-Image hydration batches and deduplicates IDs, preserves playback/user data and
-discards late results after teardown or a server/user switch.
+The client reads public configuration and the current user's settings once per
+Home instance. Standard authenticated Items batches refresh native image tags;
+Litefin's optional batch-Latest path is skipped in native mode. Playback state
+is retained and stale results are discarded after teardown/session switches.
 
-Continue Watching uses a signed episode Primary or an available signed wide
-Thumb. A Thumb can reuse the native suffix issued for the SAME item's Primary,
-retaining the Thumb's own file hash; signatures are never copied between owners.
-Horizontal frames, image fit, progress bars and navigation remain in place. A
-vertical movie/series Primary is never substituted into a horizontal frame. If
-no annotated wide source exists, the normal wide artwork remains. Native episode
-screenshots follow 2.0.150's native-image choice. The duplicate client episode
-badge is omitted on annotated Resume art; the episode code remains in its subtitle.
+The movie-only web adapter reuses upstream quality detection, label DOM/colors,
+genre icons, audio-language flags, age ratings and community/critic rating specs.
+MDBList's original buildSection function supplies provider logos/scores when its
+server API is enabled and the returned movie has a TMDB ID. Those source scores
+retain the original web renderer's normalized 0–100 format. Server tag-style
+color overrides are read from the optional tag-styles endpoint. No remote scripts
+are loaded or executed. Source adaptations and GPL-3.0 notices are included in
+src/plugins/jellyfin-enhanced-web and the IPK's assets/licenses directory.
 
-Recently Added also hydrates seasons, episode parent posters and signed series
-image tags. The complete server native tag and user marker are retained, including
-in expanded artwork. The client does not interpret group order, caps, colors or
-layout: those belong to the server renderer, so available metadata uses the same
-native appearance rather than a client approximation.
+Only nearby movie cards request user-scoped tag-data, in deduplicated batches.
+There is no fallback to unfiltered media facts after a failed/empty response.
+The adapter reads group visibility/scopes, corner placement, group order/caps,
+quality-category preferences and rating-source choices. Native band/caption
+layouts, per-item native looks and native-only extra groups are not reproduced;
+original web quality/language detection and formatting can differ from native
+image tags. Audio-language flags follow the original web renderer (up to three).
+The movie label layer adds no focus targets or pointer handlers, preserves the
+existing artwork node/URL/fit/frame and progress, and releases observers, styles
+and components on page exit. CSS/font rules are scoped to the movie layer.
 
-Existing Jellyfin-Enhanced native settings continue to apply; no server update or
-settings change is required for a server already working with 2.0.150. Litefin
-only reads settings. Re-enter Home to reload tags after changing preferences.
-Browser-only Jellyfin Web overlays require the plugin's native image mode to
-appear in an independent TV client.
+No Jellyfin Server/plugin update is required. Existing native switches still
+control availability. Re-enter Home to read changed personal preferences.
+Litefin sends only read-only metadata requests and never writes plugin settings.
 
 Movie/series details (including Discover details) have a native **Awards**
 section backed by `/JellyfinEnhanced/awards/movie|tv/{tmdbId}`. It displays confirmed

@@ -18,3 +18,20 @@
 .details-award-row span { margin-top: 3px; font-size: 16px; color: var(--jf-text-secondary); }
 
 .details-award-row.focused { outline: 2px solid var(--jf-accent); border-radius: var(--jf-border-radius); }
+
+@font-face { font-family: 'Enhanced Material Symbols'; src: url('../assets/fonts/EnhancedMaterialSymbols.woff2') format('woff2'); font-display: swap; }
+.lf-movie-web-tags { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+.lf-movie-web-tags .lf-web-tag-corner { position: absolute; display: flex; flex-direction: column; max-width: 49%; }
+.lf-movie-web-tags [data-corner^="top"] { top: 6px; }
+.lf-movie-web-tags [data-corner^="bottom"] { bottom: 24px; }
+.lf-movie-web-tags [data-corner$="left"] { left: 6px; align-items: flex-start; }
+.lf-movie-web-tags [data-corner$="right"] { right: 6px; align-items: flex-end; }
+.lf-movie-web-tags .lf-web-tag-corner > div { position: static; top: auto; right: auto; bottom: auto; left: auto; max-width: 100%; max-height: none; overflow: visible; margin: 0 0 4px; }
+.lf-movie-web-tags .quality-overlay-container > div, .lf-movie-web-tags .rating-overlay-container > div { margin-bottom: 3px; }
+.lf-movie-web-tags .je-msym-outlined { font-family: 'Enhanced Material Symbols'; font-weight: normal; font-style: normal; font-feature-settings: 'liga'; }
+.lf-movie-web-tags .lf-web-mdb-ratings { display: flex; flex-direction: column; align-items: inherit; }
+.lf-movie-web-tags .je-mdblist-badge { display: inline-flex; align-items: center; background: rgba(0,0,0,.85); color: white; border-radius: 4px; padding: 2px 5px; font-size: 14px; line-height: 1.2; margin-bottom: 3px; white-space: nowrap; }
+.lf-movie-web-tags .je-mdblist-logo { position: static; width: 15px; height: 15px; opacity: 1; object-fit: contain; margin-right: 4px; }
+.media-card .card-image .lf-movie-web-tags img { position: static; opacity: 1; transform: none; object-fit: contain; }
+.media-card .card-image .lf-movie-web-tags img.je-mdblist-logo { width: 15px; height: 15px; margin-right: 4px; }
+.media-card .card-image .lf-movie-web-tags img.language-flag { width: 28px; height: 21px; }

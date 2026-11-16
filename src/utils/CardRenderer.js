@@ -437,7 +437,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${options.showPosterBadges}|${item._nativePosterTagsEnabled || false}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${options.showPosterBadges}|${item._nativePosterTagsEnabled || false}|${item._webResumeTags || false}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -476,6 +476,9 @@ class CardRenderer {
                     maxHeight: Math.round(getUrlOptions.maxWidth * aspectRatio)
                 };
             }
+            if (item._webResumeTags && getUrlOptions.tag) {
+                getUrlOptions = { ...getUrlOptions, tag: getUrlOptions.tag.replace(/-jet[A-Za-z0-9_-]+$/, '') };
+            }
             return api.getImageUrl(id, imageType, getUrlOptions);
         };
 
@@ -483,7 +486,7 @@ class CardRenderer {
         // By default, we expect an image. We DO NOT render the fallback DOM yet to save memory.
         imageInnerHtml = '';
 
-        const nativeArtwork = options.showPosterBadges
+        const nativeArtwork = options.showPosterBadges && !item._webResumeTags
             ? serverPosterArtwork(
                   item,
                   isLandscape || isExpanded,
@@ -1459,7 +1462,7 @@ class CardRenderer {
             };
 
             let thumbUrl = '';
-            const nativeThumb = options.showPosterBadges
+            const nativeThumb = options.showPosterBadges && !item._webResumeTags
                 ? serverPosterArtwork(
                       item,
                       true,
@@ -1647,7 +1650,7 @@ class CardRenderer {
         `;
 
         const html = `
-            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" ${options.showPosterBadges && ['Movie', 'Series', 'Episode', 'Season', 'Video', 'BoxSet'].includes(item.Type) ? `data-poster-series-id="${escapeHtml(item.Type === 'Series' ? itemId : item.SeriesId || '')}" data-poster-media-type="${item.Type}"` : ''} ${type === 'person' ? `data-person-id="${escapeHtml(item._tmdbPersonId ? `tmdb-person-${item._tmdbPersonId}` : itemId)}"` : ''} data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
+            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" ${item._webResumeTags ? 'data-web-movie-tags="true"' : ''} ${options.showPosterBadges && ['Movie', 'Series', 'Episode', 'Season', 'Video', 'BoxSet'].includes(item.Type) ? `data-poster-series-id="${escapeHtml(item.Type === 'Series' ? itemId : item.SeriesId || '')}" data-poster-media-type="${item.Type}"` : ''} ${type === 'person' ? `data-person-id="${escapeHtml(item._tmdbPersonId ? `tmdb-person-${item._tmdbPersonId}` : itemId)}"` : ''} data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
                 <div class="card-image">
                     ${imagePart}
                     ${progressHtml}
