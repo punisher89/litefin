@@ -42,55 +42,39 @@ translation fall back to English. The test button and metadata labels are locali
 
 ## Posters and details
 
-Home posters and Next Up use the server's annotated artwork without a separate
-Litefin rating star. Signed native
-Thumb/Primary variants take precedence over ordinary backdrops, including the
-wide image used during poster expansion. For companion batch/merged responses
-whose wrapper bypasses Enhanced's DTO filter, nearby cards refresh image tags
-through the normal authenticated item endpoint. Episode landscape cards also
-resolve signed series thumbs without revealing episode screenshots when the
-spoiler-free preference is active. Horizontal slots never fall back to a vertical
-signed movie/series poster: without an annotated wide image, they keep the normal
-wide thumbnail/backdrop. Seasons are included in hydration, and both portrait
-episode and season cards refresh their parent series artwork when necessary. The full server tag and user marker are
-preserved, as are playback state, button focus and native lazy image loading.
-Requests are bounded to four concurrent cards with a server/user-scoped cache.
+Home rows use Jellyfin-Enhanced's server-rendered image variants, following the
+supplied 2.0.150 IPK. The server draws the complete metadata, logos, flags and
+layout into the image using its own settings. Litefin no longer reconstructs a
+subset from tag-data, downloads badge palettes/logos or adds a separate score star.
 
-Continue Watching keeps its current image node, source, fit and dimensions. If
-the current image already has native server annotations, it is left alone.
-Otherwise a lightweight, noninteractive overlay displays technical format/audio,
-certification and source-labelled ratings from the read-only Enhanced tag-data
-API. Older servers fall back to their actual Jellyfin media DTO, without invented
-provider scores. Metadata rendering does not request or replace poster artwork;
-labels do not intercept input or cover the progress bar. Resume technical badges
-read their exact base palette from the installed Enhanced quality resource as
-color data only (never executing its script). Rating badges use the plugin's
-own CDN PNG logos, numeric values and dark backgrounds, instead of provider-name
-text. Composite audio labels and source-native colors follow those server
-resources. Logo sizing/opacity are isolated from the card artwork's image rules;
-existing episode badges retain their own space. Logos and Enhanced frontend
-scripts are not bundled into Litefin. Removed virtual cards
-and page teardown release their overlay components. The app's score visibility
-preference remains respected.
+Each Home page reads `/JellyfinEnhanced/public-config` and the signed-in user's
+`/JellyfinEnhanced/user-settings/{userId}/settings.json` once to check the native
+master/user switches. Standard authenticated `/Items` DTO batches refresh image
+tags, since companion merged/batch wrappers can bypass Enhanced's DTO filter.
+As in 2.0.150, the optional Litefin batch-Latest path is skipped in native mode.
+Image hydration batches and deduplicates IDs, preserves playback/user data and
+discards late results after teardown or a server/user switch.
 
-Resume metadata reads `/JellyfinEnhanced/public-config` and the signed-in user's
-`/JellyfinEnhanced/user-settings/{userId}/settings.json` once per Home page
-instance. Personal values override public defaults; null values inherit. It
-honors the native master/user switches, the five quality/genre/language/rating/
-age groups, Continue Watching/item-type scopes, corner positions (including
-Corners profile off slots), group/category order, caps, source selection and
-minimum score, score color, scale/gap, quality switches and language priorities.
-The overlay supports four-corner placement; bands/caption layouts are not
-replicated. Image geometry stays unchanged. Metadata and settings refresh on
-re-entry so a failed old request or a changed privacy policy is not retained
-between Home page instances.
+Continue Watching uses a signed episode Primary or an available signed wide
+Thumb. A Thumb can reuse the native suffix issued for the SAME item's Primary,
+retaining the Thumb's own file hash; signatures are never copied between owners.
+Horizontal frames, image fit, progress bars and navigation remain in place. A
+vertical movie/series Primary is never substituted into a horizontal frame. If
+no annotated wide source exists, the normal wide artwork remains. Native episode
+screenshots follow 2.0.150's native-image choice. The duplicate client episode
+badge is omitted on annotated Resume art; the episode code remains in its subtitle.
 
-To configure: in Jellyfin Web, use the same account as Litefin. Open **Enhanced
-Panel** from the drawer, or **Jellyfin Enhanced** from the Jellyfin 12 avatar menu,
-then **Media Tags**. Enable the desired groups, choose corner positions and save.
-Return to Litefin's Home page to refresh its metadata. No server settings are
-written by Litefin. Server-native annotated images on other rows remain under
-Jellyfin-Enhanced's own rendering/settings.
+Recently Added also hydrates seasons, episode parent posters and signed series
+image tags. The complete server native tag and user marker are retained, including
+in expanded artwork. The client does not interpret group order, caps, colors or
+layout: those belong to the server renderer, so available metadata uses the same
+native appearance rather than a client approximation.
+
+Existing Jellyfin-Enhanced native settings continue to apply; no server update or
+settings change is required for a server already working with 2.0.150. Litefin
+only reads settings. Re-enter Home to reload tags after changing preferences.
+Browser-only Jellyfin Web overlays require the plugin's native image mode to
+appear in an independent TV client.
 
 Movie/series details (including Discover details) have a native **Awards**
 section backed by `/JellyfinEnhanced/awards/movie|tv/{tmdbId}`. It displays confirmed
@@ -129,7 +113,7 @@ date or physical-disc release is never substituted for a digital release.
 ## Validation
 
 Build with `npm run package:webos-normal`; run `npm test` and ESLint on changed
-modules. Node tests cover session security, card scores/quality, calendar-age
+modules. Node tests cover session security, native artwork selection/hydration, card scores, calendar-age
 boundaries, deceased/posthumous cases, date validation and TMDB release types.
 Browser checks use actual bundled components and original plugin API shapes
 in Chromium 79: zero iframes, all ten tabs, native focus/modal trapping,

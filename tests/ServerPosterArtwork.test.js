@@ -45,3 +45,15 @@ test('recent seasons without a signed own poster can use the series poster', () 
         ImageTags: { Primary: 'ordinary-season' }, SeriesPrimaryImageTag: 'series-jetSigned-jeu123' };
     assert.deepEqual(serverPosterArtwork(season), { id: 'series', type: 'Primary', tag: 'series-jetSigned-jeu123' });
 });
+
+test('native Resume matches 2.0.150 by using the signed episode Primary, not the series poster', () => {
+    const item = { Id: 'episode', Type: 'Episode', SeriesId: 'series', PrimaryImageAspectRatio: 1.777,
+        ImageTags: { Primary: 'episode-jetSigned-jeu123' }, SeriesThumbImageTag: 'plain-wide' };
+    assert.deepEqual(serverPosterArtwork(item, true, false, true), { id:'episode', type:'Primary', tag:'episode-jetSigned-jeu123' });
+});
+test('native Thumb preserves its own file hash and the server-issued signature for that image owner', () => {
+    const item = { Id: 'movie', Type: 'Movie', PrimaryImageAspectRatio: 0.667,
+        ImageTags: { Primary: 'original-jetSigned-jeu123', Thumb: 'plain-thumb' } };
+    assert.deepEqual(serverPosterArtwork(item,true,false,true), {id:'movie',type:'Thumb',tag:'plain-thumb-jetSigned-jeu123'});
+    assert.equal(serverPosterArtwork({...item,ImageTags:{Primary:item.ImageTags.Primary}},true,false,true),null);
+});

@@ -437,7 +437,7 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${options.showPosterBadges}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${options.showPosterBadges}|${item._nativePosterTagsEnabled || false}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
@@ -484,7 +484,13 @@ class CardRenderer {
         imageInnerHtml = '';
 
         const nativeArtwork = options.showPosterBadges
-            ? serverPosterArtwork(item, isLandscape || isExpanded, prefs.preferEpisodeImages) : null;
+            ? serverPosterArtwork(
+                  item,
+                  isLandscape || isExpanded,
+                  prefs.preferEpisodeImages,
+                  contextType === 'resume' && item._nativePosterTagsEnabled
+              )
+            : null;
 
         // Poster supplied verbatim by an external provider. Same idea as
         // _dynamicThumbUrl below: skip Jellyfin URL building, which is
@@ -1069,7 +1075,13 @@ class CardRenderer {
         // For recently added cards, episode identifiers are rendered in the subtitle line,
         // so we suppress the badge overlay to maintain a clean card presentation.
         // -------------------------------------------------------------
-        if (item.Type === 'Episode' && item.IndexNumber !== undefined && useEpisodeBadges && contextType !== 'latest') {
+        if (
+            item.Type === 'Episode' &&
+            item.IndexNumber !== undefined &&
+            useEpisodeBadges &&
+            contextType !== 'latest' &&
+            !(contextType === 'resume' && item._nativePosterTagsEnabled && nativeArtwork)
+        ) {
             const s = (item.ParentIndexNumber || 0).toString().padStart(2, '0');
             const e = (item.IndexNumber || 0).toString().padStart(2, '0');
             episodeBadgeHtml = `<div class="episode-badge">S${s}E${e}</div>`;
@@ -1448,7 +1460,13 @@ class CardRenderer {
 
             let thumbUrl = '';
             const nativeThumb = options.showPosterBadges
-                ? serverPosterArtwork(item, true, prefs.preferEpisodeImages) : null;
+                ? serverPosterArtwork(
+                      item,
+                      true,
+                      prefs.preferEpisodeImages,
+                      contextType === 'resume' && item._nativePosterTagsEnabled
+                  )
+                : null;
             if (nativeThumb) {
                 thumbUrl = _imgUrl(nativeThumb.id, nativeThumb.type, {
                     maxWidth: thumbParams.maxWidth, quality: thumbParams.quality, tag: nativeThumb.tag

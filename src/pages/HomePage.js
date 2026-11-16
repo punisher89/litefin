@@ -2067,7 +2067,8 @@ class HomePage extends Page {
             // A background prefetch (see _prefetchRow) may already have the request
             // in flight — reuse that promise so the network round-trip overlaps
             // with whatever triggered this load instead of restarting from zero.
-            const items = await (descriptor._prefetchPromise || descriptor.fetchFn());
+            let items = await (descriptor._prefetchPromise || descriptor.fetchFn());
+            if (items?.length && this._posterMetadata) items = await this._posterMetadata.prepare(items);
 
             if (!this._isMounted) return false;
 
@@ -2175,6 +2176,8 @@ class HomePage extends Page {
      * @param {RowDescriptor[]} descriptors
      */
     async _preFetchLatestRows(descriptors) {
+        // As in 2.0.150, standard item DTOs carry the native server image tags.
+        if (await this._posterMetadata?.isNativeEnabled()) return;
         const useBatchPlugin = storage.getItem('pref:useBatchLatestPlugin') !== 'false';
         if (!useBatchPlugin) return;
 
