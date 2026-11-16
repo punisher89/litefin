@@ -725,7 +725,9 @@ export class ApiClient {
                              * If keepalive was active and threw a TypeError, fall back to a standard fetch without keepalive.
                              */
                             if (fetchOptions.keepalive && fetchErr instanceof TypeError) {
-                                log.warn(`Fetch with keepalive failed (${fetchErr.message}); retrying without keepalive...`);
+                                log.warn(
+                                    `Fetch with keepalive failed (${fetchErr.message}); retrying without keepalive...`
+                                );
                                 delete fetchOptions.keepalive;
                                 return await fetch(url, fetchOptions);
                             }
@@ -837,7 +839,10 @@ export class ApiClient {
 
             // Immediately abort any background Wake-on-LAN retry loop when
             // health checks or user profile requests confirm the server is awake
-            if (_activeWolAbortController && (endpoint.includes('/System/Info/Public') || endpoint.includes('/Users/'))) {
+            if (
+                _activeWolAbortController &&
+                (endpoint.includes('/System/Info/Public') || endpoint.includes('/Users/'))
+            ) {
                 cancelWakeOnLan();
             }
 
@@ -1387,7 +1392,7 @@ export class ApiClient {
             // Default item count per library row configured via user settings
             Limit: defaultLimit,
             // Request tags, backdrop, and series metadata needed for home card representation
-            Fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag',
+            Fields: 'BackdropImageTags,ParentBackdropImageTags,Tags,Status,EndDate,SeriesPrimaryImageTag,CommunityRating,Width,Height,MediaStreams',
             ImageTypeLimit: 1,
             EnableImageTypes: 'Primary,Backdrop,Thumb',
             ParentId: parentId
@@ -1423,7 +1428,7 @@ export class ApiClient {
             Limit: defaultLimit,
             Recursive: true,
             // Include Tags so game ROM items can be identified with platform badges and progress bar suppression
-            Fields: 'SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,Tags',
+            Fields: 'SeriesThumbImageTag,ParentThumbImageTag,BackdropImageTags,ParentBackdropImageTags,Tags,CommunityRating,Width,Height,MediaStreams',
             ImageTypeLimit: 1,
             EnableImageTypes: 'Primary,Backdrop,Thumb',
             EnableTotalRecordCount: false,
@@ -1790,7 +1795,7 @@ export class ApiClient {
             cache: 'no-store',
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
+                Pragma: 'no-cache',
                 ...(options.headers || {})
             },
             ...options

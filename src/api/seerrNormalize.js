@@ -183,7 +183,10 @@ export function normalizeSeerrItem(result, fallbackMediaType = null) {
         _tmdbId: result.id,
         _mediaType: mediaType,
         RunTimeTicks: (result.runtime || result.episodeRunTime?.[0] || 0) * 600000000,
-        ReleaseDate: result.releaseDate || result.firstAirDate || '',
+        ReleaseDate: result.releaseDate || result.firstAirDate || result.release_date || result.first_air_date || '',
+        ReleaseDates: result.releaseDates || result.release_dates || null,
+        DigitalReleaseDate: result.digitalReleaseDate || result.digitalRelease || null,
+        TheatricalReleaseDate: result.theatricalReleaseDate || null,
         Budget: typeof result.budget === 'number' && result.budget > 0 ? result.budget : null,
         Revenue: typeof result.revenue === 'number' && result.revenue > 0 ? result.revenue : null,
         MediaStatus: result.status || result.mediaStatus || '',
@@ -254,7 +257,8 @@ export function normalizeSeerrItem(result, fallbackMediaType = null) {
 
             return '';
         })(),
-        CommunityRating: typeof result.voteAverage === 'number' ? result.voteAverage : 0,
+        CommunityRating: Number(result.voteAverage ?? result.vote_average) || 0,
+        _tmdbRating: Number(result.voteAverage ?? result.vote_average) || 0,
         Genres: Array.isArray(result.genres)
             ? result.genres
                   .map((g) =>
@@ -327,6 +331,7 @@ export function normalizeSeerrItem(result, fallbackMediaType = null) {
             if (!Array.isArray(rawCast)) return [];
             return rawCast.map((c) => ({
                 Id: c.id,
+                _tmdbPersonId: c.id,
                 Name: c.name,
                 Role: c.character || '',
                 Type: 'Person',

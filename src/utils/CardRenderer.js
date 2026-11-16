@@ -14,6 +14,7 @@ import { i18n } from './i18n.js';
 import { storage } from './StorageService.js';
 import { shouldShowScore } from './visibility.js';
 import { detailsIcons, getStaticIcon } from './Icons.js';
+import { serverPosterArtwork } from './ServerPosterArtwork.js';
 import { platformInfo } from './PlatformInfo.js';
 
 class CardRenderer {
@@ -64,7 +65,8 @@ class CardRenderer {
             useSeasonBadges: storage.getItem('pref:useSeasonBadges') === 'true',
             swapEpisodeTitles: storage.getItem('pref:swapEpisodeTitles') === 'true',
             showFavoriteBadges: storage.getItem('pref:showFavoriteBadges') === 'true',
-            showQualityBadges: storage.getItem('pref:showQualityBadges') === 'true'
+            showQualityBadges: storage.getItem('pref:showQualityBadges') === 'true',
+            scoreVisibility: storage.getItem('pref:scoreVisibility') || 'all'
         };
         // Each of these shapes the markup the HTML cache keeps, so all of them are
         // part of its key: a changed setting rebuilds the cards once
@@ -255,11 +257,12 @@ class CardRenderer {
      * @param {Object} item
      * @returns {string} HTML string
      */
-    static getQualityBadgeHtml(item) {
-        if (!item) return '';
+    static getQualityBadgeHtml(item, enabledForHome = false) {
+        if (!item || enabledForHome) return '';
+        // Home artwork keeps technical tags rendered by the server.
         // Game ROMs do not have video resolution/HDR streams
         if (CardRenderer.isGame(item)) return '';
-        if (!CardRenderer._getPrefs().showQualityBadges) return '';
+        if (!enabledForHome && !CardRenderer._getPrefs().showQualityBadges) return '';
 
         let width = item.Width;
         let height = item.Height;
@@ -273,8 +276,13 @@ class CardRenderer {
          * Extract video stream attributes from media source container metadata.
          * We inspect VideoRange, VideoRangeType, Profile, Title, and Codec strings.
          */
-        if (item.MediaSources && item.MediaSources.length > 0) {
-            const source = item.MediaSources[0];
+        const qualitySources = item.MediaSources?.length
+            ? item.MediaSources
+            : item.MediaStreams?.length
+              ? [{ MediaStreams: item.MediaStreams }]
+              : [];
+        if (qualitySources.length > 0) {
+            const source = qualitySources[0];
             if (source.Width) width = source.Width;
             if (source.Height) height = source.Height;
             if (source.MediaStreams) {
@@ -429,13 +437,14 @@ class CardRenderer {
         // markupKey adds the card settings not spelled out here (favorite and quality
         // badges, progress bar, counts...): without them, turning on Show Favorite
         // Badges showed no heart until something else cleared the cache
-        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
+        const cacheKey = `${mediaLayout}|${isLandscape}|${type}|${contextType}|${isGrid}|${cardWidth}|${options.showMeta}|${options.showPosterBadges}|${item._nativePosterTagsEnabled || false}|${item._dynamicThumbUrl || ''}|${libraryThumbMode}|${prefs.hideLibraryLabels}|${prefs.cardLabelStyle}|${preferBackdrops}|${isGlobalBlurHashDisabled}|${isLibraryBlurHashDisabledPref}|${prefs.markupKey}`;
         if (CardRenderer._htmlCacheKey !== cacheKey) {
             CardRenderer._htmlCache.clear();
             CardRenderer._htmlCacheKey = cacheKey;
         }
         const itemId = item.Id;
-        const cached = CardRenderer._htmlCache.get(itemId);
+        const artworkKey = `${itemId}|${item.ImageTags?.Primary || ''}|${item.ImageTags?.Thumb || ''}|${item.SeriesPrimaryImageTag || ''}|${item.SeriesThumbImageTag || ''}`;
+        const cached = CardRenderer._htmlCache.get(artworkKey);
         if (cached !== undefined) return cached;
 
         let imageUrl = '';
@@ -474,11 +483,25 @@ class CardRenderer {
         // By default, we expect an image. We DO NOT render the fallback DOM yet to save memory.
         imageInnerHtml = '';
 
+        const nativeArtwork = options.showPosterBadges
+            ? serverPosterArtwork(
+                  item,
+                  isLandscape || isExpanded,
+                  prefs.preferEpisodeImages,
+                  contextType === 'resume' && item._nativePosterTagsEnabled
+              )
+            : null;
+
         // Poster supplied verbatim by an external provider. Same idea as
         // _dynamicThumbUrl below: skip Jellyfin URL building, which is
         // meaningless for a remote item.
         if (item._imageUrl) {
             imageUrl = item._imageUrl;
+        } else if (nativeArtwork) {
+            const params = imageService.getParams(isLandscape || isExpanded ? 'card-backdrop' : 'poster', contextType);
+            imageUrl = _imgUrl(nativeArtwork.id, nativeArtwork.type, {
+                maxWidth: params.maxWidth, quality: params.quality, tag: nativeArtwork.tag
+            });
         } else if (type === 'person') {
             const primaryTag = item.ImageTags?.Primary || item.PrimaryImageTag;
             const isArtist = item.Type === 'MusicArtist' || item.Type === 'Artist';
@@ -960,8 +983,7 @@ class CardRenderer {
         // playback percentage from server UserData.
         // --------------------------------------------------------------------
         const hasPlaybackTicks = Boolean(item?.UserData?.PlaybackPositionTicks && item?.RunTimeTicks);
-        const hasPlayedPercentage =
-            item?.UserData?.PlayedPercentage != null && item.UserData.PlayedPercentage > 0;
+        const hasPlayedPercentage = item?.UserData?.PlayedPercentage != null && item.UserData.PlayedPercentage > 0;
 
         if (
             !hideProgressBar &&
@@ -1053,7 +1075,13 @@ class CardRenderer {
         // For recently added cards, episode identifiers are rendered in the subtitle line,
         // so we suppress the badge overlay to maintain a clean card presentation.
         // -------------------------------------------------------------
-        if (item.Type === 'Episode' && item.IndexNumber !== undefined && useEpisodeBadges && contextType !== 'latest') {
+        if (
+            item.Type === 'Episode' &&
+            item.IndexNumber !== undefined &&
+            useEpisodeBadges &&
+            contextType !== 'latest' &&
+            !(contextType === 'resume' && item._nativePosterTagsEnabled && nativeArtwork)
+        ) {
             const s = (item.ParentIndexNumber || 0).toString().padStart(2, '0');
             const e = (item.IndexNumber || 0).toString().padStart(2, '0');
             episodeBadgeHtml = `<div class="episode-badge">S${s}E${e}</div>`;
@@ -1062,7 +1090,7 @@ class CardRenderer {
         }
 
         // Quality Badge (Resolution/HDR)
-        const qualityBadgeHtml = CardRenderer.getQualityBadgeHtml(item);
+        const qualityBadgeHtml = CardRenderer.getQualityBadgeHtml(item, options.showPosterBadges);
 
         let seerrTypeBadgeHtml = '';
         let seerrBadgeHtml = '';
@@ -1431,7 +1459,19 @@ class CardRenderer {
             };
 
             let thumbUrl = '';
-            if (preferBackdrops) {
+            const nativeThumb = options.showPosterBadges
+                ? serverPosterArtwork(
+                      item,
+                      true,
+                      prefs.preferEpisodeImages,
+                      contextType === 'resume' && item._nativePosterTagsEnabled
+                  )
+                : null;
+            if (nativeThumb) {
+                thumbUrl = _imgUrl(nativeThumb.id, nativeThumb.type, {
+                    maxWidth: thumbParams.maxWidth, quality: thumbParams.quality, tag: nativeThumb.tag
+                });
+            } else if (preferBackdrops) {
                 thumbUrl = resolveBackdrop() || resolveThumb();
             } else {
                 thumbUrl = resolveThumb() || resolveBackdrop();
@@ -1583,6 +1623,16 @@ class CardRenderer {
         // Rank badge for ordered rows (Home Screen Sections "Top Ten")
         const rankBadgeHtml = item._rank ? `<div class="card-rank-badge">${parseInt(item._rank, 10)}</div>` : '';
 
+        const tmdbRating = Number(item._tmdbRating);
+        const tmdbRatingHtml =
+            isSeerrItem &&
+            type !== 'person' &&
+            Number.isFinite(tmdbRating) &&
+            tmdbRating > 0 &&
+            tmdbRating <= 10 &&
+            shouldShowScore(item)
+                ? `<div class="card-tmdb-rating"><span>TMDB</span> ${detailsIcons.ratingStar}${tmdbRating.toFixed(1)}</div>`
+                : '';
         const badgeContainer = `
             ${rankBadgeHtml}
             ${episodeBadgeHtml}
@@ -1597,7 +1647,7 @@ class CardRenderer {
         `;
 
         const html = `
-            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
+            <button class="${cssClass}${expansionClass}" data-item-id="${itemId}" ${options.showPosterBadges && ['Movie', 'Series', 'Episode', 'Season', 'Video', 'BoxSet'].includes(item.Type) ? `data-poster-series-id="${escapeHtml(item.Type === 'Series' ? itemId : item.SeriesId || '')}" data-poster-media-type="${item.Type}"` : ''} ${type === 'person' ? `data-person-id="${escapeHtml(item._tmdbPersonId ? `tmdb-person-${item._tmdbPersonId}` : itemId)}"` : ''} data-series-id="${item.SeriesId || ''}" data-type="${item.Type}" data-item-type="${item.Type}" data-collection-type="${item.CollectionType || ''}" data-context-type="${finalContextType}" data-channel-id="${item.ChannelId || ''}" data-media-type="${item._mediaType || ''}" data-tmdb-id="${item._tmdbId || ''}" tabindex="0">
                 <div class="card-image">
                     ${imagePart}
                     ${progressHtml}
@@ -1640,6 +1690,7 @@ class CardRenderer {
                     }
                     ${subtitleText ? `<div class="card-subtitle"><span>${subtitleText}</span></div>` : ''}
                     ${metaHtml}
+                    ${tmdbRatingHtml}
                 </div>
                 `
                         : ''
@@ -1648,7 +1699,7 @@ class CardRenderer {
         `;
 
         // Cache the output for reuse during this render context
-        CardRenderer._htmlCache.set(itemId, html);
+        CardRenderer._htmlCache.set(artworkKey, html);
         return html;
     }
 

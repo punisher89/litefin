@@ -103,6 +103,13 @@ class Sidebar extends Component {
                         <span class="item-text" data-i18n="Favorites">Favorites</span>
                     </button>
 
+                    <button class="sidebar-item" id="sidebar-achievements" tabindex="0" data-path="/achievements">
+                        <div class="item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3h8v6a4 4 0 0 1-8 0V3Z M8 5H4v2a4 4 0 0 0 4 4 M16 5h4v2a4 4 0 0 1-4 4 M12 13v6 M8 21h8 M9 19h6"/></svg>
+                        </div>
+                        <span class="item-text" data-i18n="Achievements">Achievements</span>
+                    </button>
+
                     <button class="sidebar-item" id="sidebar-search" tabindex="0" data-path="/search">
                         <div class="item-icon">
                             ${sidebarIcons.search}
